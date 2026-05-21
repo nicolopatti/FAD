@@ -86,20 +86,15 @@ Utenze demo create da `npm run bootstrap`:
 
 ## Verifica gate M1a (alla fine del Task 2, prima di proseguire)
 
-I sei criteri del brief si verificano così, **tutti nel cloud**.
+I sei criteri del brief sono verificati da due suite complementari.
 
-### A — Suite SQL (pgTAP) sul progetto Supabase
+### A — pgTAP (`supabase/tests/m1a_audit_log.sql`) — 20/20 ✅
 
-Apri Supabase → SQL Editor e incolla `supabase/tests/m1a_audit_log.sql`.
-Esegui. Il test parte con `begin; … rollback;` ⇒ non lascia tracce.
-
-> In alternativa, da una session Claude Code con CLI Supabase linkata:
-> `supabase test db --file supabase/tests/m1a_audit_log.sql`.
-
-Copre:
+Copre i criteri 1/3/4/5/6 + append serializzato in-transaction (criterio 2
+parziale):
 1. **Immutabilità fisica** — `UPDATE`/`DELETE`/`TRUNCATE` su `evento` falliscono
    (trigger); `anon`/`authenticated` non hanno UPDATE/DELETE/INSERT diretti
-   (REVOKE); `audit_append` è eseguibile dagli authenticated.
+   (REVOKE); `audit_append` è eseguibile dagli `authenticated` (unica via).
 2. **Append in serie** — 30 append consecutivi danno seq monotoni contigui (1..30).
 3. **Catena verificabile** — `audit_verify_chain` ritorna 0 problemi su catena
    integra e rileva una manomissione simulata del payload del primo evento.
@@ -109,20 +104,65 @@ Copre:
    `nome`/`email`/`codice_fiscale`.
 6. **Timestamp server-side** — `occurred_at` viene assegnato dentro `audit_append`.
 
-### B — Concorrenza reale (vitest contro il progetto Supabase)
+Gira il test in una qualunque delle tre modalità:
+- **Supabase SQL Editor** → incolla il contenuto del file e premi Run
+  (`begin; … rollback;` ⇒ non lascia tracce).
+- **CLI Supabase linkata** → `supabase test db --file supabase/tests/m1a_audit_log.sql`.
+- **Postgres locale al container** → ricetta nella sezione "Riproduzione locale".
 
-Da una session Claude Code on the web (env già impostati):
+### B — Concorrenza reale (criterio 2 completo) — 2/2 ✅
+
+La pgTAP gira tutto in una sola transazione, quindi non può testare il lock di
+riga tra connessioni distinte. Per quello c'è `tests/m1a/concurrency-pg.test.ts`,
+che apre **50 connessioni Postgres parallele** e lancia `audit_append` in
+contemporanea sullo stesso stream. Verifica:
+
+- 50 righe inserite, una per call;
+- `seq` 1..50 senza duplicati né buchi;
+- `prev_hash[i] == hash[i-1]` per ogni i;
+- `audit_verify_chain` ritorna 0 problemi.
+
+In più, `tests/m1a/serialized-append.test.ts` fa la stessa verifica passando
+per il client `@supabase/supabase-js` (HTTP/PostgREST) contro un progetto
+Supabase reale — gated sui secrets, gira in CI sul branch principale.
+
+### Riproduzione locale al container Claude Code on the web
+
+Ricetta esatta usata per certificare i 20+2 OK qui sopra:
+
 ```bash
-npm run test:m1a
+# 1) Postgres locale al container (già installato nelle session)
+service postgresql start
+sudo -u postgres psql -c "alter user postgres password 'testpass';"
+
+# 2) DB di test + stub minimale dell'auth schema di Supabase
+sudo -u postgres psql <<'EOF'
+drop database if exists fad_test;
+create database fad_test;
+\c fad_test
+create extension pgcrypto;
+create extension pgtap;
+create schema auth;
+create table auth.users (id uuid primary key, email text, raw_app_meta_data jsonb default '{}');
+create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
+create or replace function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;
+create role anon nologin;
+create role authenticated nologin;
+create role service_role nologin bypassrls;
+EOF
+
+# 3) Applica le 3 migration nello stesso ordine in cui le applichi in cloud
+sudo -u postgres psql -d fad_test -v ON_ERROR_STOP=1 \
+  -f supabase/migrations/20260521000001_schema.sql \
+  -f supabase/migrations/20260521000002_audit_log.sql \
+  -f supabase/migrations/20260521000003_tenant_stream_bootstrap.sql
+
+# 4) Lancia la suite pgTAP (20 ok / 20 totali)
+sudo -u postgres psql -d fad_test -f supabase/tests/m1a_audit_log.sql | grep -E "^ ok |^not ok "
+
+# 5) Lancia il test di concorrenza pg (50 connessioni parallele)
+PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
 ```
-
-50 append paralleli sullo stesso stream via Admin RPC (service-role). Verifica:
-nessun duplicato di `seq`, nessun buco, `prev_hash` sempre uguale all'`hash`
-del predecessore, `audit_verify_chain` conferma integrità. Skippato se il
-service role non è disponibile nell'ambiente.
-
-In CI: la stessa suite gira su PR (vedi `.github/workflows/ci.yml`); le chiavi
-sono in GitHub Secrets, mai nel repo.
 
 ### Stop & verify
 Se anche **uno solo** dei criteri non passa, ci si ferma. È la ragione per cui
