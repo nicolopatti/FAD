@@ -103,10 +103,13 @@ create trigger evento_no_truncate
 -- Genesi: sentinella deterministica derivata dallo stream_id (D18).
 -- Sha256('GENESIS:' || stream_id::text).
 -- ---------------------------------------------------------------------------
+-- search_path include "extensions" perché su Supabase pgcrypto vive lì
+-- (e su Postgres vanilla è nel default schema, comunque coperto da public).
 create or replace function public.audit_genesis_hash(p_stream_id uuid)
 returns bytea
 language sql
 immutable
+set search_path = public, extensions
 as $$
   select digest('GENESIS:' || p_stream_id::text, 'sha256')
 $$;
@@ -130,6 +133,7 @@ create or replace function public.audit_canonical(
 returns text
 language sql
 immutable
+set search_path = public, extensions
 as $$
   select jsonb_build_object(
     'stream_id', p_stream_id::text,
@@ -163,7 +167,7 @@ create or replace function public.audit_append(
 returns public.evento
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_stream public.stream_audit;
@@ -253,7 +257,7 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_expected_prev bytea;
@@ -320,7 +324,7 @@ returns uuid
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select s.id
   from public.stream_audit s
