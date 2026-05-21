@@ -170,6 +170,23 @@ M1a è un gate separato.
 
 ## Verifica gate M1 (alla fine del Task 6)
 
+### Suite SQL `supabase/tests/m1_slice_data.sql` — 10/10 ✅
+
+Esercita a livello DB le proprietà-dato della slice (Tasks 4-5-6) senza
+dipendere dal browser:
+- LO1 sbloccato all'inizio, LO2 bloccato (D26 con `sblocco_sequenziale=true`).
+- Dopo `video.ended` su LO1 → LO1 completato + LO2 si sblocca.
+- Idoneità si attiva solo quando tutti gli LO obbligatori sono completati.
+- **D8 esplicito**: si azzerano `cache_completata` / `cache_idonea` e il
+  ricalcolo dagli Eventi resta corretto — la cache non è consultata.
+- La catena hash dei video event resta integra.
+- Sblocco è per-iscritto: un secondo iscritto vede ancora LO2 bloccato.
+
+Lo eseguo con `supabase test db --file supabase/tests/m1_slice_data.sql` o
+incollando nel SQL Editor.
+
+### Verifica manuale (UI)
+
 Tutto contro il deployment Vercel collegato al progetto Supabase.
 
 1. **Slice end-to-end** — login (`discente@fad.local`) → `/corsi` → click corso

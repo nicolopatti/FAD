@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAuditor } from '@/lib/auth-context';
 import { ChainVerifyButton } from '@/components/ChainVerifyButton';
+import type { EventoRow } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,21 +10,22 @@ export default async function AuditLogPage() {
   const supabase = createSupabaseServerClient();
 
   // Stream del tenant corrente.
-  const { data: stream } = await supabase.rpc('current_stream_id');
-  const streamId = stream as string | null;
+  const { data: streamRpc } = await supabase.rpc('current_stream_id');
+  const streamId = typeof streamRpc === 'string' ? streamRpc : null;
 
   // Eventi dello stream.
   const { data: eventi } = await supabase
     .from('evento')
     .select('id, seq, event_type, occurred_at, actor, subject_type, subject_id, payload, prev_hash, hash')
-    .order('seq', { ascending: true });
+    .order('seq', { ascending: true })
+    .returns<EventoRow[]>();
 
   // Anagrafica per la risoluzione dei pseudonimi nella cronologia leggibile.
   const personaIds = Array.from(
     new Set(
       (eventi ?? [])
-        .map((e) => (e.actor as { persona_id?: string } | null)?.persona_id)
-        .filter(Boolean) as string[],
+        .map((e) => e.actor?.persona_id)
+        .filter((x): x is string => typeof x === 'string'),
     ),
   );
   const personaById = new Map<string, { nome: string; cognome: string; email: string }>();
@@ -35,13 +37,13 @@ export default async function AuditLogPage() {
     for (const p of persone ?? []) personaById.set(p.id, p);
   }
 
-  // Idem per learning_object e iscrizione mostrate in cronologia.
+  // Idem per learning_object mostrati in cronologia.
   const loIds = Array.from(
     new Set(
       (eventi ?? [])
         .filter((e) => e.subject_type === 'learning_object')
         .map((e) => e.subject_id)
-        .filter(Boolean) as string[],
+        .filter((x): x is string => typeof x === 'string'),
     ),
   );
   const loById = new Map<string, { titolo: string }>();
@@ -78,7 +80,7 @@ export default async function AuditLogPage() {
           </thead>
           <tbody>
             {(eventi ?? []).map((e) => {
-              const personaId = (e.actor as { persona_id?: string } | null)?.persona_id;
+              const personaId = e.actor?.persona_id;
               const p = personaId ? personaById.get(personaId) : undefined;
               const lo =
                 e.subject_type === 'learning_object' && e.subject_id
@@ -143,8 +145,8 @@ export default async function AuditLogPage() {
                 <td className="mono">
                   {Object.keys(e.payload ?? {}).length ? JSON.stringify(e.payload) : '—'}
                 </td>
-                <td className="mono hash">{hexOf(e.prev_hash)}</td>
-                <td className="mono hash">{hexOf(e.hash)}</td>
+                <td className="mono hash">{bytesToHex(e.prev_hash)}</td>
+                <td className="mono hash">{bytesToHex(e.hash)}</td>
               </tr>
             ))}
           </tbody>
@@ -154,8 +156,18 @@ export default async function AuditLogPage() {
   );
 }
 
-function hexOf(input: unknown): string {
-  if (typeof input !== 'string') return '';
-  // Supabase serializza bytea come stringa con prefisso "\x".
-  return input.startsWith('\\x') ? input.slice(2) : input;
+function bytesToHex(input: unknown): string {
+  if (typeof input !== 'string' || input.length === 0) return '';
+  // Postgres "hex" output (psql, supabase test db): "\x" + hex.
+  if (input.startsWith('\\x')) return input.slice(2);
+  // PostgREST (Supabase REST API) serializza bytea come base64 in JSON:
+  // lo riconvertiamo in hex per la lettura nel report di audit.
+  try {
+    const decoded = Buffer.from(input, 'base64');
+    // Heuristica: hash sha256 = 32 byte. Se il decode non torna 32 byte,
+    // probabilmente la stringa non era base64 → mostriamo l'originale.
+    return decoded.length > 0 ? decoded.toString('hex') : input;
+  } catch {
+    return input;
+  }
 }

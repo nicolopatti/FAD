@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { StrutturaRow } from './db-types';
 
 export type StrutturaItem = {
   struttura_id: string;
@@ -67,19 +68,22 @@ export async function computeProgressoForIscrizione(
       learning_object:learning_object_id ( titolo, type, config )
     `)
     .eq('corso_id', corso.id)
-    .order('ordine', { ascending: true });
+    .order('ordine', { ascending: true })
+    .returns<StrutturaRow[]>();
   if (errStr || !struttura) return null;
 
-  const items: StrutturaItem[] = struttura.map((row: any) => ({
-    struttura_id: row.id,
-    learning_object_id: row.learning_object_id,
-    ordine: row.ordine,
-    obbligatorio: row.obbligatorio,
-    regola_completamento: row.regola_completamento,
-    lo_titolo: row.learning_object.titolo,
-    lo_type: row.learning_object.type,
-    lo_config: row.learning_object.config,
-  }));
+  const items: StrutturaItem[] = struttura
+    .filter((row) => row.learning_object !== null)
+    .map((row) => ({
+      struttura_id: row.id,
+      learning_object_id: row.learning_object_id,
+      ordine: row.ordine,
+      obbligatorio: row.obbligatorio,
+      regola_completamento: row.regola_completamento,
+      lo_titolo: row.learning_object!.titolo,
+      lo_type: row.learning_object!.type,
+      lo_config: row.learning_object!.config,
+    }));
 
   const loIds = items.map((i) => i.learning_object_id);
 
@@ -88,16 +92,22 @@ export async function computeProgressoForIscrizione(
   const completionTypes = Array.from(
     new Set(items.map((i) => COMPLETION_EVENT_FOR_RULE[i.regola_completamento.tipo])),
   ).filter(Boolean);
-  let completedLoIds = new Set<string>();
+  type EventoCompletamento = {
+    subject_id: string | null;
+    event_type: string;
+    actor: { persona_id?: string } | null;
+  };
+
+  const completedLoIds = new Set<string>();
   if (loIds.length && completionTypes.length) {
     const { data: events } = await supabase
       .from('evento')
       .select('subject_id, event_type, actor')
       .in('event_type', completionTypes)
-      .in('subject_id', loIds);
+      .in('subject_id', loIds)
+      .returns<EventoCompletamento[]>();
     for (const e of events ?? []) {
-      const actor = e.actor as { persona_id?: string } | null;
-      if (actor?.persona_id === iscrizione.persona_id && e.subject_id) {
+      if (e.actor?.persona_id === iscrizione.persona_id && e.subject_id) {
         completedLoIds.add(e.subject_id);
       }
     }

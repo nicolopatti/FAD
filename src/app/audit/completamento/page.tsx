@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAuditor } from '@/lib/auth-context';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
+import type { IscrizioneAuditRow } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +14,12 @@ export default async function CompletamentoPage() {
     .select(`
       id, persona_id, edizione_id,
       persona:persona_id ( nome, cognome, email ),
-      edizione:edizione_id ( codice, corso:corso_id ( titolo ) )
-    `);
+      edizione:edizione_id ( id, codice, corso:corso_id ( id, titolo ) )
+    `)
+    .returns<IscrizioneAuditRow[]>();
 
   const rows = await Promise.all(
-    (iscrizioni ?? []).map(async (i: any) => {
+    (iscrizioni ?? []).map(async (i) => {
       const prog = await computeProgressoForIscrizione(supabase, i.id);
       return { i, prog };
     }),
@@ -45,12 +47,18 @@ export default async function CompletamentoPage() {
             {rows.map(({ i, prog }) => (
               <tr key={i.id}>
                 <td>
-                  {i.persona.nome} {i.persona.cognome}
-                  <div className="muted">{i.persona.email}</div>
+                  {i.persona ? (
+                    <>
+                      {i.persona.nome} {i.persona.cognome}
+                      <div className="muted">{i.persona.email}</div>
+                    </>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
                 </td>
                 <td>
-                  {i.edizione.corso.titolo}
-                  <div className="muted">ed. {i.edizione.codice}</div>
+                  {i.edizione?.corso?.titolo ?? <span className="muted">—</span>}
+                  <div className="muted">ed. {i.edizione?.codice ?? '—'}</div>
                 </td>
                 <td>
                   {prog ? (
