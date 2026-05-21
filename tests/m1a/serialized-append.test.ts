@@ -1,5 +1,4 @@
 /// <reference types="vitest" />
-import 'dotenv/config';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 

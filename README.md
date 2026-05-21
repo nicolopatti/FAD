@@ -1,6 +1,6 @@
 # FAD — Fase 1 (fetta verticale)
 
-Mandato operativo: il documento [`docs/brief-fase-1.md`](docs/brief-fase-1.md).
+Mandato operativo: [`docs/brief-fase-1.md`](docs/brief-fase-1.md).
 Decisioni di riferimento: `piattaforma-elearning-stato-progetto-v7.md` (D1–D35).
 
 > **Cosa contiene questa fase.** Substrato dati con `tenant_id` + RLS attiva,
@@ -10,37 +10,66 @@ Decisioni di riferimento: `piattaforma-elearning-stato-progetto-v7.md` (D1–D35
 > Tutto il resto (assemblatore corsi, quiz, attestati, webinar, report fondi…)
 > resta **fuori** dalla Fase 1.
 
+## Modalità di lavoro — tutto in cloud (ratificata)
+
+Niente ambiente locale. Niente file `.env.local`.
+
+- **Codice** → GitHub (`nicolopatti/FAD`, branch di sviluppo `claude/fetta-fad-fase-1-aJZsU`)
+- **Hosting** → Vercel collegato al repo (preview a ogni PR, prod su `main`)
+- **DB + Auth** → progetto Supabase (managed)
+- **Sviluppo interattivo** → Claude Code on the web (session ephemera, clone fresco a ogni avvio)
+
+Le credenziali (chiavi Supabase, Vimeo) vivono solo nei pannelli dei provider
+e nei secrets dell'ambiente Claude Code. `.env.example` resta come documentazione
+del set richiesto.
+
 ## Stack
 - Next.js 14 (App Router) + TypeScript
-- Supabase (Postgres 15) — Auth, RLS, Storage non usato in Fase 1
-- Vimeo Player.js per hosting video
+- Supabase (Postgres 15) — Auth, RLS
+- Vimeo (hosting video con domain restriction)
 
-> **Vimeo da ratificare (brief §10).** L'implementazione del Task 5 assume Vimeo
-> come da orientamento. Se la decisione formale dovesse cambiare, l'impatto è
-> circoscritto a `src/components/VimeoPlayer.tsx` (embed) e al campo `config`
-> del Learning Object (`vimeo_id` → `<altro_id>`): il resto della slice non si
-> tocca.
+## Setup dell'ambiente cloud (una tantum)
 
-## Avvio
+1. **Crea il progetto Supabase**
+   - Dashboard Supabase → New project (regione UE)
+   - Annota `Project URL`, `anon key`, `service_role key` (Project Settings → API)
 
-```bash
-# 1) Installa dipendenze
-npm install
+2. **Applica le migration**
+   - Opzione A — `supabase` CLI da una session Claude Code:
+     ```bash
+     supabase link --project-ref <ref>
+     npm run db:push          # applica supabase/migrations/*
+     ```
+   - Opzione B — SQL Editor: incolla nell'ordine i tre file:
+     1. `supabase/migrations/20260521000001_schema.sql`
+     2. `supabase/migrations/20260521000002_audit_log.sql`
+     3. `supabase/migrations/20260521000003_tenant_stream_bootstrap.sql`
 
-# 2) Avvia Supabase locale (richiede supabase CLI)
-supabase start
-supabase db reset      # applica le migration in supabase/migrations/* e supabase/seed.sql
+3. **Bootstrap dati demo** (utenti + corso FAD del Task 4)
+   ```bash
+   # Da una session Claude Code on the web con gli env impostati
+   npm install
+   npm run bootstrap
+   ```
+   Lo script `scripts/bootstrap.ts` è **idempotente** (upsert): crea/aggiorna i
+   due utenti Auth (`discente@fad.local`, `auditor@fad.local`), mappa le
+   Persone e popola Corso + LO video + Struttura + Edizione + Iscrizione.
 
-# 3) Configura variabili
-cp .env.example .env.local
-# popola NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
-# (le ottieni da: supabase status)
+4. **Collega Vercel al repo**
+   - Vercel → Import GitHub repo → seleziona `nicolopatti/FAD`
+   - Environment Variables (Production + Preview):
+     - `NEXT_PUBLIC_SUPABASE_URL`
+     - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+     - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+     - `NEXT_PUBLIC_TENANT_ID` (default `00000000-0000-0000-0000-000000000001`)
+   - Aggiungi l'URL di Vercel all'allowlist di Supabase Auth (`Site URL` +
+     `Redirect URLs`).
+   - Configura il **domain restriction su Vimeo** (Settings → Privacy del video)
+     aggiungendo il dominio Vercel di produzione e quelli di preview.
 
-# 4) Avvia il dev server
-npm run dev
-```
+5. **Deploy** — push su `main` → Vercel deploya automaticamente.
 
-Utenze demo (create dal seed):
+Utenze demo create da `npm run bootstrap`:
 - Discente — `discente@fad.local` / `discente-pass-123`
 - Auditor — `auditor@fad.local` / `auditor-pass-123`
 
@@ -51,89 +80,110 @@ Utenze demo (create dal seed):
 | 1 — Substrato + RLS | tabelle base, RLS, helper `current_tenant_id()` | `supabase/migrations/20260521000001_schema.sql` |
 | 2 — Log append-only (M1a) | `stream_audit`, `evento`, `audit_append`, `audit_verify_chain`, trigger immutabilità | `supabase/migrations/20260521000002_audit_log.sql` |
 | 3 — Auth + login | login/logout, mapping `auth_user_id` ↔ Persona, eventi `auth.login`/`auth.logout` | `src/app/login/page.tsx`, `src/app/api/auth/*` |
-| 4 — Seed corso FAD | Corso + LO video + Struttura + Edizione + Iscrizione | `supabase/seed.sql`; pagine `src/app/corsi/*` |
-| 5 — Player video tracciato | Embed Vimeo, eventi server-side, sblocco sequenziale (D26) | `src/components/VimeoPlayer.tsx`, `src/app/api/events/video/route.ts`, `src/lib/compliance.ts` |
+| 4 — Seed corso FAD | Corso + LO video + Struttura + Edizione + Iscrizione (via bootstrap script) | `scripts/bootstrap.ts`; pagine `src/app/corsi/*` |
+| 5 — Player video Vimeo tracciato | embed Vimeo, eventi server-side, sblocco sequenziale (D26) | `src/components/VimeoPlayer.tsx`, `src/app/api/events/video/route.ts`, `src/lib/compliance.ts` |
 | 6 — Report audit (M1) | due report distinti (D35), verifica catena | `src/app/audit/log/page.tsx`, `src/app/audit/completamento/page.tsx`, `src/app/api/audit/verify/route.ts` |
 
 ## Verifica gate M1a (alla fine del Task 2, prima di proseguire)
 
-I sei criteri del brief si verificano così.
+I sei criteri del brief si verificano così, **tutti nel cloud**.
 
-### A — Suite SQL (pgTAP)
+### A — Suite SQL (pgTAP) sul progetto Supabase
 
-```bash
-supabase test db --file supabase/tests/m1a_audit_log.sql
-```
+Apri Supabase → SQL Editor e incolla `supabase/tests/m1a_audit_log.sql`.
+Esegui. Il test parte con `begin; … rollback;` ⇒ non lascia tracce.
+
+> In alternativa, da una session Claude Code con CLI Supabase linkata:
+> `supabase test db --file supabase/tests/m1a_audit_log.sql`.
 
 Copre:
-1. **Immutabilità fisica** — `UPDATE`/`DELETE`/`TRUNCATE` su `evento` falliscono (trigger);
-   `anon`/`authenticated` non hanno UPDATE/DELETE diretti (REVOKE).
+1. **Immutabilità fisica** — `UPDATE`/`DELETE`/`TRUNCATE` su `evento` falliscono
+   (trigger); `anon`/`authenticated` non hanno UPDATE/DELETE/INSERT diretti
+   (REVOKE); `audit_append` è eseguibile dagli authenticated.
 2. **Append in serie** — 30 append consecutivi danno seq monotoni contigui (1..30).
-3. **Catena verificabile** — `audit_verify_chain` ritorna 0 problemi su catena integra
-   e rileva una manomissione simulata del payload del primo evento.
-4. **Genesi** — `prev_hash` = `audit_genesis_hash(stream_id)`, non `NULL`; deterministica.
-5. **No PII** — `audit_append` rifiuta `actor`/`payload` con `nome`/`email`/`codice_fiscale`.
+3. **Catena verificabile** — `audit_verify_chain` ritorna 0 problemi su catena
+   integra e rileva una manomissione simulata del payload del primo evento.
+4. **Genesi** — `prev_hash` = `audit_genesis_hash(stream_id)`, non `NULL`;
+   deterministica.
+5. **No PII** — `audit_append` rifiuta `actor`/`payload` con
+   `nome`/`email`/`codice_fiscale`.
 6. **Timestamp server-side** — `occurred_at` viene assegnato dentro `audit_append`.
 
-### B — Concorrenza reale (vitest)
+### B — Concorrenza reale (vitest contro il progetto Supabase)
 
+Da una session Claude Code on the web (env già impostati):
 ```bash
 npm run test:m1a
 ```
 
-Esegue 50 append in parallelo sullo stesso stream tramite il client Supabase
-con service-role. Verifica: nessun duplicato di `seq`, nessun buco, `prev_hash`
-sempre uguale all'`hash` del predecessore. Skippato se `.env.local` non
-contiene `SUPABASE_SERVICE_ROLE_KEY`.
+50 append paralleli sullo stesso stream via Admin RPC (service-role). Verifica:
+nessun duplicato di `seq`, nessun buco, `prev_hash` sempre uguale all'`hash`
+del predecessore, `audit_verify_chain` conferma integrità. Skippato se il
+service role non è disponibile nell'ambiente.
+
+In CI: la stessa suite gira su PR (vedi `.github/workflows/ci.yml`); le chiavi
+sono in GitHub Secrets, mai nel repo.
 
 ### Stop & verify
 Se anche **uno solo** dei criteri non passa, ci si ferma. È la ragione per cui
-M1a è un gate separato: il log è il pezzo portante e deve reggere prima di
-costruirci sopra.
+M1a è un gate separato.
 
 ## Verifica gate M1 (alla fine del Task 6)
 
-1. **Slice end-to-end** — login (discente) → `/corsi` → click corso → `/corsi/.../lo/...`
-   → riproduzione del video → gli eventi `video.play/pause/seek/ended` appaiono
-   nei due report di audit dell'auditor.
+Tutto contro il deployment Vercel collegato al progetto Supabase.
+
+1. **Slice end-to-end** — login (`discente@fad.local`) → `/corsi` → click corso
+   → `/corsi/.../lo/...` → riproduzione del video → gli eventi
+   `video.play/pause/seek/ended` appaiono nei due report di audit
+   (login con `auditor@fad.local`).
 2. **Log fisicamente immutabile** — i criteri di M1a continuano a passare:
-   ripetere `supabase test db --file supabase/tests/m1a_audit_log.sql` dopo aver
-   prodotto eventi reali.
+   esegui di nuovo `supabase/tests/m1a_audit_log.sql` dopo aver prodotto eventi
+   reali sul progetto Supabase.
 3. **Sblocco sequenziale server-side** — con `corso.sblocco_sequenziale = true`,
    una chiamata diretta
    ```bash
-   curl -X POST $APP/api/events/video \
+   curl -X POST https://<app>.vercel.app/api/events/video \
      -H 'cookie: <sessione discente>' \
+     -H 'content-type: application/json' \
      -d '{"event_type":"video.play","iscrizione_id":"<id>","learning_object_id":"<lo bloccato>","payload":{}}'
    ```
    risponde **HTTP 403** (`LO non sbloccato`).
-4. **Completamento ricalcolato** — svuotare le colonne-cache dell'Iscrizione
-   (`update iscrizione set cache_completata = false, cache_idonea = false`) e
-   ricaricare `/audit/completamento`: il report mostra comunque lo stato corretto
-   perché lo deriva dagli Eventi.
-5. **Isolamento tenant** — tentando di leggere righe di un altro `tenant_id` con
-   un token di tenant diverso la RLS blocca a livello DB. Verifica con
+4. **Completamento ricalcolato** — dal SQL Editor:
    ```sql
-   set role authenticated; set request.jwt.claim.sub = '<altro auth_user_id>';
-   select * from public.corso; -- non vede righe del tenant_id del primo
+   update public.iscrizione
+      set cache_completata = false,
+          cache_idonea = false
+    where id = '15c11111-15c1-15c1-15c1-15c115c115c1';
+   ```
+   ricarica `/audit/completamento`: il report mostra lo stato corretto perché
+   lo deriva sempre dagli Eventi (D8).
+5. **Isolamento tenant** — RLS attiva su tutte le tabelle di business.
+   Verifica con un secondo tenant fittizio nel SQL Editor:
+   ```sql
+   insert into public.tenant (nome) values ('Tenant intruso') returning id; -- T2
+   -- crea una persona finta nel tenant T2, prova a SELECT come authenticated
+   -- impersonando il discente del tenant 1: non vede righe del tenant T2.
    ```
 6. **Verifica della catena nell'area auditor** — pulsante "Verifica integrità
    catena" su `/audit/log` deve restituire "Catena integra" sui dati reali.
 
+## CI / pipeline
+
+`.github/workflows/ci.yml` esegue su ogni PR:
+- `npm run typecheck`
+- `npm run build` (con env placeholder per evitare la dipendenza dalle chiavi
+  reali in build).
+
+I test M1a contro un vero progetto Supabase si attivano solo se i secrets
+`SUPABASE_*` sono presenti nel repository (consigliato per il branch `main`).
+
 ## Architettura — i 5 invarianti
 
-1. **Tenant-ready dal giorno 1 (D2).** Ogni tabella di business ha `tenant_id`
-   NOT NULL e RLS attiva nella stessa migration che la crea.
-2. **Il log è la fonte di verità (D8).** Stato di compliance e completamento
-   sono cache derivate dagli Eventi; il report ricalcola sempre dagli Eventi.
-3. **Server unica fonte di verità sulla fruizione (D26).** Lo sblocco
-   sequenziale è applicato sia nella pagina del LO sia nell'API POST eventi.
-4. **Mai PII nel log (D18).** L'`actor` è un `persona_id` pseudonimo; nomi/email
-   appaiono nel report solo se l'auditor risolve gli pseudonimi via anagrafica
-   al momento della lettura.
-5. **Append solo via funzione (D11/D19).** `evento` ha REVOKE su UPDATE/DELETE
-   e trigger di blocco; l'unica scrittura passa da `audit_append`, che usa
-   `FOR UPDATE` sulla riga `stream_audit` per serializzare.
+1. **Tenant-ready dal giorno 1 (D2).**
+2. **Il log è la fonte di verità (D8).**
+3. **Server unica fonte di verità sulla fruizione (D26).**
+4. **Mai PII nel log (D18).**
+5. **Append solo via funzione (D11/D19).**
 
 ## Cosa NON c'è qui (per scelta)
 

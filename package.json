@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:reset": "supabase db reset",
-    "db:push": "supabase db push",
+    "db:push": "supabase db push --linked",
+    "bootstrap": "tsx scripts/bootstrap.ts",
     "test:m1a": "vitest run tests/m1a"
   },
   "dependencies": {
@@ -23,9 +23,9 @@
     "@types/node": "^20.16.10",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
-    "dotenv": "^16.4.5",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.15",
+    "tsx": "^4.19.1",
     "typescript": "^5.6.2",
     "vitest": "^2.1.2"
   }
