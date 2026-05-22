@@ -41,8 +41,11 @@ deploy: confermata 2026-05-22.
 ### Repo GitHub
 - `nicolopatti/FAD`
 - **Default branch su GitHub: `main`** (impostato 2026-05-22; era il vecchio feature branch).
-- Branch di sessione corrente: `claude/resume-previous-work-fOZWz`
 - Vercel deploya `main` come Production; preview su ogni altro branch.
+- Ogni sessione Claude Code on the web lavora su un proprio branch
+  (`claude/<slug>-<id>`); a fine sessione, il push del branch + un
+  `git push origin <branch>:main` allinea Production (autorizzato dall'utente
+  esplicitamente in questa sessione).
 
 ### Progetto Supabase
 - Nome: **fad-fase-1**
@@ -140,14 +143,42 @@ NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
 NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder \
 npm run build
 
+# typecheck solo (più veloce, basta per validare patch TS)
+npm run typecheck
+
 # verifica M1a sul Supabase live (richiede MCP Supabase attivo)
 # → incolla supabase/tests/m1a_audit_log.sql nel SQL Editor del progetto eqtiyqoxwgnerbmdkqff
 # → oppure usa il tool mcp__…__execute_sql con quel file
 
-# verifica M1a in locale (Postgres del container Claude Code)
-service postgresql start
-# poi segui la ricetta esatta nel README sezione "Riproduzione locale al container"
+# verifica M1a in locale (Postgres del container Claude Code) — ricetta completa
+# nel README sezione "Riproduzione locale al container". Per il pezzo Node:
+PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
+# (senza PG_URL il test di concorrenza viene saltato: è gated apposta, vedi trabocchetti)
 ```
+
+### Re-verifica rapida di M1 sul deploy (≈3 min, dal browser)
+
+1. Login discente su https://fad-wine.vercel.app/login (`discente@fad.local` /
+   `discente-pass-123`), entra nel corso "Sicurezza sul lavoro", verifica
+   che vedi 2 capitoli col secondo bloccato.
+2. DevTools Console (Cmd+Opt+J / F12) sulla pagina del corso, incolla:
+   ```js
+   fetch('/api/events/video', {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({
+       event_type: 'video.play',
+       iscrizione_id: '15c11111-15c1-15c1-15c1-15c115c115c1',
+       learning_object_id: '10102222-1010-1010-1010-101010101010'
+     })
+   }).then(r => r.json().then(j => console.log('STATUS', r.status, 'BODY', j)))
+   ```
+   Atteso: `STATUS 403 BODY {ok:false, error:"LO non sbloccato (sblocco_sequenziale)"}`.
+3. Completa il LO #1 (video Introduzione fino a `video.ended`), il LO #2 si
+   sblocca, rilancia il fetch sopra: atteso `STATUS 200 BODY {ok:true}`.
+4. Logout → login auditor (`auditor@fad.local` / `auditor-pass-123`) → vai
+   su `/audit/log` → premi "Verifica integrità catena" → atteso "Catena
+   integra. Tutti gli hash combaciano."
 
 ## Punti di attenzione / trabocchetti noti
 
@@ -180,15 +211,35 @@ service postgresql start
    complesso. Strada pulita: aprire la Console DevTools nel browser dopo
    il login e fare `fetch('/api/events/video', …)` — il browser allega i cookie
    automaticamente.
+10. **CI job `M1a — concorrenza reale (gated)`** è gated su due livelli:
+    - `tests/m1a/concurrency-pg.test.ts` → `describe.skip` se non c'è
+      `PG_URL`/`SUPABASE_DB_URL` (in CI non si imposta, quindi è sempre skip;
+      gira solo in locale con la ricetta del README).
+    - `tests/m1a/serialized-append.test.ts` → `describe.skip` se mancano
+      i secrets `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` nei
+      GitHub Actions Secrets. Oggi non sono impostati: il job M1a passa con
+      tutti i test in skip. Se un domani si vuole attivare il test contro
+      il Supabase live, basta aggiungere i 3 secrets in GitHub → Settings
+      → Secrets and variables → Actions (NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).
 
 ## Cosa NON fare
 
-- **NON iniziare Fase 2** prima che M1 sia certificato verde.
-- **NON aggiungere features fuori scope** rispetto a `docs/brief-fase-1.md` §4.
-  Se emerge la tentazione di costruire qualcosa fuori scope, segnalalo e fermati.
+- **NON iniziare Fase 2 senza un brief operativo** equivalente a
+  `docs/brief-fase-1.md`. M1 è verde, ma costruire roba di Fase 2 a istinto
+  riapre lo scope che il brief di Fase 1 ha chiuso con precisione.
+- **NON aggiungere features fuori scope** rispetto al brief della fase
+  corrente. Se emerge la tentazione di costruire qualcosa fuori scope,
+  segnalalo all'utente e fermati.
 - **NON committare `.env`** né esporre la service_role key in repo.
 - **NON cambiare l'algoritmo di canonicalizzazione hash** in `audit_canonical`
   senza una migration esplicita: tutti gli eventi storici diventerebbero
   "manomessi" agli occhi di `audit_verify_chain`.
-- **NON skippare i gate** del brief per andare più veloce. M1a e M1 esistono
-  proprio per evitare di costruire sopra fondamenta che non reggono.
+- **NON skippare i gate** dei brief futuri per andare più veloce. M1a e M1
+  hanno funzionato proprio perché non si è costruito sopra fondamenta che
+  non reggono — replicare il pattern in Fase 2.
+- **NON pushare su `main` senza permesso esplicito** dell'utente. Il flusso
+  standard è: lavoro sul branch di sessione, push del branch, e l'utente
+  decide se mergere. In questa sessione l'utente ha autorizzato
+  `git push origin <branch>:main`; il permesso vale per la sessione,
+  non per il futuro.
