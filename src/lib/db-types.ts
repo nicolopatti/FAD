@@ -46,10 +46,34 @@ export type EventoRow = {
   hash: string | null;
 };
 
+export type LearningObjectType = 'video' | 'documento';
+
 export type LearningObjectMini = {
   titolo: string;
-  type: 'video';
+  type: LearningObjectType;
   config: Record<string, unknown>;
+};
+
+export type LearningObjectRow = {
+  id: string;
+  tenant_id: string;
+  type: LearningObjectType;
+  titolo: string;
+  config: Record<string, unknown>;
+  archiviato_at: string | null;
+  creato_il: string;
+};
+
+export type VideoConfig = {
+  vimeo_id: string;
+  durata_secondi: number;
+};
+
+export type DocumentoConfig = {
+  storage_key: string;
+  mime: 'application/pdf';
+  size: number;
+  filename?: string;
 };
 
 export type StrutturaRow = {

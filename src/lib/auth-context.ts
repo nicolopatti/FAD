@@ -7,6 +7,7 @@ export type SessionContext = {
   personaId: string;
   tenantId: string;
   isAuditor: boolean;
+  isAdmin: boolean;
 };
 
 export async function requireSession(): Promise<SessionContext> {
@@ -32,11 +33,18 @@ export async function requireSession(): Promise<SessionContext> {
     personaId: persona.id,
     tenantId: persona.tenant_id,
     isAuditor: appMeta.role === 'auditor',
+    isAdmin: appMeta.role === 'admin',
   };
 }
 
 export async function requireAuditor(): Promise<SessionContext> {
   const ctx = await requireSession();
   if (!ctx.isAuditor) redirect('/corsi');
+  return ctx;
+}
+
+export async function requireAdmin(): Promise<SessionContext> {
+  const ctx = await requireSession();
+  if (!ctx.isAdmin) redirect('/');
   return ctx;
 }

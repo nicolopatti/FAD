@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { StrutturaRow } from './db-types';
+import type { LearningObjectType, StrutturaRow } from './db-types';
 
 export type StrutturaItem = {
   struttura_id: string;
@@ -8,7 +8,7 @@ export type StrutturaItem = {
   obbligatorio: boolean;
   regola_completamento: { tipo: string };
   lo_titolo: string;
-  lo_type: 'video';
+  lo_type: LearningObjectType;
   lo_config: Record<string, unknown>;
 };
 

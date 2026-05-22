@@ -47,6 +47,16 @@ const DEMO = {
       cognome: 'Bianchi',
     },
   },
+  admin: {
+    email: 'admin@fad.local',
+    password: 'admin-pass-123',
+    appMeta: { role: 'admin' },
+    persona: {
+      id: 'aaaa3333-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      nome: 'Carlo',
+      cognome: 'Verdi',
+    },
+  },
 };
 
 const COURSE = {
@@ -107,10 +117,12 @@ async function main() {
   log('Creo/aggiorno utenti Auth…');
   const discenteAuthId = await ensureAuthUser(admin, DEMO.discente);
   const auditorAuthId = await ensureAuthUser(admin, DEMO.auditor);
+  const adminAuthId = await ensureAuthUser(admin, DEMO.admin);
 
   log('Mappo Persone all\'anagrafica…');
   await upsertPersona(admin, DEMO.discente, discenteAuthId);
   await upsertPersona(admin, DEMO.auditor, auditorAuthId);
+  await upsertPersona(admin, DEMO.admin, adminAuthId);
 
   log('Seed catalogo (Corso + LO + Struttura + Edizione + Iscrizione)…');
   await upsertCorso(admin);
@@ -122,6 +134,7 @@ async function main() {
   log('Bootstrap completato. Utenze demo:');
   log(`  ${DEMO.discente.email} / ${DEMO.discente.password}`);
   log(`  ${DEMO.auditor.email} / ${DEMO.auditor.password}`);
+  log(`  ${DEMO.admin.email} / ${DEMO.admin.password}`);
 }
 
 async function ensureTenant(admin: SupabaseClient) {
