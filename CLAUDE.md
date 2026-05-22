@@ -8,7 +8,10 @@
 
 ## Stato di avanzamento (Fase 1)
 
-**Fase 1 chiusa.** Tutti i task ✅, gate M1a e M1 ✅ verdi.
+**Fase 1 chiusa.** Tutti i task ✅, gate M1a e M1 ✅ verdi. Deploy production
+`fad-wine.vercel.app` serve il video reale del cliente su Vimeo (id `1084894652`,
+613 s) con domain restriction attiva (D5). Verifica funzionale del player sul
+deploy: confermata 2026-05-22.
 
 | Task | Descrizione | Stato |
 |---|---|---|
