@@ -13,10 +13,11 @@ import { Client } from 'pg';
  * Si connette via PG_URL (default: il Postgres locale del container di test).
  */
 
-const PG_URL =
-  process.env.PG_URL
-  ?? process.env.SUPABASE_DB_URL
-  ?? 'postgres://postgres@/fad_test?host=/var/run/postgresql';
+// Gated: il test gira solo se è stato configurato un Postgres raggiungibile
+// (es. quello locale del container Claude Code, vedi README "Riproduzione
+// locale"). In CI il job M1a non lo imposta, quindi il test viene saltato.
+const PG_URL = process.env.PG_URL ?? process.env.SUPABASE_DB_URL;
+const hasPg = Boolean(PG_URL);
 
 const PARALLEL = 50;
 
@@ -30,7 +31,7 @@ async function exec(sql: string, params: unknown[] = []) {
   }
 }
 
-describe('M1a — append serializzato (N connessioni parallele)', () => {
+(hasPg ? describe : describe.skip)('M1a — append serializzato (N connessioni parallele)', () => {
   let tenantId: string;
   let streamId: string;
 
