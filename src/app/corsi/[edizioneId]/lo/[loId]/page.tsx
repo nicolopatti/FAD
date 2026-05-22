@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { TopBar } from '@/components/TopBar';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
+import { DocumentoPlayer } from '@/components/DocumentoPlayer';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,8 +50,6 @@ export default async function LearningObjectPage({
     );
   }
 
-  const vimeoId = String((item.lo_config as { vimeo_id?: string }).vimeo_id ?? '');
-
   return (
     <>
       <TopBar email={session.email} isAuditor={session.isAuditor} />
@@ -60,18 +59,39 @@ export default async function LearningObjectPage({
         </p>
         <h1>{item.lo_titolo}</h1>
         <div className="card">
-          <VimeoPlayer
-            vimeoId={vimeoId}
-            iscrizioneId={iscrizione.id}
-            learningObjectId={item.learning_object_id}
-          />
+          {item.lo_type === 'video' ? (
+            <VimeoPlayer
+              vimeoId={String((item.lo_config as { vimeo_id?: string }).vimeo_id ?? '')}
+              iscrizioneId={iscrizione.id}
+              learningObjectId={item.learning_object_id}
+            />
+          ) : item.lo_type === 'documento' ? (
+            <DocumentoPlayer
+              iscrizioneId={iscrizione.id}
+              learningObjectId={item.learning_object_id}
+              filename={(item.lo_config as { filename?: string }).filename}
+              alreadyCompleted={item.completato}
+            />
+          ) : (
+            <div className="alert">Tipo di Learning Object non supportato.</div>
+          )}
         </div>
         <p className="muted">
-          Gli eventi del player (play / pause / seek / ended) vengono registrati
-          sul log eventi del tenant. L'oggetto risulta completato dopo l'evento{' '}
-          <code>video.ended</code>.
+          {item.lo_type === 'video' ? (
+            <>
+              Gli eventi del player (play / pause / seek / ended) vengono registrati
+              sul log eventi del tenant. L'oggetto risulta completato dopo l'evento{' '}
+              <code>video.ended</code>.
+            </>
+          ) : (
+            <>
+              Gli eventi di apertura e completamento del documento vengono registrati
+              sul log eventi del tenant. L'oggetto risulta completato dopo l'evento{' '}
+              <code>documento.completed</code>.
+            </>
+          )}
         </p>
-        {item.completato && (
+        {item.completato && item.lo_type === 'video' && (
           <div className="alert ok">
             Hai già completato questo oggetto. Puoi rivederlo, ma il completamento
             resta valido.

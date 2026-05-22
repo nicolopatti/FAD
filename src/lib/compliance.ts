@@ -34,6 +34,7 @@ export type ProgressoIscrizione = {
 
 const COMPLETION_EVENT_FOR_RULE: Record<string, string> = {
   video_ended: 'video.ended',
+  documento_completed: 'documento.completed',
 };
 
 export async function computeProgressoForIscrizione(
