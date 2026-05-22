@@ -8,14 +8,16 @@
 
 ## Stato di avanzamento (Fase 1)
 
+**Fase 1 chiusa.** Tutti i task ✅, gate M1a e M1 ✅ verdi.
+
 | Task | Descrizione | Stato |
 |---|---|---|
 | 1 | Substrato dati + RLS | ✅ done — `supabase/migrations/20260521000001_schema.sql` |
 | 2 | Log append-only (gate M1a) | ✅ done — `…002_audit_log.sql`, gate M1a **verde** |
-| 3 | Auth + login | ✅ codice in repo; verificato a livello DB |
-| 4 | Seed corso FAD | ✅ done — eseguito sul progetto Supabase live |
-| 5 | Player Vimeo tracciato | ✅ codice in repo; sblocco sequenziale enforced lato API + page |
-| 6 | I due report di audit (gate M1) | ✅ codice in repo; M1 slice data **verde** |
+| 3 | Auth + login | ✅ verificato sul deploy (login discente + auditor) |
+| 4 | Seed corso FAD | ✅ done — eseguito sul progetto Supabase live, esteso a 2 LO |
+| 5 | Player Vimeo tracciato | ✅ sblocco sequenziale enforced lato API + UI |
+| 6 | I due report di audit (gate M1) | ✅ verificati su `/audit/log` (Log eventi + Completamento attività) |
 
 ## Stato dei gate
 
@@ -23,18 +25,21 @@
   - pgTAP 20/20 sul Supabase live (`supabase/tests/m1a_audit_log.sql`)
   - pgTAP 20/20 in locale (Postgres del container Claude Code)
   - Concorrenza pg 50 connessioni parallele 2/2 in locale (`tests/m1a/concurrency-pg.test.ts`)
-- **M1** — *La fetta gira end-to-end.* ⚠️ parziale
+- **M1** — *La fetta gira end-to-end.* ✅ **VERDE** (verificato 2026-05-22 sul deploy `fad-wine.vercel.app`)
   - DB-level (M1 #4 ricalcolo completamento da Eventi, sblocco sequenziale, idoneità): **10/10** sul Supabase live (`supabase/tests/m1_slice_data.sql`)
-  - Manca: M1 #1 (slice end-to-end via UI) e #6 (verifica catena nell'area auditor) — richiedono il deploy Vercel
-  - Manca: M1 #5 (isolamento tenant via sessione utente) — verifica manuale sul deploy
+  - **#1 slice end-to-end via UI**: login discente → /corsi → 2 capitoli (#2 con lucchetto) → video play→ended → secondo capitolo si sblocca → login auditor → entrambi i report (`Log eventi`, `Completamento attività`) mostrano l'attività
+  - **#3 sblocco server-side**: `POST /api/events/video` con `learning_object_id` di LO bloccato → `HTTP 403 {ok:false, error:"LO non sbloccato (sblocco_sequenziale)"}` ; dopo `video.ended` di LO #1 → `HTTP 200 {ok:true}` (testato dalla Console del browser come discente loggato)
+  - **#5 isolamento tenant**: query con `SET LOCAL role authenticated` + JWT claim del discente di tenant A → 0 righe visibili da tenant Sentinel B (test SQL in transazione con rollback, vedi cronologia chat o `supabase/tests/`)
+  - **#6 verifica catena audit**: pulsante "Verifica integrità catena" su `/audit/log` → "Catena integra. Tutti gli hash combaciano."
+  - Nota UX confermata: lo sblocco sequenziale NON si aggira con il seek del player — `regola_completamento: video_ended` viene ricalcolato lato server dagli eventi (D26).
 
 ## Infrastruttura cloud creata
 
 ### Repo GitHub
 - `nicolopatti/FAD`
-- Branch principale: `main` (allineato al feature branch)
-- Branch di lavoro: `claude/fetta-fad-fase-1-aJZsU`
-- Ultimo commit: `3d655a4` — fix search_path extensions (Supabase)
+- **Default branch su GitHub: `main`** (impostato 2026-05-22; era il vecchio feature branch).
+- Branch di sessione corrente: `claude/resume-previous-work-fOZWz`
+- Vercel deploya `main` come Production; preview su ogni altro branch.
 
 ### Progetto Supabase
 - Nome: **fad-fase-1**
@@ -57,18 +62,27 @@
 - 1 tenant: `00000000-0000-0000-0000-000000000001` (Tenant Demo Fase 1)
 - 1 stream audit (1 per tenant come da D11/D19)
 - 2 utenti Auth + 2 Persone
-- 1 Corso + 1 LO video Vimeo + Struttura + 1 Edizione + 1 Iscrizione del discente
+- 1 Corso ("Sicurezza sul lavoro — modulo introduttivo", `c0c01111-…`) + **2 LO video Vimeo** in sequenza (`10101111-…` Introduzione ordine 1, `10102222-…` Approfondimento ordine 2) + Struttura + 1 Edizione (`ed011111-…` codice ED-001) + 1 Iscrizione del discente (`15c11111-…`)
+- Vimeo ID `76979871` è placeholder pubblico (Big Buck Bunny) usato per entrambi i LO. Va sostituito con i video reali del corso una volta caricati sull'account Vimeo del cliente — vedi TODO Vimeo sotto.
 
 #### Utenze demo (create da bootstrap)
 - Discente: `discente@fad.local` / `discente-pass-123`
 - Auditor: `auditor@fad.local` / `auditor-pass-123` (app_metadata.role=auditor)
 
 ### Vercel
-- Org `nicolopatti's projects` (`team_LDcXwgO7cQrFtkAhaISEhjYj`).
-- **Nessun progetto FAD ancora.** L'unico esistente è `acli-gestionale` (non collegato).
-- Il deploy è il prossimo passo: import GitHub interattivo dalla UI Vercel
-  (non c'è MCP per farlo automaticamente; CLI Vercel + token non disponibili
-  nell'ambiente Claude Code on the web).
+- Team `nicolopatti's projects` (`team_LDcXwgO7cQrFtkAhaISEhjYj`, slug `nicolopattis-projects`).
+- **Project FAD: `fad`** (id `prj_3u7miTUbdIwTRNuNU6KWdUHX6qLC`), collegato a `nicolopatti/FAD` su Production branch `main`.
+- URL canonico di produzione: **https://fad-wine.vercel.app**
+- Branch alias `main`: `https://fad-git-main-nicolopattis-projects.vercel.app`
+- Pattern preview: `https://fad-<hash>-nicolopattis-projects.vercel.app`
+- Env vars configurate sul progetto Vercel (Production + Preview):
+  - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+    `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_TENANT_ID`.
+- Supabase Auth → URL Configuration aggiornata: Site URL = `https://fad-wine.vercel.app`,
+  Redirect URLs = `https://fad-wine.vercel.app/**` + `https://fad-*-nicolopattis-projects.vercel.app/**`.
+- **Network policy ambiente Claude Code on the web**: `*.vercel.app` è bloccato dall'egress
+  gateway del container (risposta `x-deny-reason: host_not_allowed`). I test HTTP contro
+  il deploy vanno fatti dal browser dell'utente o dal proprio terminale, non da qui.
 
 ## Decisioni ratificate
 
@@ -79,38 +93,28 @@
 
 ## Cosa fare nella prossima sessione
 
-Priorità in ordine. Non saltare.
+Fase 1 è chiusa. Prima di iniziare Fase 2, leggere `docs/brief-fase-1.md` e — se
+esiste — il brief di Fase 2; in mancanza, partire dai TODO di Fase 1 ancora aperti
+qui sotto.
 
-### 1) Vercel — import + deploy (manuale, ~5 min)
-1. https://vercel.com/new → Import Git Repository → `nicolopatti/FAD`
-2. Framework: Next.js 14 (auto-detect)
-3. Production Branch: `main`
-4. Environment Variables (Production + Preview):
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=https://eqtiyqoxwgnerbmdkqff.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<vedi sopra o dashboard>
-   SUPABASE_SERVICE_ROLE_KEY=<copia da Supabase dashboard>
-   NEXT_PUBLIC_TENANT_ID=00000000-0000-0000-0000-000000000001
-   ```
-5. Deploy.
-6. Dopo il deploy:
-   - Supabase Auth → URL Configuration → aggiungi URL Vercel (prod + preview) a
-     `Site URL` e `Redirect URLs`.
-   - Vimeo video `76979871` → Settings → Privacy → Specific domains → aggiungi
-     domini Vercel prod + preview (D5: domain restriction).
+### TODO Fase 1 ancora aperti (non bloccanti per M1, ma da chiudere prima di mettere in mano clienti veri)
 
-### 2) Verifica M1 sul deploy (≈10 min)
-Procedura completa nel README, sezione "Verifica gate M1". I criteri rimasti:
-- **#1 slice end-to-end**: login discente → /corsi → entra corso → video → eventi → login auditor → entrambi i report mostrano l'attività
-- **#3 sblocco server-side**: curl diretto su `/api/events/video` con LO bloccato → HTTP 403
-- **#5 isolamento tenant**: SQL Editor con un secondo tenant fittizio, verifica RLS via JWT
-- **#6 verifica catena nell'area auditor**: pulsante "Verifica integrità catena" su `/audit/log` → "Catena integra"
+1. **Vimeo — sostituzione placeholder + domain restriction (D5)**
+   - Oggi i due LO usano `vimeo_id: '76979871'` (Big Buck Bunny pubblico).
+   - Quando il cliente carica i video reali del corso sul proprio account Vimeo:
+     - Aggiornare le righe `learning_object` con i nuovi `vimeo_id` e `durata_secondi`
+       (sia su DB live sia in `scripts/bootstrap.ts`).
+     - Su Vimeo: video → Settings → Privacy → "Where can this be embedded?" →
+       **Specific domains** → aggiungere `fad-wine.vercel.app` e i domini preview/staging.
+     - Vimeo Specific Domains NON supporta wildcard: serve una entry per ogni dominio.
+2. **Stato bootstrap idempotente**: lo script `npm run bootstrap` ora gestisce 2 LO
+   tramite array. Se si rilancia su un DB esistente, fa upsert; se i `learning_object_id`
+   vengono cambiati, lascia i record orfani — pulirli a mano via SQL prima.
 
-Se uno qualunque fallisce: stop, diagnostica, fix prima di chiudere Fase 1.
-
-### 3) Solo dopo M1 verde — passare a Fase 2
-Fase 2 = assemblatore corsi, LO documento, Supabase Storage.
-**Non iniziare nulla di Fase 2 finché M1 non è certificato come verde.**
+### Fase 2 (quando partirà)
+Fase 2 = assemblatore corsi, LO documento, Supabase Storage. **Non iniziare nulla di
+Fase 2 senza un brief operativo equivalente a `docs/brief-fase-1.md`.** Se il brief
+manca, segnalarlo all'utente e fermarsi.
 
 ## Come riprendere (cheatsheet per nuova session)
 
@@ -153,9 +157,19 @@ service postgresql start
    l'append fallisce con exception. Comportamento voluto (D18).
 6. **`current_stream_id()` RPC** ritorna lo scalar UUID; supabase-js lo
    restituisce come stringa. Già gestito.
-7. **`Set default branch a main` su GitHub** è ancora da fare via UI (no MCP).
-   Va impostato prima di collegare Vercel, altrimenti Vercel potrebbe scegliere
-   il branch sbagliato come Production. Settings → Branches → Default branch.
+7. **Default branch GitHub = `main`**: già impostato 2026-05-22. Per cambiarlo
+   ancora servirebbe la UI GitHub (Settings → Branches), non c'è MCP. Vercel
+   è già collegato a `main` come Production.
+8. **Network policy del container Claude Code** blocca `*.vercel.app` (e
+   probabilmente `vercel.com`) via `x-deny-reason: host_not_allowed`. Per
+   testare HTTP sul deploy serve il browser dell'utente o un terminale esterno.
+   Supabase REST + MCP funzionano normalmente.
+9. **API `/api/events/video` legge la sessione dai cookie** (`@supabase/ssr`,
+   nome cookie `sb-<project-ref>-auth-token`, possibilmente chunked + base64).
+   Per testarla con curl da fuori serve replicare il cookie format, ed è
+   complesso. Strada pulita: aprire la Console DevTools nel browser dopo
+   il login e fare `fetch('/api/events/video', …)` — il browser allega i cookie
+   automaticamente.
 
 ## Cosa NON fare
 
