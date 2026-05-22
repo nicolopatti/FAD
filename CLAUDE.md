@@ -24,18 +24,24 @@ deploy: confermata 2026-05-22.
 
 ## Stato di avanzamento (Fase 2)
 
-**Task 1 + Task 2 chiusi.** Verifica funzionale 2026-05-22 sul deploy production:
-admin crea LO `video` + LO `documento` (PDF su bucket Storage `documenti`),
-crea Corsi dalla UI, compone la Struttura aggiungendo/riordinando/togglando
-LO, gli eventi `learning_object.*`, `corso.*` e `struttura.*` compaiono nel
-log dell'auditor con catena integra.
+**Task 1 + Task 2 + Task 3 + Task 4 chiusi** (Task 4 verificato a livello DB,
+UI da provare nel browser). Verifica funzionale 2026-05-22 sul deploy
+production: admin crea LO `video` + LO `documento` (PDF su bucket Storage
+`documenti`), crea Corsi dalla UI, compone la Struttura aggiungendo/
+riordinando/togglando LO. Creazione della prima Edizione congela corso +
+Struttura via trigger DB (D22 verificato con 9 test SQL sul live).
+Fruizione discente multi-LO con sblocco sequenziale D26 verificato a livello
+DB: simulazione completa di video.ended → sblocco documento → documento.
+opened/completed → idoneità. Catena audit integra dopo i 3 nuovi tipi di
+evento. Isolamento Storage tenant verificato (un utente di tenant diverso
+vede 0 file).
 
 | Task | Descrizione | Stato |
 |---|---|---|
 | 1 | Authoring LO (video + documento + admin + Storage) | ✅ done — `…20260522000001_…sql` + `…000002_…_admin_storage.sql`, UI `/admin/learning-objects` |
 | 2 | Assemblatore Corsi (CRUD `corso` + Struttura) | ✅ done — `…20260522000003_…_corso_struttura_admin.sql`, UI `/admin/corsi`, RPC `reorder_struttura` |
-| 3 | Authoring Edizioni + congelamento D22 | ⬜ da iniziare |
-| 4 | Fruizione discente multi-LO (player documento) | ⬜ da iniziare |
+| 3 | Authoring Edizioni + congelamento D22 | ✅ done — `…20260522000004_…_edizioni_congelamento.sql`, trigger DB verificati |
+| 4 | Fruizione discente multi-LO (player documento) | ✅ done (DB) — `/api/events/documento`, `/api/storage/.../signed-url`, `DocumentoPlayer`, branching pagina LO. UI nel browser da verificare. |
 | 5 | Report completamento multi-LO (gate M2) | ⬜ da iniziare |
 
 ## Stato dei gate
@@ -51,16 +57,29 @@ log dell'auditor con catena integra.
   - **#5 isolamento tenant**: query con `SET LOCAL role authenticated` + JWT claim del discente di tenant A → 0 righe visibili da tenant Sentinel B (test SQL in transazione con rollback, vedi cronologia chat o `supabase/tests/`)
   - **#6 verifica catena audit**: pulsante "Verifica integrità catena" su `/audit/log` → "Catena integra. Tutti gli hash combaciano."
   - Nota UX confermata: lo sblocco sequenziale NON si aggira con il seek del player — `regola_completamento: video_ended` viene ricalcolato lato server dagli eventi (D26).
-- **M2** — *Corsi reali end-to-end.* ⬜ aperto. Criteri in `docs/brief-fase-2.md` §8.
-  - **#1 Authoring funzionante** ✅ sul deploy production 2026-05-22: admin
-    crea LO `video` e LO `documento` (PDF su Storage), crea un Corso dalla UI,
-    compone la Struttura con LO ordinati, alcuni obbligatori e alcuni
-    facoltativi. Gli eventi `learning_object.*`, `corso.*` e `struttura.*`
-    sono nel log dell'auditor con catena integra. *Tasks 1 + 2 chiusi.*
-  - **#2 Congelamento (D22)**, **#3 Fruizione multi-LO**, **#4 Sblocco
-    sequenziale**, **#5 Report multi-LO**, **#6 Isolamento Storage**,
-    **#7 Log Fase 1 invariato sui nuovi eventi**: ⬜ aperti, vengono
-    esercitati dai Task 3-5.
+- **M2** — *Corsi reali end-to-end.* ⬜ aperto (manca il Task 5). Criteri in
+  `docs/brief-fase-2.md` §8.
+  - **#1 Authoring funzionante** ✅ sul deploy production 2026-05-22 (Task 1+2).
+  - **#2 Congelamento reale (D22)** ✅ verificato sul Supabase live con 9 test
+    SQL: i trigger `corso_freeze` e `struttura_freeze` rifiutano
+    update/insert/delete sui campi strutturali e su `struttura_corso` quando
+    il Corso ha almeno un'Edizione (anche conclusa). Test bonus: update su
+    `creato_il` (campo non strutturale) resta consentito.
+  - **#3 Fruizione multi-LO** ✅ a livello DB (Task 4): simulato il flusso
+    completo `video.ended` → sblocco `documento` → `documento.opened`/
+    `documento.completed` → idoneità. UI player documento da verificare nel
+    browser (l'API è la stessa code path di `/api/events/video` di Fase 1).
+  - **#4 Sblocco sequenziale (D26) in esercizio** ✅ a livello DB: corso demo
+    `Demo multi-LO` con LO1 video + LO2 documento, `sblocco_sequenziale=true`,
+    LO2 risulta `sbloccato: false` finché LO1 non riceve `video.ended`.
+    `compliance.ts` aggiornato per mappare anche `documento_completed`.
+  - **#5 Report multi-LO** ⬜ aperto — è il Task 5.
+  - **#6 Isolamento Storage** ✅ verificato sul live: un utente authenticated
+    di un altro tenant (simulato con `SET LOCAL request.jwt.claims`) vede 0
+    file del bucket `documenti`; il discente legittimo vede il proprio file.
+  - **#7 Log Fase 1 invariato sui nuovi eventi** ✅ — `audit_verify_chain`
+    ritorna 0 problemi dopo i nuovi tipi `learning_object.*`, `corso.*`,
+    `struttura.*`, `edizione.*`, `documento.opened`/`documento.completed`.
 
 ## Infrastruttura cloud creata
 
@@ -142,20 +161,19 @@ log dell'auditor con catena integra.
 
 ## Cosa fare nella prossima sessione
 
-Fase 1 chiusa, Fase 2 in corso: **Task 1 ✅** (authoring LO) e **Task 2 ✅**
-(assemblatore Corsi), Task 3-5 aperti. Il prossimo da affrontare è il
-**Task 3 — Authoring Edizioni + congelamento D22** (`docs/brief-fase-2.md`
-§5 Task 3): UI per creare un'Edizione di un Corso (due coppie di date —
-`data_inizio`/`data_fine` e `fad_apertura`/`fad_chiusura` — più il ciclo di
-vita soft `concluso_at`/`annullato_at`, D29), e la creazione della *prima*
-Edizione di un Corso **congela** lato DB i campi strutturali del Corso e la
-sua Struttura (D22). Il congelamento va fatto rispettare lato server/DB con
-un trigger che rifiuta UPDATE/INSERT/DELETE sui campi congelati quando il
-Corso ha almeno un'Edizione — non solo disabilitato in UI. Avviarlo solo
-dopo conferma esplicita dell'utente.
+Fase 1 chiusa, Fase 2 in corso: **Task 1-4 ✅** (Task 4 verificato a livello
+DB, UI nel browser da rivedere). Il prossimo da affrontare è il
+**Task 5 — Report di completamento multi-LO (gate M2)**
+(`docs/brief-fase-2.md` §5 Task 5): il report *completamento attività* (D35)
+deve ricalcolare lo stato di avanzamento su un corso multi-LO, distinguere LO
+obbligatori e facoltativi, applicare la `regola_completamento` di ogni riga di
+Struttura, derivare l'idoneità dell'iscrizione. Resta **ricalcolato dagli
+Eventi a ogni apertura**, senza stato persistente proprio (D8). Il report *log
+eventi* della Fase 1 continua a funzionare invariato sui nuovi Eventi.
 
-I TODO di Fase 1 ancora aperti restano qui sotto: non sono bloccanti, ma vanno
-chiusi prima di consegnare a clienti veri.
+Avviarlo solo dopo conferma esplicita dell'utente. I TODO di Fase 1 ancora
+aperti restano qui sotto: non sono bloccanti, ma vanno chiusi prima di
+consegnare a clienti veri.
 
 ### TODO Fase 1 ancora aperti (non bloccanti per M1, ma da chiudere prima di mettere in mano clienti veri)
 
@@ -190,18 +208,31 @@ chiusi prima di consegnare a clienti veri.
   log: `learning_object.{created,updated,archived,unarchived}`. §9 ratificato.
 - **Task 2 — Assemblatore Corsi** ✅ done (2026-05-22). Policy RLS write su
   `corso` e `struttura_corso` per admin, RPC `reorder_struttura` per il
-  riordino atomico (shift in range negativo, poi riassegnazione 1..N). UI
-  `/admin/corsi` con lista + form `new` + dettaglio con editor della Struttura
-  (aggiungi LO dal catalogo non archiviato, frecce ↑↓, toggle obbligatorio,
-  rimuovi). Eventi: `corso.{created,updated}` e
+  riordino atomico. UI `/admin/corsi` con lista + form + dettaglio con editor
+  della Struttura. Eventi: `corso.{created,updated}` e
   `struttura.{added,updated,removed,reordered}`.
-- **Task 3 — Edizioni + congelamento D22** ⬜ da iniziare. UI per `edizione`;
-  la creazione della prima Edizione di un Corso **congela** lato DB i campi
-  strutturali del Corso e la Struttura.
-- **Task 4 — Fruizione multi-LO** ⬜ da iniziare. Visualizzatore PDF per
-  `documento` con eventi server-side; sblocco sequenziale esercitato su corsi
-  multi-LO reali.
-- **Task 5 — Report multi-LO (gate M2)** ⬜ da iniziare.
+- **Task 3 — Edizioni + congelamento D22** ✅ done (2026-05-22). Rename
+  `edizione.inizio/fine` → `data_inizio/data_fine`, aggiunte
+  `fad_apertura/fad_chiusura/concluso_at/annullato_at`, policy RLS, trigger
+  `corso_freeze` + `struttura_freeze` (rifiutano write a livello DB quando
+  Corso ha ≥1 Edizione). UI sezione Edizioni con tabella + form crea +
+  Concludi/Annulla; banner "Corso congelato" + disabilitazione dei controlli.
+  Eventi: `edizione.{created,updated,concluded,cancelled}`.
+- **Task 4 — Fruizione multi-LO** ✅ done (DB) (2026-05-22). Aggiunti
+  `/api/events/documento` (gemello di `/api/events/video` con stesso
+  enforcement D26), `/api/storage/documento/[loId]/signed-url` (genera
+  signed URL temporanea 1h con check di sblocco prima di firmare),
+  `<DocumentoPlayer>` client component (iframe + bottone "Ho terminato la
+  lettura" → `documento.completed`). Pagina LO discente con branching su
+  `lo.type`. `compliance.ts` mappa anche `documento_completed`. Verifica
+  funzionale UI nel browser ancora da fare. Setup di test sul live:
+  corso `Demo multi-LO` (id `a4a4a4a4-…0001`, edizione `ED-T4-DEMO`,
+  iscrizione discente `a4a4a4a4-…0030`) — il discente l'ha già completato
+  via simulazione SQL.
+- **Task 5 — Report multi-LO (gate M2)** ⬜ da iniziare. Estendere il report
+  `/audit/completamento` per ricalcolare lo stato su corsi multi-LO, distinguere
+  obbligatori e facoltativi, derivare l'idoneità dell'iscrizione. Tutto come
+  vista derivata dagli Eventi (D8), niente stato proprio.
 
 Mandato operativo completo: **`docs/brief-fase-2.md`**.
 
@@ -317,11 +348,11 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
 
 ## Cosa NON fare
 
-- **NON iniziare il Task 3 di Fase 2 (Edizioni + congelamento D22) senza
+- **NON iniziare il Task 5 di Fase 2 (Report multi-LO, gate M2) senza
   conferma esplicita dell'utente.** Il brief `docs/brief-fase-2.md` §5
-  Task 3 fissa lo scope, e il congelamento D22 è la garanzia che un corso
-  erogato non cambi sotto i piedi di chi lo segue — va costruito bene, non
-  a istinto. Stesso vincolo per i Task 4-5.
+  Task 5 fissa lo scope, e il report del completamento è una vista *derivata*
+  dagli Eventi (D8, D35) — niente stato proprio, ricalcolata a ogni apertura.
+  Quando il Task 5 è verde, M2 è verde.
 - **NON aggiungere features fuori scope** rispetto al brief della fase
   corrente. Se emerge la tentazione di costruire qualcosa fuori scope,
   segnalalo all'utente e fermati.
