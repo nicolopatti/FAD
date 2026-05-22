@@ -230,6 +230,21 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
       il Supabase live, basta aggiungere i 3 secrets in GitHub → Settings
       → Secrets and variables → Actions (NEXT_PUBLIC_SUPABASE_URL,
       NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).
+11. **Insert diretto in `auth.users` via SQL** (fallback quando manca la
+    service-role key in env, es. quando si crea un utente via MCP
+    `execute_sql` invece che con `npm run bootstrap`): GoTrue richiede che
+    quattro colonne varchar siano **stringa vuota `''`** e non `NULL`,
+    altrimenti il login fallisce con il messaggio generico `Database error
+    querying schema`. I campi noti sono `confirmation_token`,
+    `recovery_token`, `email_change_token_new`, `email_change`. Default
+    della tabella è `NULL` (non `''`), quindi se l'INSERT non li elenca
+    esplicitamente prendono `NULL` ed è quello che rompe. Fix: aggiungerli
+    all'INSERT con valore `''`, oppure fare un `update auth.users set …` a
+    posteriori. Il bootstrap via Auth Admin API (`npm run bootstrap`) NON
+    ha questo problema perché GoTrue popola correttamente. Diagnostica:
+    confronta i campi dell'utente rotto con quelli di un utente buono
+    (`select confirmation_token, recovery_token, … from auth.users where
+    email in (…)`) — i NULL saltano fuori subito.
 
 ## Cosa NON fare
 
