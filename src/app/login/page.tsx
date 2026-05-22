@@ -49,7 +49,8 @@ export default function LoginPage() {
       </form>
       <p className="muted mono" style={{ marginTop: 24 }}>
         Demo: <code>discente@fad.local</code> / <code>discente-pass-123</code><br/>
-        Demo: <code>auditor@fad.local</code> / <code>auditor-pass-123</code>
+        Demo: <code>auditor@fad.local</code> / <code>auditor-pass-123</code><br/>
+        Demo: <code>admin@fad.local</code> / <code>admin-pass-123</code>
       </p>
     </div>
   );
