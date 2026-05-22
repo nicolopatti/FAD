@@ -2,7 +2,12 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import type { CorsoRow, LearningObjectRow, StrutturaCorsoConLO } from '@/lib/db-types';
+import type {
+  CorsoRow,
+  EdizioneRow,
+  LearningObjectRow,
+  StrutturaCorsoConLO,
+} from '@/lib/db-types';
 import { CorsoEditor } from './CorsoEditor';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +34,17 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
     .order('ordine', { ascending: true })
     .returns<StrutturaCorsoConLO[]>();
 
+  const { data: edizioni } = await supabase
+    .from('edizione')
+    .select(`
+      id, tenant_id, corso_id, codice,
+      data_inizio, data_fine, fad_apertura, fad_chiusura,
+      concluso_at, annullato_at, creato_il
+    `)
+    .eq('corso_id', params.id)
+    .order('creato_il', { ascending: false })
+    .returns<EdizioneRow[]>();
+
   // LO disponibili per essere aggiunti: non archiviati e non già nella struttura.
   const usedLoIds = new Set((struttura ?? []).map((s) => s.learning_object_id));
   const { data: allLo } = await supabase
@@ -49,6 +65,7 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
       <CorsoEditor
         corso={corso}
         struttura={struttura ?? []}
+        edizioni={edizioni ?? []}
         availableLo={availableLo}
       />
     </>

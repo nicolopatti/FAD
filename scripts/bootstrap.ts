@@ -245,8 +245,10 @@ async function upsertEdizione(admin: SupabaseClient) {
       ...COURSE.edizione,
       tenant_id: TENANT_ID,
       corso_id: COURSE.corso.id,
-      inizio: today,
-      fine: in60,
+      data_inizio: today,
+      data_fine: in60,
+      fad_apertura: today,
+      fad_chiusura: in60,
     },
     { onConflict: 'id' },
   );

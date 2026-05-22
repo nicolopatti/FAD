@@ -101,6 +101,26 @@ export type StrutturaCorsoConLO = StrutturaCorsoRow & {
   learning_object: LearningObjectMini | null;
 };
 
+export type EdizioneRow = {
+  id: string;
+  tenant_id: string;
+  corso_id: string;
+  codice: string;
+  data_inizio: string | null;
+  data_fine: string | null;
+  fad_apertura: string | null;
+  fad_chiusura: string | null;
+  concluso_at: string | null;
+  annullato_at: string | null;
+  creato_il: string;
+};
+
+export function edizioneStato(e: Pick<EdizioneRow, 'concluso_at' | 'annullato_at'>): 'attiva' | 'conclusa' | 'annullata' {
+  if (e.annullato_at) return 'annullata';
+  if (e.concluso_at) return 'conclusa';
+  return 'attiva';
+}
+
 export type StrutturaRow = {
   id: string;
   ordine: number;
