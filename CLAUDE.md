@@ -1,10 +1,10 @@
-# Stato del progetto FAD — Fase 1 (handoff session-to-session)
+# Stato del progetto FAD — Fase 2 in corso (handoff session-to-session)
 
 > Questo file è il primo da leggere all'inizio di ogni nuova sessione.
 > Riassume cosa è stato fatto, cosa resta, e come riprendere senza dover
 > rispiegare nulla. Fonte autoritativa per *cosa* costruire: `docs/brief-fase-1.md`
-> (mandato operativo) e — in caso di conflitto — `piattaforma-elearning-stato-progetto-v7.md`
-> con le decisioni D1–D35.
+> (Fase 1, chiusa) e `docs/brief-fase-2.md` (Fase 2, in corso) — e in caso di
+> conflitto `piattaforma-elearning-stato-progetto-v7.md` con le decisioni D1–D35.
 
 ## Stato di avanzamento (Fase 1)
 
@@ -22,6 +22,21 @@ deploy: confermata 2026-05-22.
 | 5 | Player Vimeo tracciato | ✅ sblocco sequenziale enforced lato API + UI |
 | 6 | I due report di audit (gate M1) | ✅ verificati su `/audit/log` (Log eventi + Completamento attività) |
 
+## Stato di avanzamento (Fase 2)
+
+**Task 1 chiuso.** Verifica funzionale 2026-05-22 sul deploy production: admin
+loggato, creato LO `video` e LO `documento` (PDF caricato su bucket Storage
+`documenti`), eventi `learning_object.created` visibili sul log dell'auditor,
+verifica catena hash integra.
+
+| Task | Descrizione | Stato |
+|---|---|---|
+| 1 | Authoring LO (video + documento + admin + Storage) | ✅ done — `supabase/migrations/20260522000001_…sql` + `…000002_…_admin_storage.sql`, UI `/admin/learning-objects` |
+| 2 | Assemblatore Corsi (CRUD `corso` + Struttura) | ⬜ da iniziare |
+| 3 | Authoring Edizioni + congelamento D22 | ⬜ da iniziare |
+| 4 | Fruizione discente multi-LO (player documento) | ⬜ da iniziare |
+| 5 | Report completamento multi-LO (gate M2) | ⬜ da iniziare |
+
 ## Stato dei gate
 
 - **M1a** — *Il log regge.* ✅
@@ -35,6 +50,12 @@ deploy: confermata 2026-05-22.
   - **#5 isolamento tenant**: query con `SET LOCAL role authenticated` + JWT claim del discente di tenant A → 0 righe visibili da tenant Sentinel B (test SQL in transazione con rollback, vedi cronologia chat o `supabase/tests/`)
   - **#6 verifica catena audit**: pulsante "Verifica integrità catena" su `/audit/log` → "Catena integra. Tutti gli hash combaciano."
   - Nota UX confermata: lo sblocco sequenziale NON si aggira con il seek del player — `regola_completamento: video_ended` viene ricalcolato lato server dagli eventi (D26).
+- **M2** — *Corsi reali end-to-end.* ⬜ aperto. Criteri in `docs/brief-fase-2.md` §8.
+  - Verifica funzionale Task 1 (authoring LO) ✅ sul preview deploy 2026-05-22:
+    admin crea LO `video` e LO `documento` (PDF su Storage), li archivia/ripristina,
+    gli eventi `learning_object.*` compaiono nel log dell'auditor con catena
+    integra. È *una* delle 7 condizioni di M2 (#1 parziale, manca il pezzo
+    "compone la Struttura del Corso" che è del Task 2).
 
 ## Infrastruttura cloud creata
 
@@ -74,6 +95,20 @@ deploy: confermata 2026-05-22.
 #### Utenze demo (create da bootstrap)
 - Discente: `discente@fad.local` / `discente-pass-123`
 - Auditor: `auditor@fad.local` / `auditor-pass-123` (app_metadata.role=auditor)
+- Admin: `admin@fad.local` / `admin-pass-123` (app_metadata.role=admin) — creato
+  in Fase 2 Task 1; sul live l'utente è stato inserito via SQL diretto (la session
+  non aveva la service_role key in env per `npm run bootstrap`). Re-eseguire
+  `npm run bootstrap` con la chiave in env è idempotente e ricrea l'admin nello
+  stesso stato.
+
+#### Supabase Storage
+- Bucket **`documenti`** (privato), creato in Fase 2 Task 1.
+- 4 policy RLS su `storage.objects` (vedi `…000002_…_admin_storage.sql`):
+  - read: chiunque sia `authenticated` dello stesso tenant può scaricare i file
+    con prefisso `{tenant_id}/...` (Task 4 ne avrà bisogno per i discenti);
+  - insert/update/delete: solo `is_admin()` del tenant proprio.
+- Path convenzione: `{tenant_id}/{lo_id}.pdf` — il primo segmento è verificato
+  dalle policy via `(storage.foldername(name))[1]`.
 
 ### Vercel
 - Team `nicolopatti's projects` (`team_LDcXwgO7cQrFtkAhaISEhjYj`, slug `nicolopattis-projects`).
@@ -95,17 +130,23 @@ deploy: confermata 2026-05-22.
 1. **Cloud-only workflow** — GitHub → Vercel → Supabase, Claude Code on the web.
    Niente `.env` locali, niente `supabase start`. Credenziali nei pannelli dei provider.
 2. **Vimeo** come hosting video (D5 con domain restriction).
-3. Tutto il resto del brief: D2, D8, D11, D18, D19, D23, D24, D26, D27, D35 implementati come specificato.
+3. **Supabase Storage** come hosting dei file `documento` (§9 brief Fase 2,
+   ratificato all'avvio del Task 1 della Fase 2). Bucket privato + policy RLS
+   per-tenant + path `{tenant_id}/{lo_id}.pdf`.
+4. Tutto il resto del brief: D2, D8, D11, D18, D19, D23, D24, D26, D27, D35 implementati come specificato.
 
 ## Cosa fare nella prossima sessione
 
-Fase 1 è chiusa. Il brief operativo della Fase 2 esiste: **`docs/brief-fase-2.md`**
-(scope, ordine dei 5 task, milestone M2). Prima di iniziare a costruire, leggerlo
-per intero — è il mandato che vincola lo scope esattamente come `docs/brief-fase-1.md`
-ha fatto in Fase 1. Avviare il Task 1 solo dopo conferma esplicita dell'utente
-(serve almeno ratificare il §9 — Supabase Storage come hosting dei file `documento`).
-I TODO di Fase 1 ancora aperti restano qui sotto: non sono bloccanti per partire
-con Fase 2, ma vanno chiusi prima di consegnare a clienti veri.
+Fase 1 chiusa, Fase 2 in corso: **Task 1 ✅** (authoring LO), Task 2-5 aperti.
+Il prossimo da affrontare è il **Task 2 — Assemblatore di Corsi**
+(`docs/brief-fase-2.md` §5 Task 2): CRUD `corso` dalla UI, composizione della
+Struttura del corso (aggiungere LO esistenti, riordinare, marcare obbligatorio
+e regola di completamento), unicità `(corso_id, learning_object_id)`, sequenza
+piatta (D25). Avviarlo solo dopo conferma esplicita dell'utente — il brief è
+il mandato e va riletto per restare nello scope.
+
+I TODO di Fase 1 ancora aperti restano qui sotto: non sono bloccanti, ma vanno
+chiusi prima di consegnare a clienti veri.
 
 ### TODO Fase 1 ancora aperti (non bloccanti per M1, ma da chiudere prima di mettere in mano clienti veri)
 
@@ -128,13 +169,23 @@ con Fase 2, ma vanno chiusi prima di consegnare a clienti veri.
    tramite array. Se si rilancia su un DB esistente, fa upsert; se i `learning_object_id`
    vengono cambiati, lascia i record orfani — pulirli a mano via SQL prima.
 
-### Fase 2 (quando partirà)
-Fase 2 = assemblatore corsi (UI di authoring su `learning_object`, `corso`,
-`struttura_corso`, `edizione`), LO `documento` su Supabase Storage, congelamento D22
-fatto rispettare lato DB, sblocco sequenziale esercitato su corsi multi-LO reali, report
-di completamento ricalcolato su multi-LO. Mandato operativo completo in
-**`docs/brief-fase-2.md`** (5 task in sequenza → gate M2). Decisione ancora aperta da
-ratificare al §9 del brief: **Supabase Storage come hosting dei file `documento`**.
+### Fase 2 (in corso) — stato di dettaglio
+- **Task 1 — Authoring LO** ✅ done (2026-05-22). Aggiunti: tipo `documento`,
+  `archiviato_at`, ruolo `admin`, policy RLS, bucket Storage `documenti`, UI
+  `/admin/learning-objects`, API `/api/admin/learning-objects/*`. Eventi nel
+  log: `learning_object.{created,updated,archived,unarchived}`. §9 ratificato.
+- **Task 2 — Assemblatore Corsi** ⬜ da iniziare. CRUD `corso` + composizione
+  Struttura (`struttura_corso`) dalla UI. Sequenza piatta (D25), unicità
+  `(corso_id, LO_id)`. Finché il Corso non ha Edizioni, struttura libera.
+- **Task 3 — Edizioni + congelamento D22** ⬜ da iniziare. UI per `edizione`;
+  la creazione della prima Edizione di un Corso **congela** lato DB i campi
+  strutturali del Corso e la Struttura.
+- **Task 4 — Fruizione multi-LO** ⬜ da iniziare. Visualizzatore PDF per
+  `documento` con eventi server-side; sblocco sequenziale esercitato su corsi
+  multi-LO reali.
+- **Task 5 — Report multi-LO (gate M2)** ⬜ da iniziare.
+
+Mandato operativo completo: **`docs/brief-fase-2.md`**.
 
 ## Come riprendere (cheatsheet per nuova session)
 
@@ -248,11 +299,10 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
 
 ## Cosa NON fare
 
-- **NON iniziare il Task 1 di Fase 2 senza conferma esplicita dell'utente** e
-  senza aver ratificato il §9 di `docs/brief-fase-2.md` (Supabase Storage come
-  hosting dei file `documento`). Il brief esiste e fissa lo scope: costruire a
-  istinto fuori da quel perimetro riapre lo scope creep che la Fase 1 ha chiuso
-  con precisione.
+- **NON iniziare il Task 2 di Fase 2 (assemblatore Corsi) senza conferma
+  esplicita dell'utente.** Il brief `docs/brief-fase-2.md` §5 Task 2 fissa lo
+  scope; costruire a istinto fuori da quel perimetro riapre lo scope creep che
+  la Fase 1 ha chiuso con precisione. Stesso vincolo per i Task 3-5.
 - **NON aggiungere features fuori scope** rispetto al brief della fase
   corrente. Se emerge la tentazione di costruire qualcosa fuori scope,
   segnalalo all'utente e fermati.
