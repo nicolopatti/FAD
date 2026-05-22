@@ -56,20 +56,36 @@ const COURSE = {
     descrizione: 'Corso FAD di prova per la fetta verticale di Fase 1.',
     sblocco_sequenziale: true,
   },
-  lo: {
-    id: '10101111-1010-1010-1010-101010101010',
-    type: 'video' as const,
-    titolo: 'Introduzione',
-    // Big Buck Bunny — placeholder Vimeo pubblico. Sostituire con il video reale
-    // una volta caricato sull'account Vimeo con domain restriction abilitata.
-    config: { vimeo_id: '76979871', durata_secondi: 160 },
-  },
-  struttura: {
-    id: '5550c011-5555-5555-5555-555555555555',
-    ordine: 1,
-    obbligatorio: true,
-    regola_completamento: { tipo: 'video_ended' },
-  },
+  // Due LO video in sequenza: D26 sblocco sequenziale richiede che LO #2 sia
+  // bloccato finché LO #1 non riceve video.ended. Vimeo ID è il placeholder
+  // pubblico di Fase 1; va sostituito con i video reali quando caricati
+  // sull'account Vimeo con domain restriction.
+  los: [
+    {
+      id: '10101111-1010-1010-1010-101010101010',
+      type: 'video' as const,
+      titolo: 'Introduzione',
+      config: { vimeo_id: '76979871', durata_secondi: 160 },
+      struttura: {
+        id: '5550c011-5555-5555-5555-555555555555',
+        ordine: 1,
+        obbligatorio: true,
+        regola_completamento: { tipo: 'video_ended' },
+      },
+    },
+    {
+      id: '10102222-1010-1010-1010-101010101010',
+      type: 'video' as const,
+      titolo: 'Approfondimento — modulo 2',
+      config: { vimeo_id: '76979871', durata_secondi: 160 },
+      struttura: {
+        id: '5550c022-5555-5555-5555-555555555555',
+        ordine: 2,
+        obbligatorio: true,
+        regola_completamento: { tipo: 'video_ended' },
+      },
+    },
+  ],
   edizione: {
     id: 'ed011111-ed01-ed01-ed01-ed01ed01ed01',
     codice: 'ED-001',
@@ -97,8 +113,8 @@ async function main() {
 
   log('Seed catalogo (Corso + LO + Struttura + Edizione + Iscrizione)…');
   await upsertCorso(admin);
-  await upsertLearningObject(admin);
-  await upsertStruttura(admin);
+  await upsertLearningObjects(admin);
+  await upsertStrutture(admin);
   await upsertEdizione(admin);
   await upsertIscrizione(admin, DEMO.discente.persona.id);
 
@@ -176,25 +192,35 @@ async function upsertCorso(admin: SupabaseClient) {
   if (error) throw error;
 }
 
-async function upsertLearningObject(admin: SupabaseClient) {
-  const { error } = await admin.from('learning_object').upsert(
-    { ...COURSE.lo, tenant_id: TENANT_ID },
-    { onConflict: 'id' },
-  );
-  if (error) throw error;
+async function upsertLearningObjects(admin: SupabaseClient) {
+  for (const lo of COURSE.los) {
+    const { error } = await admin.from('learning_object').upsert(
+      {
+        id: lo.id,
+        type: lo.type,
+        titolo: lo.titolo,
+        config: lo.config,
+        tenant_id: TENANT_ID,
+      },
+      { onConflict: 'id' },
+    );
+    if (error) throw error;
+  }
 }
 
-async function upsertStruttura(admin: SupabaseClient) {
-  const { error } = await admin.from('struttura_corso').upsert(
-    {
-      ...COURSE.struttura,
-      tenant_id: TENANT_ID,
-      corso_id: COURSE.corso.id,
-      learning_object_id: COURSE.lo.id,
-    },
-    { onConflict: 'id' },
-  );
-  if (error) throw error;
+async function upsertStrutture(admin: SupabaseClient) {
+  for (const lo of COURSE.los) {
+    const { error } = await admin.from('struttura_corso').upsert(
+      {
+        ...lo.struttura,
+        tenant_id: TENANT_ID,
+        corso_id: COURSE.corso.id,
+        learning_object_id: lo.id,
+      },
+      { onConflict: 'id' },
+    );
+    if (error) throw error;
+  }
 }
 
 async function upsertEdizione(admin: SupabaseClient) {
