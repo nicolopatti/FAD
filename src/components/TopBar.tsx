@@ -21,6 +21,7 @@ export function TopBar({
         ) : isAdmin ? (
           <>
             <Link href="/admin/learning-objects">Learning Object</Link>
+            <Link href="/admin/corsi">Corsi</Link>
           </>
         ) : (
           <Link href="/corsi">I miei corsi</Link>

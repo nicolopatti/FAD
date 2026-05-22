@@ -76,6 +76,31 @@ export type DocumentoConfig = {
   filename?: string;
 };
 
+export type CorsoRow = {
+  id: string;
+  tenant_id: string;
+  titolo: string;
+  descrizione: string | null;
+  sblocco_sequenziale: boolean;
+  creato_il: string;
+};
+
+export type RegolaCompletamento = { tipo: 'video_ended' } | { tipo: 'documento_completed' };
+
+export type StrutturaCorsoRow = {
+  id: string;
+  tenant_id: string;
+  corso_id: string;
+  learning_object_id: string;
+  ordine: number;
+  obbligatorio: boolean;
+  regola_completamento: RegolaCompletamento;
+};
+
+export type StrutturaCorsoConLO = StrutturaCorsoRow & {
+  learning_object: LearningObjectMini | null;
+};
+
 export type StrutturaRow = {
   id: string;
   ordine: number;
