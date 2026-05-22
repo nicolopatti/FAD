@@ -63,7 +63,7 @@
 - 1 stream audit (1 per tenant come da D11/D19)
 - 2 utenti Auth + 2 Persone
 - 1 Corso ("Sicurezza sul lavoro — modulo introduttivo", `c0c01111-…`) + **2 LO video Vimeo** in sequenza (`10101111-…` Introduzione ordine 1, `10102222-…` Approfondimento ordine 2) + Struttura + 1 Edizione (`ed011111-…` codice ED-001) + 1 Iscrizione del discente (`15c11111-…`)
-- Vimeo ID `76979871` è placeholder pubblico (Big Buck Bunny) usato per entrambi i LO. Va sostituito con i video reali del corso una volta caricati sull'account Vimeo del cliente — vedi TODO Vimeo sotto.
+- Vimeo ID `1084894652` (video reale del cliente, 613 s) usato per entrambi i LO. Privacy: Hide from Vimeo + embed limitato ai 3 domini Vercel del progetto (D5 rispettata).
 
 #### Utenze demo (create da bootstrap)
 - Discente: `discente@fad.local` / `discente-pass-123`
@@ -99,15 +99,22 @@ qui sotto.
 
 ### TODO Fase 1 ancora aperti (non bloccanti per M1, ma da chiudere prima di mettere in mano clienti veri)
 
-1. **Vimeo — sostituzione placeholder + domain restriction (D5)**
-   - Oggi i due LO usano `vimeo_id: '76979871'` (Big Buck Bunny pubblico).
-   - Quando il cliente carica i video reali del corso sul proprio account Vimeo:
-     - Aggiornare le righe `learning_object` con i nuovi `vimeo_id` e `durata_secondi`
-       (sia su DB live sia in `scripts/bootstrap.ts`).
-     - Su Vimeo: video → Settings → Privacy → "Where can this be embedded?" →
-       **Specific domains** → aggiungere `fad-wine.vercel.app` e i domini preview/staging.
-     - Vimeo Specific Domains NON supporta wildcard: serve una entry per ogni dominio.
-2. **Stato bootstrap idempotente**: lo script `npm run bootstrap` ora gestisce 2 LO
+1. **Secondo video del corso (opzionale)**: oggi entrambi i LO puntano allo stesso
+   `vimeo_id: '1084894652'` (613 s). La verifica dello sblocco sequenziale funziona
+   lo stesso perché i due LO sono righe distinte, ma per un corso reale il
+   cliente vorrà probabilmente un video diverso sul secondo capitolo. Quando lo
+   ha caricato su Vimeo, aggiornare la riga `learning_object` di id
+   `10102222-1010-1010-1010-101010101010` (DB live + `scripts/bootstrap.ts`).
+2. **Anagrafica + titoli del corso reali**: oggi titoli, descrizione e codice
+   edizione sono i seed di Fase 1 ("Sicurezza sul lavoro — modulo introduttivo",
+   "ED-001"). Vanno sostituiti con i contenuti veri quando definiti dal cliente.
+3. **Domini preview Vimeo**: la domain whitelist Vimeo include solo i 3 alias
+   stabili (`fad-wine`, `fad-nicolopattis-projects`, `fad-git-main-…`). Le
+   preview Vercel con hash (`fad-<hash>-…`) non riusciranno a riprodurre il
+   video — Vimeo Specific Domains NON supporta wildcard. Se serve testare un
+   video reale in preview, aggiungere a mano il dominio preview specifico su
+   Vimeo (o tornare temporaneamente a "Anywhere" per quella sessione di test).
+4. **Stato bootstrap idempotente**: lo script `npm run bootstrap` ora gestisce 2 LO
    tramite array. Se si rilancia su un DB esistente, fa upsert; se i `learning_object_id`
    vengono cambiati, lascia i record orfani — pulirli a mano via SQL prima.
 

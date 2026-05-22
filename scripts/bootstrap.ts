@@ -57,15 +57,16 @@ const COURSE = {
     sblocco_sequenziale: true,
   },
   // Due LO video in sequenza: D26 sblocco sequenziale richiede che LO #2 sia
-  // bloccato finché LO #1 non riceve video.ended. Vimeo ID è il placeholder
-  // pubblico di Fase 1; va sostituito con i video reali quando caricati
-  // sull'account Vimeo con domain restriction.
+  // bloccato finché LO #1 non riceve video.ended. Per la Fase 1 puntano allo
+  // stesso video reale del cliente su Vimeo (privacy + domain restriction su
+  // fad-wine / fad-nicolopattis-projects / fad-git-main-…); per la verifica
+  // dello sblocco bastano due LO distinti, non serve un secondo video reale.
   los: [
     {
       id: '10101111-1010-1010-1010-101010101010',
       type: 'video' as const,
       titolo: 'Introduzione',
-      config: { vimeo_id: '76979871', durata_secondi: 160 },
+      config: { vimeo_id: '1084894652', durata_secondi: 613 },
       struttura: {
         id: '5550c011-5555-5555-5555-555555555555',
         ordine: 1,
@@ -77,7 +78,7 @@ const COURSE = {
       id: '10102222-1010-1010-1010-101010101010',
       type: 'video' as const,
       titolo: 'Approfondimento — modulo 2',
-      config: { vimeo_id: '76979871', durata_secondi: 160 },
+      config: { vimeo_id: '1084894652', durata_secondi: 613 },
       struttura: {
         id: '5550c022-5555-5555-5555-555555555555',
         ordine: 2,
