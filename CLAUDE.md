@@ -99,9 +99,13 @@ deploy: confermata 2026-05-22.
 
 ## Cosa fare nella prossima sessione
 
-Fase 1 è chiusa. Prima di iniziare Fase 2, leggere `docs/brief-fase-1.md` e — se
-esiste — il brief di Fase 2; in mancanza, partire dai TODO di Fase 1 ancora aperti
-qui sotto.
+Fase 1 è chiusa. Il brief operativo della Fase 2 esiste: **`docs/brief-fase-2.md`**
+(scope, ordine dei 5 task, milestone M2). Prima di iniziare a costruire, leggerlo
+per intero — è il mandato che vincola lo scope esattamente come `docs/brief-fase-1.md`
+ha fatto in Fase 1. Avviare il Task 1 solo dopo conferma esplicita dell'utente
+(serve almeno ratificare il §9 — Supabase Storage come hosting dei file `documento`).
+I TODO di Fase 1 ancora aperti restano qui sotto: non sono bloccanti per partire
+con Fase 2, ma vanno chiusi prima di consegnare a clienti veri.
 
 ### TODO Fase 1 ancora aperti (non bloccanti per M1, ma da chiudere prima di mettere in mano clienti veri)
 
@@ -125,16 +129,20 @@ qui sotto.
    vengono cambiati, lascia i record orfani — pulirli a mano via SQL prima.
 
 ### Fase 2 (quando partirà)
-Fase 2 = assemblatore corsi, LO documento, Supabase Storage. **Non iniziare nulla di
-Fase 2 senza un brief operativo equivalente a `docs/brief-fase-1.md`.** Se il brief
-manca, segnalarlo all'utente e fermarsi.
+Fase 2 = assemblatore corsi (UI di authoring su `learning_object`, `corso`,
+`struttura_corso`, `edizione`), LO `documento` su Supabase Storage, congelamento D22
+fatto rispettare lato DB, sblocco sequenziale esercitato su corsi multi-LO reali, report
+di completamento ricalcolato su multi-LO. Mandato operativo completo in
+**`docs/brief-fase-2.md`** (5 task in sequenza → gate M2). Decisione ancora aperta da
+ratificare al §9 del brief: **Supabase Storage come hosting dei file `documento`**.
 
 ## Come riprendere (cheatsheet per nuova session)
 
-Tutte le info utili stanno in 3 file in questo repo:
+Tutte le info utili stanno in 4 file in questo repo:
 - `CLAUDE.md` (questo file) → stato
 - `README.md` → setup, mappa Task → file, ricette di verifica M1a/M1
-- `docs/brief-fase-1.md` → mandato operativo Fase 1
+- `docs/brief-fase-1.md` → mandato operativo Fase 1 (storico, chiusa)
+- `docs/brief-fase-2.md` → mandato operativo Fase 2 (corrente)
 
 Comandi spesso usati:
 ```bash
@@ -225,9 +233,11 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
 
 ## Cosa NON fare
 
-- **NON iniziare Fase 2 senza un brief operativo** equivalente a
-  `docs/brief-fase-1.md`. M1 è verde, ma costruire roba di Fase 2 a istinto
-  riapre lo scope che il brief di Fase 1 ha chiuso con precisione.
+- **NON iniziare il Task 1 di Fase 2 senza conferma esplicita dell'utente** e
+  senza aver ratificato il §9 di `docs/brief-fase-2.md` (Supabase Storage come
+  hosting dei file `documento`). Il brief esiste e fissa lo scope: costruire a
+  istinto fuori da quel perimetro riapre lo scope creep che la Fase 1 ha chiuso
+  con precisione.
 - **NON aggiungere features fuori scope** rispetto al brief della fase
   corrente. Se emerge la tentazione di costruire qualcosa fuori scope,
   segnalalo all'utente e fermati.
