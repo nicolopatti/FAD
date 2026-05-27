@@ -24,17 +24,20 @@ deploy: confermata 2026-05-22.
 
 ## Stato di avanzamento (Fase 2)
 
-**Task 1 + Task 2 + Task 3 + Task 4 chiusi** (Task 4 verificato a livello DB,
-UI da provare nel browser). Verifica funzionale 2026-05-22 sul deploy
-production: admin crea LO `video` + LO `documento` (PDF su bucket Storage
-`documenti`), crea Corsi dalla UI, compone la Struttura aggiungendo/
-riordinando/togglando LO. Creazione della prima Edizione congela corso +
-Struttura via trigger DB (D22 verificato con 9 test SQL sul live).
-Fruizione discente multi-LO con sblocco sequenziale D26 verificato a livello
-DB: simulazione completa di video.ended → sblocco documento → documento.
-opened/completed → idoneità. Catena audit integra dopo i 3 nuovi tipi di
-evento. Isolamento Storage tenant verificato (un utente di tenant diverso
-vede 0 file).
+**Fase 2 chiusa. Tutti i Task ✅, gate M2 ✅ VERDE** (Task 5 chiuso 2026-05-27;
+verifiche UI nel browser di Task 4/5 ancora consigliate prima della consegna a
+clienti veri). Verifica funzionale 2026-05-22 sul deploy production: admin crea
+LO `video` + LO `documento` (PDF su bucket Storage `documenti`), crea Corsi dalla
+UI, compone la Struttura aggiungendo/riordinando/togglando LO. Creazione della
+prima Edizione congela corso + Struttura via trigger DB (D22 verificato con 9
+test SQL sul live). Fruizione discente multi-LO con sblocco sequenziale D26
+verificato a livello DB: simulazione completa di video.ended → sblocco documento
+→ documento.opened/completed → idoneità. Catena audit integra dopo i 3 nuovi
+tipi di evento. Isolamento Storage tenant verificato (un utente di tenant diverso
+vede 0 file). Task 5: report di completamento *rule-aware* su corso multi-LO
+(distingue obbligatori/facoltativi, applica la `regola_completamento` di ogni
+riga, deriva l'idoneità solo dagli obbligatori), verificato con 21/21 test SQL
+sul live + read-only sul corso reale `Demo multi-LO`.
 
 | Task | Descrizione | Stato |
 |---|---|---|
@@ -42,7 +45,7 @@ vede 0 file).
 | 2 | Assemblatore Corsi (CRUD `corso` + Struttura) | ✅ done — `…20260522000003_…_corso_struttura_admin.sql`, UI `/admin/corsi`, RPC `reorder_struttura` |
 | 3 | Authoring Edizioni + congelamento D22 | ✅ done — `…20260522000004_…_edizioni_congelamento.sql`, trigger DB verificati |
 | 4 | Fruizione discente multi-LO (player documento) | ✅ done (DB) — `/api/events/documento`, `/api/storage/.../signed-url`, `DocumentoPlayer`, branching pagina LO. UI nel browser da verificare. |
-| 5 | Report completamento multi-LO (gate M2) | ⬜ da iniziare |
+| 5 | Report completamento multi-LO (gate M2) | ✅ done — report *rule-aware* in `compliance.ts` + UI `/audit/completamento` (mostra tipo, obbligatorio/facoltativo, regola), test `supabase/tests/m2_completamento.sql` 21/21 sul live |
 
 ## Stato dei gate
 
@@ -57,8 +60,8 @@ vede 0 file).
   - **#5 isolamento tenant**: query con `SET LOCAL role authenticated` + JWT claim del discente di tenant A → 0 righe visibili da tenant Sentinel B (test SQL in transazione con rollback, vedi cronologia chat o `supabase/tests/`)
   - **#6 verifica catena audit**: pulsante "Verifica integrità catena" su `/audit/log` → "Catena integra. Tutti gli hash combaciano."
   - Nota UX confermata: lo sblocco sequenziale NON si aggira con il seek del player — `regola_completamento: video_ended` viene ricalcolato lato server dagli eventi (D26).
-- **M2** — *Corsi reali end-to-end.* ⬜ aperto (manca il Task 5). Criteri in
-  `docs/brief-fase-2.md` §8.
+- **M2** — *Corsi reali end-to-end.* ✅ **VERDE** (Task 5 chiuso 2026-05-27).
+  Criteri in `docs/brief-fase-2.md` §8.
   - **#1 Authoring funzionante** ✅ sul deploy production 2026-05-22 (Task 1+2).
   - **#2 Congelamento reale (D22)** ✅ verificato sul Supabase live con 9 test
     SQL: i trigger `corso_freeze` e `struttura_freeze` rifiutano
@@ -73,7 +76,18 @@ vede 0 file).
     `Demo multi-LO` con LO1 video + LO2 documento, `sblocco_sequenziale=true`,
     LO2 risulta `sbloccato: false` finché LO1 non riceve `video.ended`.
     `compliance.ts` aggiornato per mappare anche `documento_completed`.
-  - **#5 Report multi-LO** ⬜ aperto — è il Task 5.
+  - **#5 Report multi-LO** ✅ verificato 2026-05-27. `compliance.ts` ricalcola
+    il progresso dagli Eventi (D8, `force-dynamic`), distingue obbligatori e
+    facoltativi e applica la `regola_completamento` di ogni riga via
+    `COMPLETION_EVENT_FOR_RULE` (`video_ended`→`video.ended`,
+    `documento_completed`→`documento.completed`). L'idoneità dipende solo dagli
+    obbligatori (i facoltativi non bloccano). UI `/audit/completamento` ora
+    mostra per ogni LO tipo, obbligatorio/facoltativo, regola applicata e stato.
+    Test `supabase/tests/m2_completamento.sql` **21/21** sul Supabase live
+    (vista di test rule-aware, scenario 3 LO misti): include la prova che un
+    `video.ended` sul LO `documento` NON lo completa e che il facoltativo non
+    incide sull'idoneità. Verifica read-only sul corso reale `Demo multi-LO`:
+    idoneità derivata corretta, eventi di altri corsi ignorati.
   - **#6 Isolamento Storage** ✅ verificato sul live: un utente authenticated
     di un altro tenant (simulato con `SET LOCAL request.jwt.claims`) vede 0
     file del bucket `documenti`; il discente legittimo vede il proprio file.
@@ -161,19 +175,21 @@ vede 0 file).
 
 ## Cosa fare nella prossima sessione
 
-Fase 1 chiusa, Fase 2 in corso: **Task 1-4 ✅** (Task 4 verificato a livello
-DB, UI nel browser da rivedere). Il prossimo da affrontare è il
-**Task 5 — Report di completamento multi-LO (gate M2)**
-(`docs/brief-fase-2.md` §5 Task 5): il report *completamento attività* (D35)
-deve ricalcolare lo stato di avanzamento su un corso multi-LO, distinguere LO
-obbligatori e facoltativi, applicare la `regola_completamento` di ogni riga di
-Struttura, derivare l'idoneità dell'iscrizione. Resta **ricalcolato dagli
-Eventi a ogni apertura**, senza stato persistente proprio (D8). Il report *log
-eventi* della Fase 1 continua a funzionare invariato sui nuovi Eventi.
+**Fase 1 e Fase 2 chiuse, gate M1a/M1/M2 tutti ✅ VERDI.** Non c'è un Task
+successivo già definito: la fetta FAD è completa end-to-end (admin compone un
+corso multi-LO → discente lo fruisce → report e idoneità lo rispecchiano).
 
-Avviarlo solo dopo conferma esplicita dell'utente. I TODO di Fase 1 ancora
-aperti restano qui sotto: non sono bloccanti, ma vanno chiusi prima di
-consegnare a clienti veri.
+Prima di aprire nuovo lavoro:
+- **Verifiche UI nel browser** di Task 4 (player documento) e Task 5 (badge
+  obbligatorio/facoltativo + regola su `/audit/completamento`): non verificate
+  da qui perché la network policy del container blocca `*.vercel.app`. Da fare
+  dal browser dell'utente sul deploy.
+- **Chiudere i TODO di Fase 1** qui sotto (non bloccanti, ma da sistemare prima
+  di consegnare a clienti veri).
+- Le fasi successive (Fase 3 webinar/CSV, Fase 4 report fondi, Fase 5 Attestato)
+  sono fuori dal lavoro corrente: il mandato si ferma alla Fase 2. **Non
+  iniziare una nuova fase senza conferma esplicita dell'utente** e senza il
+  relativo brief.
 
 ### TODO Fase 1 ancora aperti (non bloccanti per M1, ma da chiudere prima di mettere in mano clienti veri)
 
@@ -229,10 +245,18 @@ consegnare a clienti veri.
   corso `Demo multi-LO` (id `a4a4a4a4-…0001`, edizione `ED-T4-DEMO`,
   iscrizione discente `a4a4a4a4-…0030`) — il discente l'ha già completato
   via simulazione SQL.
-- **Task 5 — Report multi-LO (gate M2)** ⬜ da iniziare. Estendere il report
-  `/audit/completamento` per ricalcolare lo stato su corsi multi-LO, distinguere
-  obbligatori e facoltativi, derivare l'idoneità dell'iscrizione. Tutto come
-  vista derivata dagli Eventi (D8), niente stato proprio.
+- **Task 5 — Report multi-LO (gate M2)** ✅ done (2026-05-27). Il calcolo
+  esisteva già da M1 #4 (`compliance.ts`) ed era stato esteso al `documento` in
+  Task 4; il Task 5 lo ha completato sul fronte report: `compliance.ts` espone
+  `regolaLabel()` e `/audit/completamento` mostra per ogni LO il tipo,
+  `obbligatorio`/`facoltativo` e la regola applicata (visione/lettura integrale),
+  con nota sul fatto che i facoltativi non bloccano l'idoneità. Aggiunto il test
+  `supabase/tests/m2_completamento.sql` (pgTAP, vista rule-aware, 3 LO misti,
+  21 asserzioni), eseguito 21/21 sul Supabase live in transazione+rollback.
+  Verifica read-only sul corso reale `Demo multi-LO` (iscrizione
+  `a4a4a4a4-…0030`): 2/2 obbligatori completati, idonea, eventi di altri corsi
+  ignorati; `audit_verify_chain` = 0 problemi sul tenant reale (M2 #7). UI nel
+  browser ancora da confermare (network policy blocca `*.vercel.app` da qui).
 
 Mandato operativo completo: **`docs/brief-fase-2.md`**.
 
@@ -348,11 +372,11 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
 
 ## Cosa NON fare
 
-- **NON iniziare il Task 5 di Fase 2 (Report multi-LO, gate M2) senza
-  conferma esplicita dell'utente.** Il brief `docs/brief-fase-2.md` §5
-  Task 5 fissa lo scope, e il report del completamento è una vista *derivata*
-  dagli Eventi (D8, D35) — niente stato proprio, ricalcolata a ogni apertura.
-  Quando il Task 5 è verde, M2 è verde.
+- **NON iniziare una nuova fase (Fase 3+) senza conferma esplicita dell'utente
+  e senza il relativo brief.** Fase 1 e Fase 2 sono chiuse (M1a/M1/M2 verdi). Lo
+  scope si ferma alla fetta FAD: Fase 3 (webinar/CSV), Fase 4 (report fondi),
+  Fase 5 (Attestato) sono fuori dal lavoro corrente. Replicare il pattern dei
+  gate: non costruire sopra fondamenta non verificate.
 - **NON aggiungere features fuori scope** rispetto al brief della fase
   corrente. Se emerge la tentazione di costruire qualcosa fuori scope,
   segnalalo all'utente e fermati.

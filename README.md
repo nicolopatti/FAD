@@ -84,6 +84,16 @@ Utenze demo create da `npm run bootstrap`:
 | 5 — Player video Vimeo tracciato | embed Vimeo, eventi server-side, sblocco sequenziale (D26) | `src/components/VimeoPlayer.tsx`, `src/app/api/events/video/route.ts`, `src/lib/compliance.ts` |
 | 6 — Report audit (M1) | due report distinti (D35), verifica catena | `src/app/audit/log/page.tsx`, `src/app/audit/completamento/page.tsx`, `src/app/api/audit/verify/route.ts` |
 
+### Fase 2 — assemblatore e fruizione multi-LO
+
+| Task (F2) | Contenuto | File principali |
+|---|---|---|
+| 1 — Authoring LO (+ `documento`) | CRUD LO video/documento, ruolo admin, bucket Storage `documenti` + policy per-tenant | `supabase/migrations/20260522000001_fase2_lo_type_documento.sql`, `…000002_fase2_lo_admin_storage.sql`, `src/app/admin/learning-objects/*` |
+| 2 — Assemblatore Corsi | CRUD `corso` + composizione Struttura, RPC `reorder_struttura` | `supabase/migrations/20260522000003_fase2_corso_struttura_admin.sql`, `src/app/admin/corsi/*` |
+| 3 — Edizioni + congelamento D22 | Edizioni, trigger `corso_freeze`/`struttura_freeze` (rifiuto write lato DB) | `supabase/migrations/20260522000004_fase2_edizioni_congelamento.sql` |
+| 4 — Fruizione multi-LO | player documento, eventi server-side, sblocco D26 esteso al `documento` | `src/app/api/events/documento/route.ts`, `src/app/api/storage/documento/[loId]/signed-url/route.ts`, `src/components/DocumentoPlayer.tsx` |
+| 5 — Report completamento multi-LO (M2) | report *rule-aware*, distinzione obbligatori/facoltativi, idoneità derivata | `src/lib/compliance.ts`, `src/app/audit/completamento/page.tsx`, `supabase/tests/m2_completamento.sql` |
+
 ## Verifica gate M1a (alla fine del Task 2, prima di proseguire)
 
 I sei criteri del brief sono verificati da due suite complementari.
@@ -223,6 +233,39 @@ Tutto contro il deployment Vercel collegato al progetto Supabase.
    ```
 6. **Verifica della catena nell'area auditor** — pulsante "Verifica integrità
    catena" su `/audit/log` deve restituire "Catena integra" sui dati reali.
+
+## Verifica gate M2 (alla fine del Task 5 di Fase 2)
+
+### Suite SQL `supabase/tests/m2_completamento.sql` — 21/21 ✅
+
+Estende `m1_slice_data.sql` al report di completamento su **corso multi-LO** con
+tipi misti (video + documento) e LO obbligatori + facoltativi. La vista di test
+è *rule-aware*: il completamento di ogni riga di Struttura dipende dalla sua
+`regola_completamento` (`video_ended` → `video.ended`, `documento_completed` →
+`documento.completed`), la stessa mappa `COMPLETION_EVENT_FOR_RULE` di
+`src/lib/compliance.ts`. Copre i criteri M2 #5 e #7:
+- ricalcolo dagli Eventi (D8): cache `iscrizione` azzerata, idoneità invariata;
+- **regola rispettata per riga**: un `video.ended` sul LO `documento` NON lo
+  completa — serve `documento.completed` (e viceversa);
+- obbligatori vs facoltativi: l'idoneità dipende **solo** dagli obbligatori, il
+  facoltativo conta nell'avanzamento ma non blocca;
+- sblocco sequenziale D26 a cascata su 3 LO misti;
+- catena hash integra dopo i nuovi tipi `documento.*`.
+
+Lo eseguo con `supabase test db --file supabase/tests/m2_completamento.sql` o
+incollando nel SQL Editor (`begin; … rollback;`, non lascia tracce). Certificato
+sul Supabase live (`eqtiyqoxwgnerbmdkqff`, 2026-05-27): 21/21, più una verifica
+read-only sul corso reale `Demo multi-LO` (idoneità derivata corretta, eventi
+estranei di altri corsi correttamente ignorati) e `audit_verify_chain` = 0
+problemi sul tenant reale.
+
+### Report nell'area auditor
+
+`/audit/completamento` (login `auditor@fad.local`) mostra, per ogni iscrizione:
+avanzamento `completati/totale` + `obbligatori X/Y`, badge idoneità, e per ogni
+LO il tipo, **obbligatorio/facoltativo**, la regola applicata (visione/lettura
+integrale) e lo stato (ok / da fare / bloccato). Sempre ricalcolato dagli Eventi
+a ogni apertura (D8); le colonne-cache sull'Iscrizione non vengono lette.
 
 ## CI / pipeline
 

@@ -37,6 +37,19 @@ const COMPLETION_EVENT_FOR_RULE: Record<string, string> = {
   documento_completed: 'documento.completed',
 };
 
+// Etichetta leggibile della regola di completamento per la UI di audit (D35).
+// Stesso vocabolario di COMPLETION_EVENT_FOR_RULE: "visione/lettura integrale".
+export function regolaLabel(tipo: string): string {
+  switch (tipo) {
+    case 'video_ended':
+      return 'visione integrale';
+    case 'documento_completed':
+      return 'lettura integrale';
+    default:
+      return tipo;
+  }
+}
+
 export async function computeProgressoForIscrizione(
   supabase: SupabaseClient,
   iscrizioneId: string,

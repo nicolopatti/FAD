@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAuditor } from '@/lib/auth-context';
-import { computeProgressoForIscrizione } from '@/lib/compliance';
+import { computeProgressoForIscrizione, regolaLabel } from '@/lib/compliance';
 import type { IscrizioneAuditRow } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +31,9 @@ export default async function CompletamentoPage() {
       <p className="muted">
         Stato ricalcolato dagli <em>Eventi</em> a ogni apertura. Le colonne-cache
         sull'Iscrizione non vengono lette qui (D8): la verità è il log.
+        L'idoneità richiede il completamento di tutti gli LO <strong>obbligatori</strong>,
+        ciascuno secondo la sua <em>regola di completamento</em>; gli LO
+        facoltativi contano nell'avanzamento ma non bloccano l'idoneità (D35).
       </p>
       <div className="card">
         <table>
@@ -83,9 +86,18 @@ export default async function CompletamentoPage() {
                   {prog && (
                     <ul style={{ margin: 0, paddingLeft: 18 }}>
                       {prog.items.map((it) => (
-                        <li key={it.struttura_id}>
+                        <li key={it.struttura_id} style={{ marginBottom: 4 }}>
                           <span className="mono">{it.ordine}.</span>{' '}
                           {it.lo_titolo}{' '}
+                          <span className="badge muted">{it.lo_type}</span>{' '}
+                          {it.obbligatorio ? (
+                            <span className="badge">obbligatorio</span>
+                          ) : (
+                            <span className="badge muted">facoltativo</span>
+                          )}{' '}
+                          <span className="muted" style={{ fontSize: '0.85em' }}>
+                            regola: {regolaLabel(it.regola_completamento.tipo)}
+                          </span>{' '}
                           {it.completato ? (
                             <span className="badge ok">ok</span>
                           ) : it.sbloccato ? (
