@@ -1,10 +1,12 @@
-# Stato del progetto FAD — Fase 2 in corso (handoff session-to-session)
+# Stato del progetto FAD — Fase 3 in corso (handoff session-to-session)
 
 > Questo file è il primo da leggere all'inizio di ogni nuova sessione.
 > Riassume cosa è stato fatto, cosa resta, e come riprendere senza dover
 > rispiegare nulla. Fonte autoritativa per *cosa* costruire: `docs/brief-fase-1.md`
-> (Fase 1, chiusa) e `docs/brief-fase-2.md` (Fase 2, in corso) — e in caso di
-> conflitto `piattaforma-elearning-stato-progetto-v7.md` con le decisioni D1–D35.
+> (Fase 1, chiusa), `docs/brief-fase-2.md` (Fase 2, chiusa) e
+> `docs/brief-fase-3.md` (Fase 3, **in corso** — è il mandato corrente) — e in
+> caso di conflitto `piattaforma-elearning-stato-progetto-v7.md` (non in repo)
+> con le decisioni D1–D35.
 
 ## Stato di avanzamento (Fase 1)
 
@@ -306,11 +308,22 @@ Mandato operativo completo: **`docs/brief-fase-2.md`**.
 
 ## Come riprendere (cheatsheet per nuova session)
 
-Tutte le info utili stanno in 4 file in questo repo:
-- `CLAUDE.md` (questo file) → stato
-- `README.md` → setup, mappa Task → file, ricette di verifica M1a/M1
+Tutte le info utili stanno in questi file del repo:
+- `CLAUDE.md` (questo file) → stato + come riprendere
+- `README.md` → setup, mappa Task → file, ricette di verifica M1a/M1/M2
 - `docs/brief-fase-1.md` → mandato operativo Fase 1 (storico, chiusa)
-- `docs/brief-fase-2.md` → mandato operativo Fase 2 (corrente)
+- `docs/brief-fase-2.md` → mandato operativo Fase 2 (storico, chiusa)
+- `docs/brief-fase-3.md` → mandato operativo Fase 3 (**corrente**); §11 in fondo
+  ha le note di implementazione (scope fino a M3a, decisioni §10 ratificate)
+
+**Ripartenza Fase 3 (Task 2):** la migration `…20260527000001_…` è **già applicata
+sul Supabase live** — non riapplicarla. Lo schema Gruppo 3 + il grezzo write-once
+ci sono. Il seed webinar è sul live (UUID prefisso `33333333…`: edizione
+`33333333-0000-0000-0000-0000000000e1`, sessione Teams
+`33333333-0000-0000-0000-0000000005e1`, 3 iscritti di cui uno senza
+`email_riconciliazione`). Partire dal Task 2 (pipeline unica): vedi
+`docs/brief-fase-3.md` §5 Task 2 e i "Promemoria di metodo" qui sopra in
+"Cosa fare nella prossima sessione".
 
 Comandi spesso usati:
 ```bash

@@ -94,6 +94,20 @@ Utenze demo create da `npm run bootstrap`:
 | 4 — Fruizione multi-LO | player documento, eventi server-side, sblocco D26 esteso al `documento` | `src/app/api/events/documento/route.ts`, `src/app/api/storage/documento/[loId]/signed-url/route.ts`, `src/components/DocumentoPlayer.tsx` |
 | 5 — Report completamento multi-LO (M2) | report *rule-aware*, distinzione obbligatori/facoltativi, idoneità derivata | `src/lib/compliance.ts`, `src/app/audit/completamento/page.tsx`, `supabase/tests/m2_completamento.sql` |
 
+### Fase 3 — fetta webinar (pipeline presenze)
+
+Mandato: `docs/brief-fase-3.md`. Scope della sessione corrente: **fino a M3a**
+(Task 1–5); Task 6/M3 (adattatore API Teams) rinviati al setup Azure/segreti.
+
+| Task (F3) | Contenuto | File principali / stato |
+|---|---|---|
+| 1 — Schema Gruppo 3 + grezzo write-once | azienda/piano/incarico/sessione + `report_partecipazione_grezzo` (write-once, D20), estensioni iscrizione/corso, `grezzo_content_hash` | ✅ `supabase/migrations/20260527000001_fase3_gruppo3_grezzo.sql` (applicata sul live) + seed `supabase/seed/fase3_webinar_demo.sql` |
+| 2 — Pipeline unica | ingest grezzo + Evento `report_grezzo_importato` + riconciliazione, in una funzione SECURITY DEFINER | ⬜ da costruire |
+| 3 — Adattatore CSV | upload + parser + mappatura colonne configurabile | ⬜ da costruire |
+| 4 — Riconciliazione + coda ambigui (→ M3a) | match `email_riconciliazione` → fallback `persona.email`; ambigui = blocco + risoluzione admin | ⬜ da costruire |
+| 5 — Inserimento/correzione manuale presenze | Eventi con motivazione obbligatoria, mai UPDATE | ⬜ da costruire |
+| 6 — Adattatore API Teams (→ M3) | ⛔ rinviato: setup Azure AD + segreti + egress Graph (runbook esterno) | ⛔ rinviato |
+
 ## Verifica gate M1a (alla fine del Task 2, prima di proseguire)
 
 I sei criteri del brief sono verificati da due suite complementari.
