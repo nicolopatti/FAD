@@ -47,6 +47,36 @@ sul live + read-only sul corso reale `Demo multi-LO`.
 | 4 | Fruizione discente multi-LO (player documento) | ✅ done (DB) — `/api/events/documento`, `/api/storage/.../signed-url`, `DocumentoPlayer`, branching pagina LO. UI nel browser da verificare. |
 | 5 | Report completamento multi-LO (gate M2) | ✅ done — report *rule-aware* in `compliance.ts` + UI `/audit/completamento` (mostra tipo, obbligatorio/facoltativo, regola), test `supabase/tests/m2_completamento.sql` 21/21 sul live |
 
+## Stato di avanzamento (Fase 3)
+
+**Fase 3 in corso — fetta webinar (pipeline presenze + adattatori).** Mandato:
+`docs/brief-fase-3.md`. Scope di lavoro corrente: **Task 1–5 fino al gate M3a**
+verificati sul Supabase live; **Task 6 (adattatore API Teams) + M3 rinviati**
+(richiedono setup Azure AD/segreti/egress Graph non eseguibile da Claude Code on
+the web — è un runbook lato utente).
+
+Decisioni §10 ratificate (2026-05-27): Teams unica piattaforma VCS implementata;
+match ambigui → **blocco + risoluzione manuale**; riconciliazione → **automatica
+all'import + ri-esecuzione manuale**; idoneità corsi di presenza → **automatica
+alla soglia** (`corso.soglia_frequenza_percentuale`).
+
+| Task | Descrizione | Stato |
+|---|---|---|
+| 1 | Schema Gruppo 3 (azienda/piano/incarico/sessione) + grezzo write-once + estensioni iscrizione/corso | ✅ done — `…20260527000001_fase3_gruppo3_grezzo.sql` applicata sul live; seed `supabase/seed/fase3_webinar_demo.sql` |
+| 2 | Pipeline unica (ingest grezzo → evento import → riconciliazione) | ⬜ da iniziare |
+| 3 | Adattatore CSV (upload + parser + mappatura colonne) | ⬜ da iniziare |
+| 4 | Riconciliazione + coda risoluzione ambigui (gate M3a) | ⬜ da iniziare |
+| 5 | Inserimento/correzione manuale presenze | ⬜ da iniziare |
+| 6 | Setup Teams + adattatore API (gate M3) | ⛔ rinviato (runbook esterno) |
+
+Nota Task 1: il brief assumeva `email_riconciliazione`/`ore_frequentate`/
+`frequenza_percentuale` già su `iscrizione`; non c'erano → aggiunte dalla migration,
+con le FK `azienda_id`/`piano_id` e `corso.soglia_frequenza_percentuale` (campo
+strutturale, ora nel freeze D22). Verifica hermetica sul live 10/10: grezzo
+write-once (UPDATE/DELETE bloccati, D20), `grezzo_content_hash` deterministico e
+sensibile, trigger D30 sessione↔incarico (stessa edizione + ruolo didattico),
+sessione con `incarico_id` NULL ammessa, 5 tabelle + RLS presenti.
+
 ## Stato dei gate
 
 - **M1a** — *Il log regge.* ✅
@@ -94,6 +124,11 @@ sul live + read-only sul corso reale `Demo multi-LO`.
   - **#7 Log Fase 1 invariato sui nuovi eventi** ✅ — `audit_verify_chain`
     ritorna 0 problemi dopo i nuovi tipi `learning_object.*`, `corso.*`,
     `struttura.*`, `edizione.*`, `documento.opened`/`documento.completed`.
+- **M3a** — *Pipeline + CSV reggono.* ⬜ in corso (checkpoint dopo Task 4).
+  Criteri in `docs/brief-fase-3.md` §8. Fondamenta del Task 1 verificate sul live
+  (grezzo write-once, hash contenuto, D30, RLS): 10/10 check hermetici.
+- **M3** — *Webinar end-to-end con API Teams.* ⛔ rinviato (Task 6, setup Teams
+  esterno: Azure AD + segreti + egress Graph). Criteri in `docs/brief-fase-3.md` §9.
 
 ## Infrastruttura cloud creata
 
@@ -175,21 +210,30 @@ sul live + read-only sul corso reale `Demo multi-LO`.
 
 ## Cosa fare nella prossima sessione
 
-**Fase 1 e Fase 2 chiuse, gate M1a/M1/M2 tutti ✅ VERDI.** Non c'è un Task
-successivo già definito: la fetta FAD è completa end-to-end (admin compone un
-corso multi-LO → discente lo fruisce → report e idoneità lo rispecchiano).
+**Fase 3 in corso (fetta webinar).** Gate M1a/M1/M2 verdi; Fase 3 Task 1 ✅ (schema
+Gruppo 3 + grezzo write-once, applicato sul live). **Il prossimo è il Task 2 —
+Pipeline unica** (`docs/brief-fase-3.md` §5 Task 2): funzione di ingestione del
+grezzo (stadio a) + Evento `report_grezzo_importato` con `payload.hash =
+grezzo_content_hash(contenuto)` via `audit_append` (stadio b) + riconciliazione
+(stadio c; l'algoritmo vero è del Task 4). Poi Task 3 (adattatore CSV), Task 4
+(riconciliazione + coda ambigui → **gate M3a**), Task 5 (inserimento/correzione
+manuale). Scope di questa tornata: fino a M3a; Task 6/M3 (Teams) rinviati al
+runbook utente.
 
-Prima di aprire nuovo lavoro:
-- **Verifiche UI nel browser** di Task 4 (player documento) e Task 5 (badge
-  obbligatorio/facoltativo + regola su `/audit/completamento`): non verificate
-  da qui perché la network policy del container blocca `*.vercel.app`. Da fare
-  dal browser dell'utente sul deploy.
-- **Chiudere i TODO di Fase 1** qui sotto (non bloccanti, ma da sistemare prima
-  di consegnare a clienti veri).
-- Le fasi successive (Fase 3 webinar/CSV, Fase 4 report fondi, Fase 5 Attestato)
-  sono fuori dal lavoro corrente: il mandato si ferma alla Fase 2. **Non
-  iniziare una nuova fase senza conferma esplicita dell'utente** e senza il
-  relativo brief.
+Promemoria di metodo:
+- pipeline = un'unica funzione SECURITY DEFINER che inserisce nel grezzo e appende
+  l'Evento di import nella stessa transazione (niente righe orfane, §11 brief);
+- mai INSERT diretto in `evento` né nel grezzo da PostgREST: la write del grezzo
+  passa solo per la funzione di ingestione (la tabella ha REVOKE + trigger);
+- presenze come Eventi senza PII nel payload (attori pseudonimi); idoneità auto
+  alla soglia `corso.soglia_frequenza_percentuale` nel ricalcolo della cache.
+
+Restano aperti, non bloccanti:
+- **Verifiche UI nel browser** di Fase 2 Task 4/5 sul deploy (network policy
+  blocca `*.vercel.app` da qui).
+- **TODO di Fase 1** qui sotto (prima della consegna a clienti veri).
+- **Fase 4 (report fondi) e Fase 5 (Attestato)**: fuori scope finché Fase 3 non
+  chiude e senza il relativo brief. **Non iniziarle senza conferma esplicita.**
 
 ### TODO Fase 1 ancora aperti (non bloccanti per M1, ma da chiudere prima di mettere in mano clienti veri)
 
@@ -372,11 +416,12 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
 
 ## Cosa NON fare
 
-- **NON iniziare una nuova fase (Fase 3+) senza conferma esplicita dell'utente
-  e senza il relativo brief.** Fase 1 e Fase 2 sono chiuse (M1a/M1/M2 verdi). Lo
-  scope si ferma alla fetta FAD: Fase 3 (webinar/CSV), Fase 4 (report fondi),
-  Fase 5 (Attestato) sono fuori dal lavoro corrente. Replicare il pattern dei
-  gate: non costruire sopra fondamenta non verificate.
+- **NON iniziare Fase 4+ senza conferma esplicita dell'utente e senza il relativo
+  brief.** Fase 3 è in corso (mandato in `docs/brief-fase-3.md`), scope fino a M3a.
+  Fase 4 (report fondi) e Fase 5 (Attestato) restano fuori finché Fase 3 non chiude.
+  Replicare il pattern dei gate: non costruire sopra fondamenta non verificate.
+- **NON implementare l'adattatore Zoom né la co-docenza** (scope OUT di Fase 3,
+  §4 del brief): solo Teams, e la Sessione ha un solo `incarico_id`.
 - **NON aggiungere features fuori scope** rispetto al brief della fase
   corrente. Se emerge la tentazione di costruire qualcosa fuori scope,
   segnalalo all'utente e fermati.
