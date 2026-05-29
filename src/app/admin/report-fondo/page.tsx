@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { computeReportFondoDataset } from '@/lib/report-fondo';
 import { validateReportFondo, contaSeverita } from '@/lib/report-fondo-validazioni';
 import { formatiDisponibili, getAdapter } from '@/lib/report-fondo-formati';
+import { DepositaPanel, type SnapshotRow } from './DepositaPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,32 @@ export default async function ReportFondoPage({
   const warnings = dataset ? validateReportFondo(dataset) : [];
   const sev = contaSeverita(warnings);
   const adapter = getAdapter(formato);
+
+  // Snapshot già depositati per la coppia (+ hash attestato nell'Evento).
+  let snapshots: SnapshotRow[] = [];
+  if (dataset && edizioneId && pianoId) {
+    const { data: snapsRaw } = await supabase
+      .from('report_fondo_depositato')
+      .select('id, formato, fondo, generato_at')
+      .eq('edizione_id', edizioneId)
+      .eq('piano_id', pianoId)
+      .order('generato_at', { ascending: false })
+      .returns<{ id: string; formato: string; fondo: string | null; generato_at: string }[]>();
+    const ids = (snapsRaw ?? []).map((s) => s.id);
+    const hashById: Record<string, string | null> = {};
+    if (ids.length) {
+      const { data: evs } = await supabase
+        .from('evento')
+        .select('subject_id, payload')
+        .eq('event_type', 'report_fondo_depositato')
+        .in('subject_id', ids)
+        .returns<{ subject_id: string | null; payload: { hash?: string } | null }[]>();
+      for (const e of evs ?? []) {
+        if (e.subject_id) hashById[e.subject_id] = e.payload?.hash ?? null;
+      }
+    }
+    snapshots = (snapsRaw ?? []).map((s) => ({ ...s, hash_evento: hashById[s.id] ?? null }));
+  }
 
   return (
     <>
@@ -251,10 +278,18 @@ export default async function ReportFondoPage({
               Scarica {adapter?.etichetta ?? formato}
             </a>
             <p className="muted" style={{ fontSize: '0.85em', marginTop: 10, marginBottom: 0 }}>
-              Il deposito write-once dello snapshot (con Evento e hash nel log) sarà disponibile qui sotto
-              una volta completato il Task 6.
+              La generazione è una vista calcolata adesso e non scrive nulla nel log. Per congelare la
+              prova consegnata al fondo usa il <strong>deposito</strong> qui sotto.
             </p>
           </div>
+
+          <DepositaPanel
+            edizione={edizioneId!}
+            piano={pianoId!}
+            formato={formato}
+            bloccanti={sev.bloccanti}
+            snapshots={snapshots}
+          />
         </>
       )}
     </>

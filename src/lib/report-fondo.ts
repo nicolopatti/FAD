@@ -252,3 +252,36 @@ export async function computeReportFondoDataset(
     generato_at: new Date().toISOString(),
   };
 }
+
+// ===========================================================================
+// Task 6 — deposito write-once (wrapper della RPC report_fondo_deposita).
+// L'unico path di scrittura dello snapshot + dell'Evento di deposito: mai INSERT
+// diretto su report_fondo_depositato né su evento.
+// ===========================================================================
+export type DepositaReportFondoResult = {
+  snapshot_id: string;
+  evento_id: string;
+  evento_seq: number;
+  hash: string;
+};
+
+export async function depositaReportFondo(
+  supabase: SupabaseClient,
+  input: {
+    edizioneId: string;
+    pianoId: string;
+    formato: string;
+    contenuto: ReportFondoDataset;
+    generatoDa: string;
+  },
+): Promise<DepositaReportFondoResult> {
+  const { data, error } = await supabase.rpc('report_fondo_deposita', {
+    p_edizione_id: input.edizioneId,
+    p_piano_id: input.pianoId,
+    p_formato: input.formato,
+    p_contenuto: input.contenuto,
+    p_generato_da: input.generatoDa,
+  });
+  if (error) throw error;
+  return data as DepositaReportFondoResult;
+}
