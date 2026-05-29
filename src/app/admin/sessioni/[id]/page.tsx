@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { SessioneConEdizione } from '@/lib/db-types';
 import { CsvImportForm } from './CsvImportForm';
+import { CodaResolver, type CodaItem, type IscrittoOption } from './CodaResolver';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,8 @@ type GrezzoConContenuto = {
   creato_il: string;
   contenuto: unknown;
 };
+type CodaRowDb = { id: string; riga: number; tipo: 'ambiguo' | 'assente'; candidati: string[]; grezzo_id: string };
+type IscrittoDb = { id: string; persona: { nome: string; cognome: string; email: string } | null };
 
 function fmtData(iso: string | null): string {
   if (!iso) return '—';
@@ -37,6 +40,7 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
     .maybeSingle<SessioneConEdizione>();
 
   if (!sessione) notFound();
+  const edizioneId = sessione.edizione?.id ?? null;
 
   const { data: grezziRaw } = await supabase
     .from('report_partecipazione_grezzo')
@@ -45,7 +49,6 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
     .order('creato_il', { ascending: false })
     .returns<GrezzoConContenuto[]>();
 
-  // Conta le righe server-side senza esporre il contenuto (PII di staging) al client.
   const grezzi = (grezziRaw ?? []).map((g) => ({
     id: g.id,
     fonte: g.fonte,
@@ -53,6 +56,56 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
     creato_il: g.creato_il,
     righe: Array.isArray(g.contenuto) ? g.contenuto.length : null,
   }));
+
+  // Lookup (grezzo_id:riga) → riga normalizzata, per mostrare nome/email nella coda.
+  const rowByKey = new Map<string, { nome: string | null; email: string | null }>();
+  for (const g of grezziRaw ?? []) {
+    if (!Array.isArray(g.contenuto)) continue;
+    for (const r of g.contenuto as { riga?: number; nome?: string; email?: string | null }[]) {
+      if (r?.riga == null) continue;
+      rowByKey.set(`${g.id}:${r.riga}`, { nome: r.nome ?? null, email: r.email ?? null });
+    }
+  }
+
+  // Iscritti dell'Edizione (admin può leggerli, policy Fase 3): per dropdown + label candidati.
+  const { data: iscrittiDb } = edizioneId
+    ? await supabase
+        .from('iscrizione')
+        .select('id, persona:persona_id ( nome, cognome, email )')
+        .eq('edizione_id', edizioneId)
+        .returns<IscrittoDb[]>()
+    : { data: [] as IscrittoDb[] };
+  const labelOf = (i: IscrittoDb): string =>
+    i.persona ? `${i.persona.nome} ${i.persona.cognome} (${i.persona.email})` : i.id;
+  const iscrittiById = new Map<string, IscrittoOption>();
+  const tuttiIscritti: IscrittoOption[] = (iscrittiDb ?? []).map((i) => {
+    const opt = { id: i.id, label: labelOf(i) };
+    iscrittiById.set(i.id, opt);
+    return opt;
+  });
+
+  // Coda pending della sessione → arricchita per la UI.
+  const { data: codaDb } = await supabase
+    .from('coda_riconciliazione')
+    .select('id, riga, tipo, candidati, grezzo_id')
+    .eq('sessione_id', params.id)
+    .is('risolto_at', null)
+    .order('riga', { ascending: true })
+    .returns<CodaRowDb[]>();
+
+  const codaItems: CodaItem[] = (codaDb ?? []).map((c) => {
+    const row = rowByKey.get(`${c.grezzo_id}:${c.riga}`);
+    return {
+      id: c.id,
+      riga: c.riga,
+      tipo: c.tipo,
+      rowNome: row?.nome ?? null,
+      rowEmail: row?.email ?? null,
+      candidati: (Array.isArray(c.candidati) ? c.candidati : [])
+        .map((id) => iscrittiById.get(id))
+        .filter((x): x is IscrittoOption => Boolean(x)),
+    };
+  });
 
   return (
     <>
@@ -84,9 +137,9 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Report di partecipazione importati ({grezzi.length})</h3>
         <div className="muted" style={{ marginBottom: 8, fontSize: '0.9em' }}>
-          Ogni import è <strong>write-once</strong> (D20): è una prova immutabile. Più
-          report per sessione sono ammessi (es. CSV + API). L&apos;hash del contenuto è
-          attestato nel <em>log eventi</em> (vista auditor).
+          Ogni import è <strong>write-once</strong> (D20): prova immutabile. L&apos;hash del
+          contenuto è attestato nel <em>log eventi</em> (vista auditor). La riconciliazione
+          gira in automatico all&apos;import; le righe non risolte finiscono in coda qui sotto.
         </div>
         {grezzi.length === 0 ? (
           <div className="muted">Nessun report importato per questa sessione.</div>
@@ -101,15 +154,15 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
                   <td className="muted">{fmtData(g.creato_il)}</td>
                   <td><span className="badge muted">{g.fonte}</span></td>
                   <td>{g.righe ?? '—'}</td>
-                  <td className="mono">
-                    {g.importato_da === session.personaId ? 'tu' : (g.importato_da ?? 'automatico')}
-                  </td>
+                  <td className="mono">{g.importato_da === session.personaId ? 'tu' : (g.importato_da ?? 'automatico')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      <CodaResolver items={codaItems} tuttiIscritti={tuttiIscritti} />
 
       <CsvImportForm sessioneId={sessione.id} />
     </>

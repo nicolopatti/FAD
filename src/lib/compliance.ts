@@ -169,3 +169,134 @@ export async function isLoSbloccato(
   const item = progresso.items.find((i) => i.learning_object_id === learningObjectId);
   return Boolean(item?.sbloccato);
 }
+
+// ---------------------------------------------------------------------------
+// Frequenza webinar (Fase 3, D8/D33, M3a #9). La presenza è un Evento
+// (`presenza_webinar_registrata`), non uno stato: la frequenza si RICALCOLA
+// dagli Eventi, indipendente dalle colonne-cache dell'Iscrizione.
+// La durata nel payload è "come ricevuta" (stringa): la si interpreta qui.
+// ---------------------------------------------------------------------------
+
+// Interpreta una durata grezza in MINUTI. Formati gestiti: numero puro
+// (minuti, anche con virgola), "H:MM:SS", testuale "Xh Ym Zs" (sottoinsiemi).
+// Ritorna null se non interpretabile (verrà conteggiata come 0 e segnalata).
+export function parseDurataMinuti(raw: string | null | undefined): number | null {
+  if (raw == null) return null;
+  const s = String(raw).trim().toLowerCase();
+  if (!s) return null;
+  if (/^\d+([.,]\d+)?$/.test(s)) return parseFloat(s.replace(',', '.'));
+  const colon = s.match(/^(\d+):(\d{1,2}):(\d{1,2})$/); // H:MM:SS
+  if (colon) {
+    return parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10) + parseInt(colon[3], 10) / 60;
+  }
+  const h = s.match(/(\d+)\s*h/);
+  const m = s.match(/(\d+)\s*m(?!s)/);
+  const sec = s.match(/(\d+)\s*s/);
+  if (h || m || sec) {
+    return (h ? parseInt(h[1], 10) * 60 : 0) + (m ? parseInt(m[1], 10) : 0) + (sec ? parseInt(sec[1], 10) / 60 : 0);
+  }
+  return null;
+}
+
+export type FrequenzaIscrizione = {
+  iscrizione_id: string;
+  edizione_id: string;
+  soglia: number | null; // corso.soglia_frequenza_percentuale (null = nessun requisito)
+  sessioni_totali: number;
+  minuti_pianificati: number;
+  minuti_frequentati: number;
+  ore_frequentate: number;
+  frequenza_percentuale: number;
+  presenze: number;
+  durate_non_parsate: number;
+  idoneo_frequenza: boolean;
+};
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export async function computeFrequenzaForIscrizione(
+  supabase: SupabaseClient,
+  iscrizioneId: string,
+): Promise<FrequenzaIscrizione | null> {
+  const { data: iscrizione } = await supabase
+    .from('iscrizione')
+    .select('id, edizione_id')
+    .eq('id', iscrizioneId)
+    .single();
+  if (!iscrizione) return null;
+
+  const { data: edizione } = await supabase
+    .from('edizione')
+    .select('id, corso_id')
+    .eq('id', iscrizione.edizione_id)
+    .single();
+  if (!edizione) return null;
+
+  const { data: corso } = await supabase
+    .from('corso')
+    .select('id, soglia_frequenza_percentuale')
+    .eq('id', edizione.corso_id)
+    .single();
+
+  // Sessioni (non annullate) dell'Edizione → minuti pianificati per sessione.
+  const { data: sessioni } = await supabase
+    .from('sessione')
+    .select('id, durata_minuti, annullato_at')
+    .eq('edizione_id', iscrizione.edizione_id)
+    .returns<{ id: string; durata_minuti: number | null; annullato_at: string | null }[]>();
+
+  const plannedBySessione = new Map<string, number>();
+  let minutiPianificati = 0;
+  for (const s of sessioni ?? []) {
+    if (s.annullato_at) continue;
+    const p = s.durata_minuti ?? 0;
+    plannedBySessione.set(s.id, p);
+    minutiPianificati += p;
+  }
+
+  // Eventi di presenza per questa Iscrizione. subject_id = sessione.
+  type PresEvt = { subject_id: string | null; payload: { durata?: string | null } | null };
+  const { data: eventi } = await supabase
+    .from('evento')
+    .select('subject_id, payload')
+    .eq('event_type', 'presenza_webinar_registrata')
+    .eq('payload->>iscrizione_id', iscrizioneId)
+    .returns<PresEvt[]>();
+
+  // Per ogni sessione, prendi la MAX durata registrata (no doppio conteggio se
+  // ci sono più report per la stessa sessione), limitata al pianificato.
+  const attendedBySessione = new Map<string, number>();
+  let durateNonParsate = 0;
+  for (const e of eventi ?? []) {
+    if (!e.subject_id) continue;
+    const min = parseDurataMinuti(e.payload?.durata ?? null);
+    if (min == null) { durateNonParsate += 1; continue; }
+    const prev = attendedBySessione.get(e.subject_id) ?? 0;
+    if (min > prev) attendedBySessione.set(e.subject_id, min);
+  }
+
+  let minutiFrequentati = 0;
+  for (const [sessioneId, attended] of attendedBySessione) {
+    const planned = plannedBySessione.get(sessioneId);
+    // limita al pianificato (i rientri possono gonfiare oltre la durata)
+    minutiFrequentati += planned != null ? Math.min(attended, planned) : attended;
+  }
+
+  const soglia = corso?.soglia_frequenza_percentuale ?? null;
+  const frequenza = minutiPianificati > 0 ? round2((minutiFrequentati / minutiPianificati) * 100) : 0;
+  const idoneo = soglia != null && frequenza >= Number(soglia);
+
+  return {
+    iscrizione_id: iscrizione.id,
+    edizione_id: iscrizione.edizione_id,
+    soglia: soglia != null ? Number(soglia) : null,
+    sessioni_totali: plannedBySessione.size,
+    minuti_pianificati: minutiPianificati,
+    minuti_frequentati: round2(minutiFrequentati),
+    ore_frequentate: round2(minutiFrequentati / 60),
+    frequenza_percentuale: frequenza,
+    presenze: eventi?.length ?? 0,
+    durate_non_parsate: durateNonParsate,
+    idoneo_frequenza: idoneo,
+  };
+}

@@ -1,9 +1,11 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAuditor } from '@/lib/auth-context';
-import { computeProgressoForIscrizione, regolaLabel } from '@/lib/compliance';
+import { computeProgressoForIscrizione, computeFrequenzaForIscrizione, regolaLabel } from '@/lib/compliance';
 import type { IscrizioneAuditRow } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export default async function CompletamentoPage() {
   await requireAuditor();
@@ -20,8 +22,11 @@ export default async function CompletamentoPage() {
 
   const rows = await Promise.all(
     (iscrizioni ?? []).map(async (i) => {
-      const prog = await computeProgressoForIscrizione(supabase, i.id);
-      return { i, prog };
+      const [prog, freq] = await Promise.all([
+        computeProgressoForIscrizione(supabase, i.id),
+        computeFrequenzaForIscrizione(supabase, i.id),
+      ]);
+      return { i, prog, freq };
     }),
   );
 
@@ -43,11 +48,12 @@ export default async function CompletamentoPage() {
               <th>Corso / Edizione</th>
               <th>Avanzamento</th>
               <th>Idoneità</th>
+              <th>Frequenza webinar</th>
               <th>Dettaglio LO</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ i, prog }) => (
+            {rows.map(({ i, prog, freq }) => (
               <tr key={i.id}>
                 <td>
                   {i.persona ? (
@@ -83,6 +89,27 @@ export default async function CompletamentoPage() {
                   )}
                 </td>
                 <td>
+                  {freq && freq.soglia != null ? (
+                    <>
+                      <span className={`badge ${freq.idoneo_frequenza ? 'ok' : 'warn'}`}>
+                        {freq.frequenza_percentuale}%
+                      </span>
+                      <div className="muted" style={{ fontSize: '0.85em' }}>
+                        soglia {freq.soglia}% · {freq.ore_frequentate}h / {round1(freq.minuti_pianificati / 60)}h
+                      </div>
+                      {freq.durate_non_parsate > 0 && (
+                        <div className="muted" style={{ fontSize: '0.8em' }}>
+                          {freq.durate_non_parsate} durate non interpretate
+                        </div>
+                      )}
+                    </>
+                  ) : freq && freq.presenze > 0 ? (
+                    <span className="muted">{freq.presenze} presenze</span>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
+                <td>
                   {prog && (
                     <ul style={{ margin: 0, paddingLeft: 18 }}>
                       {prog.items.map((it) => (
@@ -114,7 +141,7 @@ export default async function CompletamentoPage() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="muted">
+                <td colSpan={6} className="muted">
                   Nessuna iscrizione presente.
                 </td>
               </tr>

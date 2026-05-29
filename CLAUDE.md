@@ -67,8 +67,8 @@ alla soglia** (`corso.soglia_frequenza_percentuale`).
 | 1 | Schema Gruppo 3 (azienda/piano/incarico/sessione) + grezzo write-once + estensioni iscrizione/corso | ✅ done — `…20260527000001_fase3_gruppo3_grezzo.sql` applicata sul live; seed `supabase/seed/fase3_webinar_demo.sql` |
 | 2 | Pipeline unica (ingest grezzo → evento import → riconciliazione) | ✅ done — `…20260529000001_fase3_pipeline_ingest.sql` applicata sul live; pgTAP `m3a_pipeline_ingest.sql` 17/17. Stadi (a)+(b); stadio (c) = seam del Task 4 |
 | 3 | Adattatore CSV (upload + parser + mappatura colonne) | ✅ done — `src/lib/csv.ts` (+`pipeline.ts`), route `…/sessioni/[id]/import-csv`, UI `/admin/sessioni`. Parser verificato; path CSV→pipeline 8/8 sul live |
-| 4 | Riconciliazione + coda risoluzione ambigui (gate M3a) | 🔄 in corso — motore DB ✅ (`…20260529000002_fase3_riconciliazione.sql`, pgTAP `m3a_riconciliazione.sql` 20/20 sul live). Manca: `compliance.ts` #9 + UI coda |
-| 5 | Inserimento/correzione manuale presenze | ⬜ da iniziare |
+| 4 | Riconciliazione + coda risoluzione ambigui (gate M3a) | ✅ done — motore DB (`…20260529000002_…`, pgTAP 20/20), `compliance.ts` frequenza #9 (8/8 + parser 14/14), UI coda (`CodaResolver` + route risolvi/ignora) e frequenza nel report auditor |
+| 5 | Inserimento/correzione manuale presenze (M3a #7) | ⬜ da iniziare (prossimo, chiude M3a) |
 | 6 | Setup Teams + adattatore API (gate M3) | ⛔ rinviato (runbook esterno) |
 
 Nota Task 1: il brief assumeva `email_riconciliazione`/`ore_frequentate`/
