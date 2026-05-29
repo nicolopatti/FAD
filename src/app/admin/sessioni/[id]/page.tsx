@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { SessioneConEdizione } from '@/lib/db-types';
 import { CsvImportForm } from './CsvImportForm';
 import { CodaResolver, type CodaItem, type IscrittoOption } from './CodaResolver';
+import { PresenzeManager, type PresenzaItem } from './PresenzeManager';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,6 +108,38 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
     };
   });
 
+  // Presenze registrate (Eventi, admin-readable via policy Fase 3). Una
+  // correzione "supera" l'Evento referenziato (mostrato barrato).
+  type PresEvtDb = {
+    id: string;
+    event_type: string;
+    payload: { iscrizione_id?: string; durata?: string | null; corregge_evento_id?: string | null } | null;
+  };
+  const { data: presEvt } = await supabase
+    .from('evento')
+    .select('id, event_type, payload')
+    .eq('subject_id', params.id)
+    .in('event_type', ['presenza_webinar_registrata', 'presenza_inserita_manualmente', 'presenza_corretta_manualmente'])
+    .order('seq', { ascending: true })
+    .returns<PresEvtDb[]>();
+  const supersededIds = new Set<string>();
+  for (const e of presEvt ?? []) {
+    const ref = e.payload?.corregge_evento_id;
+    if (ref) supersededIds.add(ref);
+  }
+  const presenze: PresenzaItem[] = (presEvt ?? []).map((e) => ({
+    id: e.id,
+    iscrizioneLabel: (e.payload?.iscrizione_id && iscrittiById.get(e.payload.iscrizione_id)?.label) || '(iscritto?)',
+    durata: e.payload?.durata ?? null,
+    origine:
+      e.event_type === 'presenza_inserita_manualmente'
+        ? 'manuale'
+        : e.event_type === 'presenza_corretta_manualmente'
+          ? 'corretta'
+          : 'automatica',
+    superseded: supersededIds.has(e.id),
+  }));
+
   return (
     <>
       <div className="muted" style={{ marginBottom: 8 }}>
@@ -163,6 +196,8 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
       </div>
 
       <CodaResolver items={codaItems} tuttiIscritti={tuttiIscritti} />
+
+      <PresenzeManager sessioneId={sessione.id} presenze={presenze} tuttiIscritti={tuttiIscritti} />
 
       <CsvImportForm sessioneId={sessione.id} />
     </>

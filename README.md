@@ -96,16 +96,17 @@ Utenze demo create da `npm run bootstrap`:
 
 ### Fase 3 — fetta webinar (pipeline presenze)
 
-Mandato: `docs/brief-fase-3.md`. Scope della sessione corrente: **fino a M3a**
-(Task 1–5); Task 6/M3 (adattatore API Teams) rinviati al setup Azure/segreti.
+Mandato: `docs/brief-fase-3.md`. **Task 1–5 ✅, gate M3a ✅ VERDE**: la fetta
+webinar gira end-to-end via CSV sul Supabase live. Task 6/M3 (adattatore API
+Teams) rinviati al setup Azure/segreti (runbook esterno).
 
 | Task (F3) | Contenuto | File principali / stato |
 |---|---|---|
 | 1 — Schema Gruppo 3 + grezzo write-once | azienda/piano/incarico/sessione + `report_partecipazione_grezzo` (write-once, D20), estensioni iscrizione/corso, `grezzo_content_hash` | ✅ `supabase/migrations/20260527000001_fase3_gruppo3_grezzo.sql` (applicata sul live) + seed `supabase/seed/fase3_webinar_demo.sql` |
 | 2 — Pipeline unica | `pipeline_ingest_grezzo()` SECURITY DEFINER: (a) scrive il grezzo write-once + (b) Evento `report_grezzo_importato` con `payload.hash` via `audit_append`, atomici; (c) riconciliazione = seam del Task 4 | ✅ `supabase/migrations/20260529000001_fase3_pipeline_ingest.sql` (applicata sul live) + test `supabase/tests/m3a_pipeline_ingest.sql` 17/17 |
 | 3 — Adattatore CSV | parser CSV/TSV senza dipendenze + alias intestazioni Teams/Zoom (IT/EN) + mappatura colonne configurabile → array normalizzato → `pipeline_ingest_grezzo(fonte='csv')`; errore esplicito se manca una colonna chiave PRIMA del grezzo | ✅ `src/lib/csv.ts`, `src/lib/pipeline.ts`, `src/app/api/admin/sessioni/[id]/import-csv/route.ts`, UI `src/app/admin/sessioni/*` (lista + pianifica + dettaglio/import) |
-| 4 — Riconciliazione + coda ambigui (→ M3a) | match `email_riconciliazione` → fallback `persona.email`; ambigui = blocco + risoluzione admin | ⬜ da costruire |
-| 5 — Inserimento/correzione manuale presenze | Eventi con motivazione obbligatoria, mai UPDATE | ⬜ da costruire |
+| 4 — Riconciliazione + coda ambigui (→ M3a) | `pipeline_riconcilia_grezzo` (match `email_riconciliazione` → fallback `persona.email`; ambiguo/assente → coda; anonimo → Evento) + RPC risolvi/ignora + `compliance.ts` frequenza/idoneità a soglia (#9) | ✅ `supabase/migrations/20260529000002_fase3_riconciliazione.sql`, `src/lib/compliance.ts`, UI `CodaResolver` + `/audit/completamento`; test `m3a_riconciliazione.sql` 20/20 |
+| 5 — Inserimento/correzione manuale presenze | RPC `presenza_inserisci_manuale`/`presenza_correggi_manuale` (motivazione obbligatoria; correzione = nuovo Evento che referenzia il precedente, mai UPDATE) | ✅ `supabase/migrations/20260529000003_fase3_presenza_manuale.sql`, UI `PresenzeManager`; test `m3a_presenza_manuale.sql` 9/9 |
 | 6 — Adattatore API Teams (→ M3) | ⛔ rinviato: setup Azure AD + segreti + egress Graph (runbook esterno) | ⛔ rinviato |
 
 ## Verifica gate M1a (alla fine del Task 2, prima di proseguire)

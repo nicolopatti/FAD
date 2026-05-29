@@ -254,21 +254,38 @@ export async function computeFrequenzaForIscrizione(
     minutiPianificati += p;
   }
 
-  // Eventi di presenza per questa Iscrizione. subject_id = sessione.
-  type PresEvt = { subject_id: string | null; payload: { durata?: string | null } | null };
+  // Eventi di presenza per questa Iscrizione (auto + manuali). subject_id = sessione.
+  type PresEvt = {
+    id: string;
+    subject_id: string | null;
+    payload: { durata?: string | null; corregge_evento_id?: string | null } | null;
+  };
   const { data: eventi } = await supabase
     .from('evento')
-    .select('subject_id, payload')
-    .eq('event_type', 'presenza_webinar_registrata')
+    .select('id, subject_id, payload')
+    .in('event_type', [
+      'presenza_webinar_registrata',
+      'presenza_inserita_manualmente',
+      'presenza_corretta_manualmente',
+    ])
     .eq('payload->>iscrizione_id', iscrizioneId)
+    .order('seq', { ascending: true })
     .returns<PresEvt[]>();
 
-  // Per ogni sessione, prendi la MAX durata registrata (no doppio conteggio se
-  // ci sono più report per la stessa sessione), limitata al pianificato.
+  // Correzioni manuali (D7/M3a#7): un Evento di correzione SUPERA quello
+  // referenziato — la ricostruzione dello stato dal log esclude il superato.
+  const superseded = new Set<string>();
+  for (const e of eventi ?? []) {
+    const ref = e.payload?.corregge_evento_id;
+    if (ref) superseded.add(ref);
+  }
+
+  // Per ogni sessione, MAX durata tra gli Eventi EFFETTIVI (non superati),
+  // limitata al pianificato (no doppio conteggio tra più report/rientri).
   const attendedBySessione = new Map<string, number>();
   let durateNonParsate = 0;
   for (const e of eventi ?? []) {
-    if (!e.subject_id) continue;
+    if (!e.subject_id || superseded.has(e.id)) continue;
     const min = parseDurataMinuti(e.payload?.durata ?? null);
     if (min == null) { durateNonParsate += 1; continue; }
     const prev = attendedBySessione.get(e.subject_id) ?? 0;

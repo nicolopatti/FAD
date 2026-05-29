@@ -51,11 +51,14 @@ sul live + read-only sul corso reale `Demo multi-LO`.
 
 ## Stato di avanzamento (Fase 3)
 
-**Fase 3 in corso — fetta webinar (pipeline presenze + adattatori).** Mandato:
-`docs/brief-fase-3.md`. Scope di lavoro corrente: **Task 1–5 fino al gate M3a**
-verificati sul Supabase live; **Task 6 (adattatore API Teams) + M3 rinviati**
-(richiedono setup Azure AD/segreti/egress Graph non eseguibile da Claude Code on
-the web — è un runbook lato utente).
+**Fase 3 — fetta webinar (pipeline presenze + adattatori). Task 1–5 ✅, gate M3a
+✅ VERDE** (2026-05-29). Mandato: `docs/brief-fase-3.md`. La slice gira end-to-end
+via CSV sul Supabase live (import → grezzo write-once → hash → riconciliazione →
+presenze/non-riconciliazioni → coda ambigui → risoluzione/inserimento/correzione
+manuale → frequenza e idoneità derivate dai soli Eventi). **Task 6 (adattatore API
+Teams) + gate M3 rinviati**: richiedono setup Azure AD/segreti/egress Graph non
+eseguibile da Claude Code on the web — è un runbook lato utente. UI da verificare
+nel browser sul deploy (egress `*.vercel.app` bloccato da qui).
 
 Decisioni §10 ratificate (2026-05-27): Teams unica piattaforma VCS implementata;
 match ambigui → **blocco + risoluzione manuale**; riconciliazione → **automatica
@@ -68,8 +71,14 @@ alla soglia** (`corso.soglia_frequenza_percentuale`).
 | 2 | Pipeline unica (ingest grezzo → evento import → riconciliazione) | ✅ done — `…20260529000001_fase3_pipeline_ingest.sql` applicata sul live; pgTAP `m3a_pipeline_ingest.sql` 17/17. Stadi (a)+(b); stadio (c) = seam del Task 4 |
 | 3 | Adattatore CSV (upload + parser + mappatura colonne) | ✅ done — `src/lib/csv.ts` (+`pipeline.ts`), route `…/sessioni/[id]/import-csv`, UI `/admin/sessioni`. Parser verificato; path CSV→pipeline 8/8 sul live |
 | 4 | Riconciliazione + coda risoluzione ambigui (gate M3a) | ✅ done — motore DB (`…20260529000002_…`, pgTAP 20/20), `compliance.ts` frequenza #9 (8/8 + parser 14/14), UI coda (`CodaResolver` + route risolvi/ignora) e frequenza nel report auditor |
-| 5 | Inserimento/correzione manuale presenze (M3a #7) | ⬜ da iniziare (prossimo, chiude M3a) |
+| 5 | Inserimento/correzione manuale presenze (M3a #7) | ✅ done — RPC `presenza_inserisci_manuale`/`presenza_correggi_manuale` (`…20260529000003_…`), UI `PresenzeManager`, pgTAP `m3a_presenza_manuale.sql` 9/9. Correzione = nuovo Evento, mai UPDATE |
 | 6 | Setup Teams + adattatore API (gate M3) | ⛔ rinviato (runbook esterno) |
+
+**Gate M3a ✅ VERDE** (2026-05-29): tutti i 9 criteri di `docs/brief-fase-3.md` §8
+verificati sul Supabase live. La fetta webinar gira end-to-end via CSV
+(import → grezzo write-once → Evento di import con hash → riconciliazione →
+Eventi di presenza/non-riconciliazione → coda ambigui → risoluzione manuale →
+inserimento/correzione manuale → frequenza/idoneità dai soli Eventi).
 
 Nota Task 1: il brief assumeva `email_riconciliazione`/`ore_frequentate`/
 `frequenza_percentuale` già su `iscrizione`; non c'erano → aggiunte dalla migration,
@@ -114,6 +123,26 @@ IT `;`, TSV, anonimo, override, errori); path CSV→pipeline con l'**admin reale
 (JWT simulato) sul live **8/8** (3 righe, anonimo preservato, hash combaciante,
 catena integra), nessun leakage; typecheck+build verdi. **Da verificare nel browser**
 sul deploy (egress `*.vercel.app` bloccato da qui): upload reale + refresh UI.
+
+Nota Task 4 (2026-05-29): `pipeline_riconcilia_grezzo(grezzo_id)` (stadio c,
+agganciato all'auto-import) + RPC `riconcilia_risolvi_match`/`riconcilia_ignora`
+(coda → Eventi, mai UPDATE) + tabella `coda_riconciliazione` (working-state) +
+policy RLS admin su persona/iscrizione (per scegliere l'iscritto). `compliance.ts`:
+`parseDurataMinuti` + `computeFrequenzaForIscrizione` (max durata effettiva per
+sessione, cap al pianificato, idoneità auto alla soglia), gestione **sostituzione**
+delle correzioni. UI: `CodaResolver` (coda) + colonna Frequenza nel report auditor.
+Verifiche live: riconciliazione 18/18, pgTAP `m3a_riconciliazione.sql` 20/20,
+frequenza #9 8/8 (Mario 100% / Lucia 91.67% a soglia 80, invariante all'azzeramento
+cache), parser 14/14.
+
+Nota Task 5 (2026-05-29): `presenza_inserisci_manuale` / `presenza_correggi_manuale`
+(motivazione obbligatoria; la correzione è un nuovo Evento `presenza_corretta_manualmente`
+con `payload.corregge_evento_id`, l'Evento precedente resta invariato — append-only).
+Policy RLS additiva: l'admin legge gli Eventi di presenza/riconciliazione del tenant
+(per la UI). UI `PresenzeManager` (elenco presenze con superate barrate + correggi +
+aggiungi manuale). Verifiche live 9/9 + pgTAP `m3a_presenza_manuale.sql` 9/9. La
+frequenza usa la durata corretta (60, non 100). Le UI di Task 4/5 sono da verificare
+nel browser sul deploy.
 
 ## Stato dei gate
 
@@ -162,14 +191,29 @@ sul deploy (egress `*.vercel.app` bloccato da qui): upload reale + refresh UI.
   - **#7 Log Fase 1 invariato sui nuovi eventi** ✅ — `audit_verify_chain`
     ritorna 0 problemi dopo i nuovi tipi `learning_object.*`, `corso.*`,
     `struttura.*`, `edizione.*`, `documento.opened`/`documento.completed`.
-- **M3a** — *Pipeline + CSV reggono.* ⬜ in corso (checkpoint dopo Task 4).
-  Criteri in `docs/brief-fase-3.md` §8. Fondamenta del Task 1 verificate sul live
-  (grezzo write-once, hash contenuto, D30, RLS): 10/10 check hermetici. **Task 2
-  (ingestione)** copre già la porzione di M3a verificabile a livello pipeline:
-  #1 grezzo immutabile, #2 import attestato (hash riproducibile e sensibile), #4
-  (parziale) payload import senza PII, #8 stream unico — pgTAP `m3a_pipeline_ingest.sql`
-  17/17 sul live. Restano per il Task 4: #4 completo (match), #5 ambiguo, #6
-  anonimo, #9 cache di compliance ricalcolata.
+- **M3a** — *Pipeline + CSV reggono.* ✅ **VERDE** (2026-05-29). Tutti i 9 criteri
+  di `docs/brief-fase-3.md` §8 verificati sul Supabase live (transazione+rollback),
+  più 3 test pgTAP committati. Mappatura criterio → evidenza:
+  - **#1 grezzo immutabile** ✅ — UPDATE/DELETE bloccati (`m3a_pipeline_ingest.sql`
+    #15/#16; Task 1 10/10).
+  - **#2 import attestato** ✅ — 1 solo `report_grezzo_importato`, `payload.hash` =
+    hash del contenuto, riproducibile e sensibile a 1 byte (`m3a_pipeline_ingest.sql`
+    #4/#5/#6, **17/17**).
+  - **#3 nessun INSERT diretto in `evento`** ✅ — grep: unico `insert into public.evento`
+    è in `audit_append`; in `src/` solo `.from('evento').select`.
+  - **#4 match esatto** ✅ — 1 `presenza_webinar_registrata`, no PII; + fallback
+    `persona.email` e priorità `email_riconciliazione` (`m3a_riconciliazione.sql`, **20/20**).
+  - **#5 match ambiguo** ✅ — ≥2 candidati → coda, nessuna presenza automatica;
+    risolto → presenza + `match_risolto_manualmente` con motivazione.
+  - **#6 partecipante anonimo** ✅ — `partecipante_non_riconciliato` con
+    identificatore stabile (hash), nome NON nel payload.
+  - **#7 correzione manuale** ✅ — `presenza_corretta_manualmente` referenzia
+    l'Evento precedente (invariato); la frequenza usa il valore corretto
+    (`m3a_presenza_manuale.sql`, **9/9**).
+  - **#8 stream unico** ✅ — tutti gli Eventi sullo stream del tenant, nessun nuovo stream.
+  - **#9 cache compliance ricalcolata** ✅ — `compliance.ts` ricalcola
+    ore/frequenza/idoneità dagli Eventi, invariante all'azzeramento delle colonne-cache
+    (live 8/8; parser durata 14/14).
 - **M3** — *Webinar end-to-end con API Teams.* ⛔ rinviato (Task 6, setup Teams
   esterno: Azure AD + segreti + egress Graph). Criteri in `docs/brief-fase-3.md` §9.
 
@@ -253,42 +297,36 @@ sul deploy (egress `*.vercel.app` bloccato da qui): upload reale + refresh UI.
 
 ## Cosa fare nella prossima sessione
 
-**Fase 3 in corso (fetta webinar).** Gate M1a/M1/M2 verdi; Fase 3 Task 1 ✅ (schema
-Gruppo 3 + grezzo write-once), Task 2 ✅ (pipeline `pipeline_ingest_grezzo`, stadi
-a+b) sul live, Task 3 ✅ (adattatore CSV + area `/admin/sessioni`). **Il prossimo è
-il Task 4 — Riconciliazione + coda ambigui → gate M3a** (`docs/brief-fase-3.md`
-§5 Task 4 e §8). Da costruire:
-1. `pipeline_riconcilia_grezzo(grezzo_id)` (SECURITY DEFINER): legge il `contenuto`
-   del grezzo e per ogni riga cerca un'Iscrizione attiva sull'edizione della
-   sessione, **prima** per `iscrizione.email_riconciliazione`, **poi** (se nulla)
-   per `persona.email` (D17/D33). Esiti via `audit_append`:
-   - 1 candidato → `presenza_webinar_registrata` (actor/subject pseudonimi,
-     payload senza PII: durata/join/leave, riferimento riga grezzo per indice);
-   - ≥2 candidati o 0 con email plausibile → **coda di risoluzione** (nessun
-     Evento di presenza finché un admin non sceglie);
-   - riga senza email/non identificabile → `partecipante_non_riconciliato` con
-     identificatore stabile derivato dalla riga (hash dei campi normalizzati), nome
-     NON nel payload.
-2. Auto-riconcilia all'import: agganciare la chiamata nello stadio (c) di
-   `pipeline_ingest_grezzo` (oggi seam) + RPC di ri-esecuzione manuale (decisione §10).
-3. UI admin coda di risoluzione: scegli iscritto → `presenza_webinar_registrata` +
-   `match_risolto_manualmente` (payload.motivazione, payload.risolto_da pseudonimo);
-   "ignora" → `partecipante_non_riconciliato`. Scelte = Eventi, mai UPDATE.
-4. `compliance.ts`: contare gli Eventi di presenza webinar verso
-   `ore_frequentate`/`frequenza_percentuale`, idoneità auto alla soglia
-   `corso.soglia_frequenza_percentuale` (M3a #9). Estendere `m3a_pipeline_ingest.sql`
-   (o un nuovo `m3a_riconciliazione.sql`) per i criteri M3a #4 completo, #5, #6, #9.
+**Fase 3 — fetta webinar: Task 1–5 ✅, gate M3a ✅ VERDE.** Gate M1a/M1/M2/M3a tutti
+verdi. La pipeline presenze gira end-to-end via CSV sul Supabase live, verificata.
+**Non resta nulla di obbligatorio in Fase 3 nello scope eseguibile da qui.** Opzioni
+per la prossima sessione, in ordine:
 
-Poi Task 5 (inserimento/correzione manuale). Scope di questa tornata: fino a M3a;
-Task 6/M3 (Teams) rinviati al runbook utente.
+1. **Verifica UI nel browser sul deploy** (non bloccante ma consigliata prima di
+   clienti veri): area admin `/admin/sessioni` (pianifica sessione, importa CSV,
+   risolvi coda, inserisci/correggi presenza) e report auditor `/audit/completamento`
+   (colonna Frequenza). L'egress `*.vercel.app` è bloccato da qui: serve il browser
+   dell'utente. Ricetta rapida sotto in "Re-verifica".
+2. **Task 6 — adattatore API Teams → gate M3** (`docs/brief-fase-3.md` §5 Task 6, §9).
+   ⛔ richiede **runbook esterno**: registrazione app Azure AD, consenso admin M365,
+   segreti in env, egress verso Microsoft Graph. Non eseguibile da Claude Code on the
+   web. Quando i segreti ci sono: l'adattatore scarica il report via Graph, lo
+   normalizza **nella stessa shape del CSV** (array di righe `{riga,nome,email,join,
+   leave,durata}`) e chiama `pipeline_ingest_grezzo` con `fonte='api_teams'`. Nota: per
+   `importato_da = NULL` (import automatico) serve sbloccare un **attore "sistema"**
+   in `pipeline_ingest_grezzo` (oggi NULL è rifiutato) e in `pipeline_riconcilia_grezzo`
+   (l'attore dei `partecipante_non_riconciliato` anonimi è oggi `importato_da`).
+3. **Fase 4 (report fondi) / Fase 5 (Attestato)**: **NON iniziare senza brief dedicato
+   e conferma esplicita dell'utente.** Fase 3 produce gli Eventi che alimenteranno il
+   generatore di Fase 4, non il generatore.
 
-Promemoria di metodo:
-- pipeline = un'unica funzione SECURITY DEFINER che inserisce nel grezzo e appende
-  l'Evento di import nella stessa transazione (niente righe orfane, §11 brief);
-- mai INSERT diretto in `evento` né nel grezzo da PostgREST: la write del grezzo
-  passa solo per la funzione di ingestione (la tabella ha REVOKE + trigger);
-- presenze come Eventi senza PII nel payload (attori pseudonimi); idoneità auto
-  alla soglia `corso.soglia_frequenza_percentuale` nel ricalcolo della cache.
+Promemoria di metodo (invarianti da non rompere):
+- mai INSERT diretto in `evento` né nel grezzo: si passa solo per `audit_append` e
+  `pipeline_ingest_grezzo`/`pipeline_riconcilia_grezzo` (SECURITY DEFINER);
+- presenze/correzioni = Eventi senza PII nel payload (attori pseudonimi); la
+  frequenza/idoneità si ricalcola dagli Eventi (`compliance.ts`, D8);
+- ogni nuova funzione di scrittura su `public`: **revocare EXECUTE da `anon`**
+  esplicitamente (Supabase lo concede di default) — vale per tutte le RPC di Fase 3.
 
 Restano aperti, non bloccanti:
 - **Verifiche UI nel browser** di Fase 2 Task 4/5 sul deploy (network policy
@@ -376,21 +414,23 @@ Tutte le info utili stanno in questi file del repo:
 - `docs/brief-fase-3.md` → mandato operativo Fase 3 (**corrente**); §11 in fondo
   ha le note di implementazione (scope fino a M3a, decisioni §10 ratificate)
 
-**Ripartenza Fase 3 (Task 4):** le migration `…20260527000001_…` (Task 1) e
-`…20260529000001_fase3_pipeline_ingest.sql` (Task 2) sono **già applicate sul
-Supabase live** — non riapplicarle. Il Task 3 (adattatore CSV) è solo codice
-applicativo (nessuna migration). Lo schema Gruppo 3, il grezzo write-once, la
-funzione `pipeline_ingest_grezzo` e l'area `/admin/sessioni` ci sono. Il seed
-webinar è sul live (UUID prefisso `33333333…`: edizione
-`33333333-0000-0000-0000-0000000000e1`, sessione Teams
+**Ripartenza Fase 3 (M3a chiuso).** Le 3 migration di Fase 3
+(`…20260527000001_…` Task 1, `…20260529000001_…` Task 2, `…20260529000002_…` Task 4,
+`…20260529000003_…` Task 5) sono **già applicate sul Supabase live** — non
+riapplicarle. Task 3 (adattatore CSV) e le UI sono solo codice applicativo. Tutto
+lo schema Gruppo 3 + grezzo write-once + pipeline + riconciliazione + coda +
+presenze manuali + l'area `/admin/sessioni` e la colonna Frequenza in
+`/audit/completamento` ci sono. Il seed webinar è sul live (UUID prefisso
+`33333333…`: edizione `33333333-0000-0000-0000-0000000000e1`, sessione Teams
 `33333333-0000-0000-0000-0000000005e1`, 3 iscritti: Mario `…015001`
 email_riconciliazione=email; Lucia `…015002` NULL→fallback persona.email; Carla
 `…015003` email_riconciliazione diversa). Persona admin reale:
-`aaaa3333-aaaa-aaaa-aaaa-aaaaaaaaaaaa`. La forma del `contenuto` del grezzo
-(prodotta dall'adattatore) è un array di `{riga,nome,email,join,leave,durata}`
-(valori grezzi). Partire dal Task 4 (riconciliazione): vedi i 4 punti in "Cosa
-fare nella prossima sessione" e `docs/brief-fase-3.md` §5 Task 4 + §8 (criteri M3a).
-Il seed è perfetto per esercitare match diretto / fallback / anonimo.
+`aaaa3333-aaaa-aaaa-aaaa-aaaaaaaaaaaa`. La forma del `contenuto` del grezzo è un
+array di `{riga,nome,email,join,leave,durata}` (valori grezzi). **Prossimi passi:
+vedi "Cosa fare nella prossima sessione"** (verifica UI nel browser; Task 6/M3
+solo con runbook Teams; Fase 4/5 solo con brief + conferma). Test M3a rieseguibili:
+`supabase/tests/m3a_pipeline_ingest.sql` (17), `…/m3a_riconciliazione.sql` (20),
+`…/m3a_presenza_manuale.sql` (9) via MCP `execute_sql` (girano in rollback).
 
 Comandi spesso usati:
 ```bash
