@@ -22,6 +22,7 @@ export function TopBar({
           <>
             <Link href="/admin/learning-objects">Learning Object</Link>
             <Link href="/admin/corsi">Corsi</Link>
+            <Link href="/admin/sessioni">Sessioni</Link>
           </>
         ) : (
           <Link href="/corsi">I miei corsi</Link>

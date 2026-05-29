@@ -66,8 +66,8 @@ alla soglia** (`corso.soglia_frequenza_percentuale`).
 |---|---|---|
 | 1 | Schema Gruppo 3 (azienda/piano/incarico/sessione) + grezzo write-once + estensioni iscrizione/corso | ✅ done — `…20260527000001_fase3_gruppo3_grezzo.sql` applicata sul live; seed `supabase/seed/fase3_webinar_demo.sql` |
 | 2 | Pipeline unica (ingest grezzo → evento import → riconciliazione) | ✅ done — `…20260529000001_fase3_pipeline_ingest.sql` applicata sul live; pgTAP `m3a_pipeline_ingest.sql` 17/17. Stadi (a)+(b); stadio (c) = seam del Task 4 |
-| 3 | Adattatore CSV (upload + parser + mappatura colonne) | ⬜ da iniziare (prossimo) |
-| 4 | Riconciliazione + coda risoluzione ambigui (gate M3a) | ⬜ da iniziare |
+| 3 | Adattatore CSV (upload + parser + mappatura colonne) | ✅ done — `src/lib/csv.ts` (+`pipeline.ts`), route `…/sessioni/[id]/import-csv`, UI `/admin/sessioni`. Parser verificato; path CSV→pipeline 8/8 sul live |
+| 4 | Riconciliazione + coda risoluzione ambigui (gate M3a) | ⬜ da iniziare (prossimo) |
 | 5 | Inserimento/correzione manuale presenze | ⬜ da iniziare |
 | 6 | Setup Teams + adattatore API (gate M3) | ⛔ rinviato (runbook esterno) |
 
@@ -95,6 +95,25 @@ EXECUTE-revocato esplicitamente** (Supabase lo concede di default sulle funzioni
 "sistema"). Verifiche sul live in transazione+rollback: 14/14 funzionali, 2/2 authz
 (admin passa / discente bloccato, JWT simulato con le Persone reali), grant puliti
 (no `anon`), nessun leakage; pgTAP `supabase/tests/m3a_pipeline_ingest.sql` **17/17**.
+
+Nota Task 3 (2026-05-29): adattatore CSV in `src/lib/csv.ts` (zero dipendenze):
+`parseDelimited` (auto-rileva `,`/`;`/tab, gestisce virgolette+`""`, CRLF/LF, BOM),
+`HEADER_ALIASES` per varianti Teams/Zoom IT/EN, `mapHeaders` con **override
+configurabile** che ha precedenza sugli alias, `csvToNormalizedRows` che produce
+un array di righe `{riga,nome,email,join,leave,durata}` (valori "come ricevuti",
+no parsing durata/timestamp — è del Task 4) e **fallisce esplicitamente** se manca
+una colonna chiave (`nome`/`email`/`durata`) PRIMA di toccare il grezzo. Le righe
+senza email restano (email→`null`) per gli anonimi del Task 4. Route admin
+`POST /api/admin/sessioni/[id]/import-csv` (`requireAdmin` → adattatore →
+`ingestGrezzo` con `fonte='csv'`, `importato_da`=persona admin). UI area
+`/admin/sessioni`: lista, **pianifica** sessione (route `POST /api/admin/sessioni`
++ Evento `sessione.created`; incarico opzionale, sessione senza docente ammessa —
+M3 #6), dettaglio con form import (file o incolla, mappatura avanzata) + elenco
+grezzi (righe + fonte, hash nel log eventi). Verifiche: parser via `tsx` (Teams `,`,
+IT `;`, TSV, anonimo, override, errori); path CSV→pipeline con l'**admin reale**
+(JWT simulato) sul live **8/8** (3 righe, anonimo preservato, hash combaciante,
+catena integra), nessun leakage; typecheck+build verdi. **Da verificare nel browser**
+sul deploy (egress `*.vercel.app` bloccato da qui): upload reale + refresh UI.
 
 ## Stato dei gate
 
@@ -235,22 +254,33 @@ EXECUTE-revocato esplicitamente** (Supabase lo concede di default sulle funzioni
 ## Cosa fare nella prossima sessione
 
 **Fase 3 in corso (fetta webinar).** Gate M1a/M1/M2 verdi; Fase 3 Task 1 ✅ (schema
-Gruppo 3 + grezzo write-once) e Task 2 ✅ (pipeline `pipeline_ingest_grezzo`, stadi
-a+b) applicati sul live. **Il prossimo è il Task 3 — Adattatore CSV**
-(`docs/brief-fase-3.md` §5 Task 3): endpoint admin di upload + parser CSV +
-mappatura colonne configurabile (chiavi attese: nome partecipante, email,
-join/leave, durata), che normalizza in **un array JSON di righe** e chiama
-`pipeline_ingest_grezzo` con `fonte='csv'` e `importato_da` = persona admin. Se
-una colonna chiave manca → errore esplicito **prima** di toccare il grezzo
-(niente default fragili). Poi Task 4 (riconciliazione + coda ambigui → **gate
-M3a**), Task 5 (inserimento/correzione manuale). Scope di questa tornata: fino a
-M3a; Task 6/M3 (Teams) rinviati al runbook utente.
+Gruppo 3 + grezzo write-once), Task 2 ✅ (pipeline `pipeline_ingest_grezzo`, stadi
+a+b) sul live, Task 3 ✅ (adattatore CSV + area `/admin/sessioni`). **Il prossimo è
+il Task 4 — Riconciliazione + coda ambigui → gate M3a** (`docs/brief-fase-3.md`
+§5 Task 4 e §8). Da costruire:
+1. `pipeline_riconcilia_grezzo(grezzo_id)` (SECURITY DEFINER): legge il `contenuto`
+   del grezzo e per ogni riga cerca un'Iscrizione attiva sull'edizione della
+   sessione, **prima** per `iscrizione.email_riconciliazione`, **poi** (se nulla)
+   per `persona.email` (D17/D33). Esiti via `audit_append`:
+   - 1 candidato → `presenza_webinar_registrata` (actor/subject pseudonimi,
+     payload senza PII: durata/join/leave, riferimento riga grezzo per indice);
+   - ≥2 candidati o 0 con email plausibile → **coda di risoluzione** (nessun
+     Evento di presenza finché un admin non sceglie);
+   - riga senza email/non identificabile → `partecipante_non_riconciliato` con
+     identificatore stabile derivato dalla riga (hash dei campi normalizzati), nome
+     NON nel payload.
+2. Auto-riconcilia all'import: agganciare la chiamata nello stadio (c) di
+   `pipeline_ingest_grezzo` (oggi seam) + RPC di ri-esecuzione manuale (decisione §10).
+3. UI admin coda di risoluzione: scegli iscritto → `presenza_webinar_registrata` +
+   `match_risolto_manualmente` (payload.motivazione, payload.risolto_da pseudonimo);
+   "ignora" → `partecipante_non_riconciliato`. Scelte = Eventi, mai UPDATE.
+4. `compliance.ts`: contare gli Eventi di presenza webinar verso
+   `ore_frequentate`/`frequenza_percentuale`, idoneità auto alla soglia
+   `corso.soglia_frequenza_percentuale` (M3a #9). Estendere `m3a_pipeline_ingest.sql`
+   (o un nuovo `m3a_riconciliazione.sql`) per i criteri M3a #4 completo, #5, #6, #9.
 
-Aggancio per il Task 4: in `pipeline_ingest_grezzo` lo stadio (c) è marcato come
-seam — lì si innesterà `pipeline_riconcilia_grezzo(grezzo_id)` (auto all'import,
-decisione §10) + la ri-esecuzione manuale; e `compliance.ts` andrà esteso per
-contare gli Eventi di presenza webinar verso `ore_frequentate`/`frequenza_percentuale`
-con idoneità auto alla soglia (M3a #9).
+Poi Task 5 (inserimento/correzione manuale). Scope di questa tornata: fino a M3a;
+Task 6/M3 (Teams) rinviati al runbook utente.
 
 Promemoria di metodo:
 - pipeline = un'unica funzione SECURITY DEFINER che inserisce nel grezzo e appende
@@ -346,17 +376,21 @@ Tutte le info utili stanno in questi file del repo:
 - `docs/brief-fase-3.md` → mandato operativo Fase 3 (**corrente**); §11 in fondo
   ha le note di implementazione (scope fino a M3a, decisioni §10 ratificate)
 
-**Ripartenza Fase 3 (Task 3):** le migration `…20260527000001_…` (Task 1) e
+**Ripartenza Fase 3 (Task 4):** le migration `…20260527000001_…` (Task 1) e
 `…20260529000001_fase3_pipeline_ingest.sql` (Task 2) sono **già applicate sul
-Supabase live** — non riapplicarle. Lo schema Gruppo 3, il grezzo write-once e la
-funzione `pipeline_ingest_grezzo` ci sono. Il seed webinar è sul live (UUID
-prefisso `33333333…`: edizione `33333333-0000-0000-0000-0000000000e1`, sessione
-Teams `33333333-0000-0000-0000-0000000005e1`, 3 iscritti di cui uno senza
-`email_riconciliazione`). Persona admin reale (attore degli import via CSV):
-`aaaa3333-aaaa-aaaa-aaaa-aaaaaaaaaaaa`. Partire dal Task 3 (adattatore CSV): la
-route admin chiama `supabase.rpc('pipeline_ingest_grezzo', {p_tenant_id,
-p_sessione_id, p_fonte:'csv', p_contenuto:<array di righe>, p_importato_da:<persona
-admin>})` dopo `requireAdmin()`. Vedi `docs/brief-fase-3.md` §5 Task 3.
+Supabase live** — non riapplicarle. Il Task 3 (adattatore CSV) è solo codice
+applicativo (nessuna migration). Lo schema Gruppo 3, il grezzo write-once, la
+funzione `pipeline_ingest_grezzo` e l'area `/admin/sessioni` ci sono. Il seed
+webinar è sul live (UUID prefisso `33333333…`: edizione
+`33333333-0000-0000-0000-0000000000e1`, sessione Teams
+`33333333-0000-0000-0000-0000000005e1`, 3 iscritti: Mario `…015001`
+email_riconciliazione=email; Lucia `…015002` NULL→fallback persona.email; Carla
+`…015003` email_riconciliazione diversa). Persona admin reale:
+`aaaa3333-aaaa-aaaa-aaaa-aaaaaaaaaaaa`. La forma del `contenuto` del grezzo
+(prodotta dall'adattatore) è un array di `{riga,nome,email,join,leave,durata}`
+(valori grezzi). Partire dal Task 4 (riconciliazione): vedi i 4 punti in "Cosa
+fare nella prossima sessione" e `docs/brief-fase-3.md` §5 Task 4 + §8 (criteri M3a).
+Il seed è perfetto per esercitare match diretto / fallback / anonimo.
 
 Comandi spesso usati:
 ```bash

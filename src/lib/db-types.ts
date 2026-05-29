@@ -129,3 +129,37 @@ export type StrutturaRow = {
   learning_object_id: string;
   learning_object: LearningObjectMini | null;
 };
+
+// --- Fase 3 — Gruppo 3 (Sessione) + Report di partecipazione grezzo ---------
+
+export type SessioneModalita = 'aula' | 'vcs';
+export type VcsPiattaforma = 'teams' | 'zoom';
+export type ReportFonte = 'api_teams' | 'api_zoom' | 'csv';
+
+export type SessioneRow = {
+  id: string;
+  tenant_id: string;
+  edizione_id: string;
+  titolo: string;
+  data_ora: string | null;
+  durata_minuti: number | null;
+  modalita: SessioneModalita;
+  vcs_piattaforma: VcsPiattaforma | null;
+  vcs_meeting_id: string | null;
+  incarico_id: string | null;
+  annullato_at: string | null;
+  creato_il: string;
+};
+
+export type SessioneConEdizione = SessioneRow & {
+  edizione: EdizioneConCorso | null;
+};
+
+// Riga del grezzo come letta in UID admin (senza `contenuto`, che è PII di staging).
+export type GrezzoMetaRow = {
+  id: string;
+  sessione_id: string;
+  fonte: ReportFonte;
+  importato_da: string | null;
+  creato_il: string;
+};
