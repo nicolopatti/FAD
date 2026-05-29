@@ -93,3 +93,38 @@ describe('adapter Fondimpresa (interim)', () => {
     expect(f.contenuto).toContain('BNCMRA80A01F205X'); // CF (iscritto)
   });
 });
+
+describe('adapter FonCoop/GIFCOOP (interim) + architettura due-formati', () => {
+  it('è registrato, non ufficiale, e sono disponibili almeno 2 formati', () => {
+    const a = getAdapter('foncoop');
+    expect(a).not.toBeNull();
+    expect(a!.ufficiale).toBe(false);
+    expect(formatiDisponibili().length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('ha un layout distinto da Fondimpresa (header diverso, colonna Esito)', () => {
+    const f = getAdapter('foncoop')!.genera(ds([{}]));
+    const header = f.contenuto.replace(/^﻿/, '').split('\r\n')[0];
+    expect(header.startsWith('Fondo;CUP;CodicePiano')).toBe(true);
+    expect(header).toContain('Esito');
+    expect(f.filename).toContain('foncoop_INTERIM_');
+  });
+
+  it('M4 #2: lo STESSO dataset produce entrambi i formati', () => {
+    const dataset = ds([
+      { cognome: 'Bianchi', nome: 'Mario', idoneo: true },
+      { cognome: 'Verdi', nome: 'Lucia', idoneo: false },
+    ]);
+    const fi = getAdapter('fondimpresa')!.genera(dataset);
+    const fc = getAdapter('foncoop')!.genera(dataset);
+    // Entrambi non vuoti, header diversi, stesso numero di righe dati.
+    const righeFi = fi.contenuto.replace(/^﻿/, '').trimEnd().split('\r\n');
+    const righeFc = fc.contenuto.replace(/^﻿/, '').trimEnd().split('\r\n');
+    expect(righeFi).toHaveLength(3);
+    expect(righeFc).toHaveLength(3);
+    expect(righeFi[0]).not.toBe(righeFc[0]); // header diversi
+    // l'esito FonCoop usa IDONEO/NON IDONEO
+    expect(fc.contenuto).toContain('IDONEO');
+    expect(fc.contenuto).toContain('NON IDONEO');
+  });
+});

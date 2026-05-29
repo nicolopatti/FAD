@@ -104,10 +104,64 @@ const adapterFondimpresa: ReportFondoAdapter = {
   },
 };
 
-// Registry. Task 5 aggiungerà 'foncoop' sullo STESSO motore (solo un altro
-// adattatore qui sotto, nessuna modifica a report-fondo.ts).
+// --- FonCoop / GIFCOOP (Task 5). STESSO motore di aggregazione: cambia solo la
+// traduzione del dataset neutro (layout/intestazioni diverse). GIFCOOP è la
+// piattaforma informatica di FonCoop, non un terzo fondo (§10): un solo
+// adattatore. Anch'esso INTERIM finché non si recepisce il tracciato ufficiale.
+function righeRendicontazioneFonCoop(dataset: ReportFondoDataset): (string | number | null)[][] {
+  const t = dataset.testata;
+  const header = [
+    'Fondo',
+    'CUP',
+    'CodicePiano',
+    'Edizione',
+    'CodiceFiscale',
+    'Cognome',
+    'Nome',
+    'Impresa',
+    'PartitaIVA',
+    'OreFrequenza',
+    'PercentualeFrequenza',
+    'Esito',
+  ];
+  const righe: (string | number | null)[][] = [header];
+  for (const i of dataset.iscritti) {
+    righe.push([
+      t.fondo,
+      t.cup,
+      t.piano_codice,
+      t.edizione_codice,
+      i.codice_fiscale,
+      i.cognome,
+      i.nome,
+      i.azienda_ragione_sociale,
+      i.azienda_partita_iva,
+      i.ore_frequentate,
+      i.frequenza_percentuale,
+      i.idoneo ? 'IDONEO' : 'NON IDONEO',
+    ]);
+  }
+  return righe;
+}
+
+const adapterFonCoop: ReportFondoAdapter = {
+  fondo: 'foncoop',
+  etichetta: 'FonCoop / GIFCOOP (CSV interim)',
+  ufficiale: false,
+  genera(dataset) {
+    return {
+      filename: `foncoop_INTERIM_${dataset.testata.edizione_codice}.csv`,
+      mime: 'text/csv;charset=utf-8',
+      contenuto: csvRows(righeRendicontazioneFonCoop(dataset)),
+    };
+  },
+};
+
+// Registry: due bocche di uscita sullo STESSO motore (report-fondo.ts non cambia
+// aggiungendo un formato — è la prova dell'architettura D7 ribaltata in output).
 const ADAPTERS: Record<string, ReportFondoAdapter> = {
   fondimpresa: adapterFondimpresa,
+  foncoop: adapterFonCoop,
 };
 
 export function getAdapter(formato: string): ReportFondoAdapter | null {
