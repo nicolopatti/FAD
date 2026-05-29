@@ -102,7 +102,7 @@ Mandato: `docs/brief-fase-3.md`. Scope della sessione corrente: **fino a M3a**
 | Task (F3) | Contenuto | File principali / stato |
 |---|---|---|
 | 1 — Schema Gruppo 3 + grezzo write-once | azienda/piano/incarico/sessione + `report_partecipazione_grezzo` (write-once, D20), estensioni iscrizione/corso, `grezzo_content_hash` | ✅ `supabase/migrations/20260527000001_fase3_gruppo3_grezzo.sql` (applicata sul live) + seed `supabase/seed/fase3_webinar_demo.sql` |
-| 2 — Pipeline unica | ingest grezzo + Evento `report_grezzo_importato` + riconciliazione, in una funzione SECURITY DEFINER | ⬜ da costruire |
+| 2 — Pipeline unica | `pipeline_ingest_grezzo()` SECURITY DEFINER: (a) scrive il grezzo write-once + (b) Evento `report_grezzo_importato` con `payload.hash` via `audit_append`, atomici; (c) riconciliazione = seam del Task 4 | ✅ `supabase/migrations/20260529000001_fase3_pipeline_ingest.sql` (applicata sul live) + test `supabase/tests/m3a_pipeline_ingest.sql` 17/17 |
 | 3 — Adattatore CSV | upload + parser + mappatura colonne configurabile | ⬜ da costruire |
 | 4 — Riconciliazione + coda ambigui (→ M3a) | match `email_riconciliazione` → fallback `persona.email`; ambigui = blocco + risoluzione admin | ⬜ da costruire |
 | 5 — Inserimento/correzione manuale presenze | Eventi con motivazione obbligatoria, mai UPDATE | ⬜ da costruire |

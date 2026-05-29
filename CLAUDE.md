@@ -65,8 +65,8 @@ alla soglia** (`corso.soglia_frequenza_percentuale`).
 | Task | Descrizione | Stato |
 |---|---|---|
 | 1 | Schema Gruppo 3 (azienda/piano/incarico/sessione) + grezzo write-once + estensioni iscrizione/corso | ✅ done — `…20260527000001_fase3_gruppo3_grezzo.sql` applicata sul live; seed `supabase/seed/fase3_webinar_demo.sql` |
-| 2 | Pipeline unica (ingest grezzo → evento import → riconciliazione) | ⬜ da iniziare |
-| 3 | Adattatore CSV (upload + parser + mappatura colonne) | ⬜ da iniziare |
+| 2 | Pipeline unica (ingest grezzo → evento import → riconciliazione) | ✅ done — `…20260529000001_fase3_pipeline_ingest.sql` applicata sul live; pgTAP `m3a_pipeline_ingest.sql` 17/17. Stadi (a)+(b); stadio (c) = seam del Task 4 |
+| 3 | Adattatore CSV (upload + parser + mappatura colonne) | ⬜ da iniziare (prossimo) |
 | 4 | Riconciliazione + coda risoluzione ambigui (gate M3a) | ⬜ da iniziare |
 | 5 | Inserimento/correzione manuale presenze | ⬜ da iniziare |
 | 6 | Setup Teams + adattatore API (gate M3) | ⛔ rinviato (runbook esterno) |
@@ -78,6 +78,23 @@ strutturale, ora nel freeze D22). Verifica hermetica sul live 10/10: grezzo
 write-once (UPDATE/DELETE bloccati, D20), `grezzo_content_hash` deterministico e
 sensibile, trigger D30 sessione↔incarico (stessa edizione + ruolo didattico),
 sessione con `incarico_id` NULL ammessa, 5 tabelle + RLS presenti.
+
+Nota Task 2 (2026-05-29): `pipeline_ingest_grezzo(tenant, sessione, fonte,
+contenuto, importato_da)` è l'**unica** via di scrittura del grezzo (SECURITY
+DEFINER come `audit_append`): nella stessa transazione fa (a) l'INSERT del grezzo
+write-once e (b) `audit_append('report_grezzo_importato', …, payload={fonte, hash,
+righe})` con `hash = encode(grezzo_content_hash(contenuto),'hex')` — mai INSERT
+diretto su `evento`. Il `contenuto` normalizzato è **un array JSON di righe**
+(stessa shape per CSV e API Teams). Stadio (c) riconciliazione = seam del Task 4
+(nessun Evento di presenza speculativo: il log è append-only). Authz come
+`audit_verify_chain`: chiamante `authenticated` ⇒ deve essere admin del tenant;
+`service_role`/`postgres` (tenant nullo) bypassano (import automatici/test). **`anon`
+EXECUTE-revocato esplicitamente** (Supabase lo concede di default sulle funzioni
+`public`, e con tenant nullo salterebbe la guardia admin). `importato_da` NULL
+(import automatico API Teams) → rifiutato per ora, è del Task 6 (serve un attore
+"sistema"). Verifiche sul live in transazione+rollback: 14/14 funzionali, 2/2 authz
+(admin passa / discente bloccato, JWT simulato con le Persone reali), grant puliti
+(no `anon`), nessun leakage; pgTAP `supabase/tests/m3a_pipeline_ingest.sql` **17/17**.
 
 ## Stato dei gate
 
@@ -128,7 +145,12 @@ sessione con `incarico_id` NULL ammessa, 5 tabelle + RLS presenti.
     `struttura.*`, `edizione.*`, `documento.opened`/`documento.completed`.
 - **M3a** — *Pipeline + CSV reggono.* ⬜ in corso (checkpoint dopo Task 4).
   Criteri in `docs/brief-fase-3.md` §8. Fondamenta del Task 1 verificate sul live
-  (grezzo write-once, hash contenuto, D30, RLS): 10/10 check hermetici.
+  (grezzo write-once, hash contenuto, D30, RLS): 10/10 check hermetici. **Task 2
+  (ingestione)** copre già la porzione di M3a verificabile a livello pipeline:
+  #1 grezzo immutabile, #2 import attestato (hash riproducibile e sensibile), #4
+  (parziale) payload import senza PII, #8 stream unico — pgTAP `m3a_pipeline_ingest.sql`
+  17/17 sul live. Restano per il Task 4: #4 completo (match), #5 ambiguo, #6
+  anonimo, #9 cache di compliance ricalcolata.
 - **M3** — *Webinar end-to-end con API Teams.* ⛔ rinviato (Task 6, setup Teams
   esterno: Azure AD + segreti + egress Graph). Criteri in `docs/brief-fase-3.md` §9.
 
@@ -213,14 +235,22 @@ sessione con `incarico_id` NULL ammessa, 5 tabelle + RLS presenti.
 ## Cosa fare nella prossima sessione
 
 **Fase 3 in corso (fetta webinar).** Gate M1a/M1/M2 verdi; Fase 3 Task 1 ✅ (schema
-Gruppo 3 + grezzo write-once, applicato sul live). **Il prossimo è il Task 2 —
-Pipeline unica** (`docs/brief-fase-3.md` §5 Task 2): funzione di ingestione del
-grezzo (stadio a) + Evento `report_grezzo_importato` con `payload.hash =
-grezzo_content_hash(contenuto)` via `audit_append` (stadio b) + riconciliazione
-(stadio c; l'algoritmo vero è del Task 4). Poi Task 3 (adattatore CSV), Task 4
-(riconciliazione + coda ambigui → **gate M3a**), Task 5 (inserimento/correzione
-manuale). Scope di questa tornata: fino a M3a; Task 6/M3 (Teams) rinviati al
-runbook utente.
+Gruppo 3 + grezzo write-once) e Task 2 ✅ (pipeline `pipeline_ingest_grezzo`, stadi
+a+b) applicati sul live. **Il prossimo è il Task 3 — Adattatore CSV**
+(`docs/brief-fase-3.md` §5 Task 3): endpoint admin di upload + parser CSV +
+mappatura colonne configurabile (chiavi attese: nome partecipante, email,
+join/leave, durata), che normalizza in **un array JSON di righe** e chiama
+`pipeline_ingest_grezzo` con `fonte='csv'` e `importato_da` = persona admin. Se
+una colonna chiave manca → errore esplicito **prima** di toccare il grezzo
+(niente default fragili). Poi Task 4 (riconciliazione + coda ambigui → **gate
+M3a**), Task 5 (inserimento/correzione manuale). Scope di questa tornata: fino a
+M3a; Task 6/M3 (Teams) rinviati al runbook utente.
+
+Aggancio per il Task 4: in `pipeline_ingest_grezzo` lo stadio (c) è marcato come
+seam — lì si innesterà `pipeline_riconcilia_grezzo(grezzo_id)` (auto all'import,
+decisione §10) + la ri-esecuzione manuale; e `compliance.ts` andrà esteso per
+contare gli Eventi di presenza webinar verso `ore_frequentate`/`frequenza_percentuale`
+con idoneità auto alla soglia (M3a #9).
 
 Promemoria di metodo:
 - pipeline = un'unica funzione SECURITY DEFINER che inserisce nel grezzo e appende
@@ -316,14 +346,17 @@ Tutte le info utili stanno in questi file del repo:
 - `docs/brief-fase-3.md` → mandato operativo Fase 3 (**corrente**); §11 in fondo
   ha le note di implementazione (scope fino a M3a, decisioni §10 ratificate)
 
-**Ripartenza Fase 3 (Task 2):** la migration `…20260527000001_…` è **già applicata
-sul Supabase live** — non riapplicarla. Lo schema Gruppo 3 + il grezzo write-once
-ci sono. Il seed webinar è sul live (UUID prefisso `33333333…`: edizione
-`33333333-0000-0000-0000-0000000000e1`, sessione Teams
-`33333333-0000-0000-0000-0000000005e1`, 3 iscritti di cui uno senza
-`email_riconciliazione`). Partire dal Task 2 (pipeline unica): vedi
-`docs/brief-fase-3.md` §5 Task 2 e i "Promemoria di metodo" qui sopra in
-"Cosa fare nella prossima sessione".
+**Ripartenza Fase 3 (Task 3):** le migration `…20260527000001_…` (Task 1) e
+`…20260529000001_fase3_pipeline_ingest.sql` (Task 2) sono **già applicate sul
+Supabase live** — non riapplicarle. Lo schema Gruppo 3, il grezzo write-once e la
+funzione `pipeline_ingest_grezzo` ci sono. Il seed webinar è sul live (UUID
+prefisso `33333333…`: edizione `33333333-0000-0000-0000-0000000000e1`, sessione
+Teams `33333333-0000-0000-0000-0000000005e1`, 3 iscritti di cui uno senza
+`email_riconciliazione`). Persona admin reale (attore degli import via CSV):
+`aaaa3333-aaaa-aaaa-aaaa-aaaaaaaaaaaa`. Partire dal Task 3 (adattatore CSV): la
+route admin chiama `supabase.rpc('pipeline_ingest_grezzo', {p_tenant_id,
+p_sessione_id, p_fonte:'csv', p_contenuto:<array di righe>, p_importato_da:<persona
+admin>})` dopo `requireAdmin()`. Vedi `docs/brief-fase-3.md` §5 Task 3.
 
 Comandi spesso usati:
 ```bash
