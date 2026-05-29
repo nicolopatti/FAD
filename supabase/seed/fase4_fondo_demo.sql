@@ -34,6 +34,12 @@ begin
          data_chiusura= date '2026-06-30'
    where id = v_piano;
 
+  -- (1b) Codici fiscali degli iscritti (anagrafica PII su Persona, mai nel log).
+  --      Servono al report fondo; senza CF scatta il warning bloccante (§10).
+  update public.persona set codice_fiscale = 'BNCMRA80A01F205X' where id = '33333333-0000-0000-0000-000000001111'; -- Mario Bianchi
+  update public.persona set codice_fiscale = 'VRDLCU85B42F205Y' where id = '33333333-0000-0000-0000-000000002222'; -- Lucia Verdi
+  update public.persona set codice_fiscale = 'NRECRL90C43F205Z' where id = '33333333-0000-0000-0000-000000003333'; -- Carla Neri
+
   -- (2) Presenze webinar via pipeline — solo se non già importate (idempotenza)
   if not exists (select 1 from public.report_partecipazione_grezzo where sessione_id = v_sessione) then
     v_res := public.pipeline_ingest_grezzo(
