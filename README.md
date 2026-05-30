@@ -1,7 +1,7 @@
 # FAD — Fase 1 (fetta verticale)
 
 Mandato operativo: [`docs/brief-fase-1.md`](docs/brief-fase-1.md).
-Decisioni di riferimento: `piattaforma-elearning-stato-progetto-v7.md` (D1–D35).
+Decisioni di riferimento: `piattaforma-elearning-stato-progetto-v8.md` (D1–D37).
 
 > **Cosa contiene questa fase.** Substrato dati con `tenant_id` + RLS attiva,
 > log eventi append-only con catena hash (gate **M1a**), autenticazione, player
@@ -108,6 +108,22 @@ Teams) rinviati al setup Azure/segreti (runbook esterno).
 | 4 — Riconciliazione + coda ambigui (→ M3a) | `pipeline_riconcilia_grezzo` (match `email_riconciliazione` → fallback `persona.email`; ambiguo/assente → coda; anonimo → Evento) + RPC risolvi/ignora + `compliance.ts` frequenza/idoneità a soglia (#9) | ✅ `supabase/migrations/20260529000002_fase3_riconciliazione.sql`, `src/lib/compliance.ts`, UI `CodaResolver` + `/audit/completamento`; test `m3a_riconciliazione.sql` 20/20 |
 | 5 — Inserimento/correzione manuale presenze | RPC `presenza_inserisci_manuale`/`presenza_correggi_manuale` (motivazione obbligatoria; correzione = nuovo Evento che referenzia il precedente, mai UPDATE) | ✅ `supabase/migrations/20260529000003_fase3_presenza_manuale.sql`, UI `PresenzeManager`; test `m3a_presenza_manuale.sql` 9/9 |
 | 6 — Adattatore API Teams (→ M3) | ⛔ rinviato: setup Azure AD + segreti + egress Graph (runbook esterno) | ⛔ rinviato |
+
+### Fase 4 — generatore di report fondi
+
+Mandato: `docs/brief-fase-4.md`. **Task 1–6 ✅, gate M4a ✅ + M4 ✅** (a livello DB):
+`(Edizione, Piano) → dataset neutro dal log → validazioni → file (interim) → snapshot
+write-once + Evento/hash`. Adattatori Fondimpresa/FonCoop **interim** (`ufficiale:false`):
+il tracciato ufficiale per-avviso resta un runbook esterno (§10).
+
+| Task (F4) | Contenuto | File principali / stato |
+|---|---|---|
+| 1 — Schema snapshot + testata Piano | `report_fondo_depositato` write-once (REVOKE+trigger, D20) + `Piano` (cup/avviso/canale/date) + hash canonico | ✅ `supabase/migrations/20260529000004_fase4_report_fondo_schema.sql` (applicata) + seed `supabase/seed/fase4_fondo_demo.sql` |
+| 2 — Motore aggregazione | `computeReportFondoDataset` (dataset neutro dagli Eventi, riusa `compliance.ts`) + `persona.codice_fiscale` + RLS admin completamenti | ✅ `src/lib/report-fondo.ts`, `…20260529000005_…` (applicata) |
+| 3 — Validazioni conformità (D33) | warning bloccanti (CUP/CF mancanti) vs avvisi | ✅ `src/lib/report-fondo-validazioni.ts`, test `tests/fase4/validazioni.test.ts` 7/7 |
+| 4 — Adattatore Fondimpresa (→ M4a) | export CSV interim + UI anteprima/genera | ✅ `src/lib/report-fondo-formati.ts`, `src/app/admin/report-fondo/*`, route `.../genera` |
+| 5 — Adattatore FonCoop/GIFCOOP | secondo adattatore sullo stesso motore | ✅ `src/lib/report-fondo-formati.ts`, test `tests/fase4/formati.test.ts` 8/8 |
+| 6 — Deposito write-once (→ M4) | RPC `report_fondo_deposita`/`report_fondo_verifica`, UI `DepositaPanel`, route deposita/verifica/snapshot | ✅ `…20260529000006_…` + `…0007_…` (applicate), test `supabase/tests/m4_report_fondo.sql` 10/10 |
 
 ## Verifica gate M1a (alla fine del Task 2, prima di proseguire)
 

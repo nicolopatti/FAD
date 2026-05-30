@@ -1,12 +1,12 @@
-# Stato del progetto FAD — Fase 3 in corso (handoff session-to-session)
+# Stato del progetto FAD — Fase 4 (report fondi) — M4 verde a livello DB (handoff session-to-session)
 
 > Questo file è il primo da leggere all'inizio di ogni nuova sessione.
 > Riassume cosa è stato fatto, cosa resta, e come riprendere senza dover
 > rispiegare nulla. Fonte autoritativa per *cosa* costruire: `docs/brief-fase-1.md`
-> (Fase 1, chiusa), `docs/brief-fase-2.md` (Fase 2, chiusa) e
-> `docs/brief-fase-3.md` (Fase 3, **in corso** — è il mandato corrente) — e in
-> caso di conflitto `piattaforma-elearning-stato-progetto-v7.md` (non in repo)
-> con le decisioni D1–D35.
+> (Fase 1, chiusa), `docs/brief-fase-2.md` (Fase 2, chiusa), `docs/brief-fase-3.md`
+> (Fase 3, chiusa fino a M3a) e `docs/brief-fase-4.md` (Fase 4, **corrente** — è il
+> mandato) — e in caso di conflitto `piattaforma-elearning-stato-progetto-v8.md`
+> (non in repo) con le decisioni D1–D37.
 
 ## Stato di avanzamento (Fase 1)
 
@@ -144,6 +144,35 @@ aggiungi manuale). Verifiche live 9/9 + pgTAP `m3a_presenza_manuale.sql` 9/9. La
 frequenza usa la durata corretta (60, non 100). Le UI di Task 4/5 sono da verificare
 nel browser sul deploy.
 
+## Stato di avanzamento (Fase 4)
+
+**Fase 4 — generatore di report fondi. Task 1–6 ✅, gate M4a ✅ + M4 ✅ verificati a
+livello DB** (2026-05-29; **mergiata su `main` → deploy Vercel production, PR #1**).
+Mandato: `docs/brief-fase-4.md`. Decisioni §10 ratificate
+con l'utente: congelamento = **snapshot write-once**; deposito sul portale = **manuale**;
+primo formato = **Fondimpresa** (unica edizione finanziata seed); warning **bloccanti**
+= CUP mancante + CF mancante (gli altri = avvisi). **Formati interim**: gli adattatori
+Fondimpresa/FonCoop producono un CSV completo ma **NON ufficiale** (`ufficiale:false`);
+il tracciato ufficiale per-avviso è un **runbook esterno** (§10, come Teams in Fase 3) →
+M4a #4 "formato conforme" resta in sospeso fino allo spec. UI da verificare nel browser
+(egress `*.vercel.app` bloccato da qui); il motore TS end-to-end va girato dove l'egress
+`*.supabase.co` è consentito (script `scripts/verify-fase4.ts`).
+
+Il motore di aggregazione è **format-agnostic** (D7 ribaltato in output): `(Edizione,
+Piano) → dataset neutro` dagli Eventi, due adattatori davanti. Riusa `compliance.ts`
+(stessa fonte dell'auditor → riconciliazione per costruzione). Lo snapshot depositato è
+prova **write-once** (REVOKE+trigger, come `evento`/grezzo); l'Evento `report_fondo_depositato`
+porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) coesistono.
+
+| Task | Descrizione | Stato |
+|---|---|---|
+| 1 | Schema `report_fondo_depositato` (write-once) + testata Piano (cup/avviso/canale/date) | ✅ `…20260529000004_…` applicata; seed `supabase/seed/fase4_fondo_demo.sql` |
+| 2 | Motore aggregazione `report-fondo.ts` (dataset neutro dal log) + `persona.codice_fiscale` + RLS admin completamenti | ✅ `…20260529000005_…`; verificato sotto RLS admin sul live |
+| 3 | Validazioni di conformità (warning bloccanti/avvisi, D33) | ✅ `report-fondo-validazioni.ts`, unit test 7/7 |
+| 4 | Adattatore Fondimpresa interim + UI anteprima/genera (gate M4a) | ✅ `report-fondo-formati.ts`, route `genera`, UI `/admin/report-fondo` |
+| 5 | Adattatore FonCoop/GIFCOOP interim (stesso motore) | ✅ secondo adattatore, test 8/8 (15/15 totali fase4) |
+| 6 | Deposito snapshot write-once + Evento/hash + verifica (gate M4) | ✅ `…20260529000006_…` + `…0007_…` (RLS), RPC `report_fondo_deposita`/`report_fondo_verifica`, UI `DepositaPanel`, pgTAP `m4_report_fondo.sql` 10/10 |
+
 ## Stato dei gate
 
 - **M1a** — *Il log regge.* ✅
@@ -216,6 +245,22 @@ nel browser sul deploy.
     (live 8/8; parser durata 14/14).
 - **M3** — *Webinar end-to-end con API Teams.* ⛔ rinviato (Task 6, setup Teams
   esterno: Azure AD + segreti + egress Graph). Criteri in `docs/brief-fase-3.md` §9.
+- **M4a** — *Primo formato regge.* ✅ (a livello DB/test, 2026-05-29). Criteri
+  `docs/brief-fase-4.md` §8: **#1** aggregazione dal log (cache=0 sul live ma report
+  100%/91.67% → numeri dagli Eventi; grep: nessuna colonna-cache nel path) ✅; **#2**
+  riconciliazione con l'auditor (stessa `compliance.ts`) ✅; **#3** nessun Evento/PII nel
+  path di generazione (grep) ✅; **#4** formato conforme ⏸️ **rinviato** (interim, tracciato
+  ufficiale §10); **#5** warning con severità corretta (unit test 7/7) ✅; **#6** isolamento
+  tenant via RLS (tenant sentinella B vede 0 di A) ✅.
+- **M4** — *Generatore end-to-end, due formati + congelamento.* ✅ (a livello DB/test,
+  2026-05-29). Criteri `docs/brief-fase-4.md` §9: **#1** report generato+depositato
+  (snapshot + Evento+hash) ✅; **#2** entrambi i formati sullo stesso motore (test
+  due-formati) ✅; **#3** snapshot immutabile (UPDATE/DELETE bloccati) ✅; **#4**
+  rigenerazione additiva (2 snapshot, 1° invariato) ✅; **#5** drift anagrafica (snapshot
+  congelato vs `persona.cognome` live cambiato) ✅; **#6** criteri M4a non regrediti ✅;
+  **#7** catena hash integra dopo il deposito ✅; **#8** sessione con `incarico_id` NULL
+  rendicontata senza rompere ✅. pgTAP `supabase/tests/m4_report_fondo.sql` **10/10** (live,
+  rollback). Resta la verifica UI nel browser + il tracciato ufficiale dei formati (runbook).
 
 ## Infrastruttura cloud creata
 
@@ -251,6 +296,8 @@ nel browser sul deploy.
 - 2 utenti Auth + 2 Persone
 - 1 Corso ("Sicurezza sul lavoro — modulo introduttivo", `c0c01111-…`) + **2 LO video Vimeo** in sequenza (`10101111-…` Introduzione ordine 1, `10102222-…` Approfondimento ordine 2) + Struttura + 1 Edizione (`ed011111-…` codice ED-001) + 1 Iscrizione del discente (`15c11111-…`)
 - Vimeo ID `1084894652` (video reale del cliente, 613 s) usato per entrambi i LO. Privacy: Hide from Vimeo + embed limitato ai 3 domini Vercel del progetto (D5 rispettata).
+- **Fase 3/4 demo (prefisso `33333333…`)**: 1 Azienda, 1 Piano `…0000b1` (**fondo=fondimpresa**, ora con CUP `B12C34000560006` + avviso "Avviso 1/2026" + canale + date, seed Fase 4), Corso webinar `…0c01` (soglia 80%, **0 struttura FAD**), Edizione `…00e1` `ED-WEB-2026`, 1 Sessione VCS Teams 120′ col docente, 3 iscritti (Mario `…015001` + Lucia `…015002` finanziati con CF; Carla `…015003` individuale). **Presenze reali nel log** (seed Fase 4 via pipeline: Mario 120′→100%, Lucia 110′→91.67%). Admin reale `aaaa3333-…`.
+- **Tabella Fase 4** `report_fondo_depositato` (write-once, vuota sul live: i depositi di test girano in rollback). RPC `report_fondo_deposita`/`report_fondo_verifica`. Seed riproducibile: `supabase/seed/fase4_fondo_demo.sql` (idempotente).
 
 #### Utenze demo (create da bootstrap)
 - Discente: `discente@fad.local` / `discente-pass-123`
@@ -297,43 +344,46 @@ nel browser sul deploy.
 
 ## Cosa fare nella prossima sessione
 
-**Fase 3 — fetta webinar: Task 1–5 ✅, gate M3a ✅ VERDE.** Gate M1a/M1/M2/M3a tutti
-verdi. La pipeline presenze gira end-to-end via CSV sul Supabase live, verificata.
-**Non resta nulla di obbligatorio in Fase 3 nello scope eseguibile da qui.** Opzioni
-per la prossima sessione, in ordine:
+**Fase 4 — report fondi: Task 1–6 ✅, gate M4a ✅ + M4 ✅ a livello DB.** Gate
+M1a/M1/M2/M3a/M4a/M4 tutti verdi (M3 e M4a#4 rinviati a runbook esterno). Il generatore
+gira: `(Edizione, Piano) → dataset dal log → validazioni → file (interim) → snapshot
+write-once + Evento/hash`, verificato sul Supabase live (pgTAP `m4_report_fondo.sql`
+10/10 + verifiche MCP). **Non resta nulla di obbligatorio nello scope eseguibile da qui.**
+Opzioni per la prossima sessione, in ordine:
 
 1. **Verifica UI nel browser sul deploy** (non bloccante ma consigliata prima di
-   clienti veri): area admin `/admin/sessioni` (pianifica sessione, importa CSV,
-   risolvi coda, inserisci/correggi presenza) e report auditor `/audit/completamento`
-   (colonna Frequenza). L'egress `*.vercel.app` è bloccato da qui: serve il browser
-   dell'utente. Ricetta rapida sotto in "Re-verifica".
-2. **Task 6 — adattatore API Teams → gate M3** (`docs/brief-fase-3.md` §5 Task 6, §9).
-   ⛔ richiede **runbook esterno**: registrazione app Azure AD, consenso admin M365,
-   segreti in env, egress verso Microsoft Graph. Non eseguibile da Claude Code on the
-   web. Quando i segreti ci sono: l'adattatore scarica il report via Graph, lo
-   normalizza **nella stessa shape del CSV** (array di righe `{riga,nome,email,join,
-   leave,durata}`) e chiama `pipeline_ingest_grezzo` con `fonte='api_teams'`. Nota: per
-   `importato_da = NULL` (import automatico) serve sbloccare un **attore "sistema"**
-   in `pipeline_ingest_grezzo` (oggi NULL è rifiutato) e in `pipeline_riconcilia_grezzo`
-   (l'attore dei `partecipante_non_riconciliato` anonimi è oggi `importato_da`).
-3. **Fase 4 (report fondi) / Fase 5 (Attestato)**: **NON iniziare senza brief dedicato
-   e conferma esplicita dell'utente.** Fase 3 produce gli Eventi che alimenteranno il
-   generatore di Fase 4, non il generatore.
+   clienti veri): `/admin/report-fondo` (seleziona edizione finanziata → anteprima con
+   warning → genera file → deposita → verifica integrità snapshot) e `/audit/log`
+   (l'auditor vede l'Evento `report_fondo_depositato` e verifica la catena). Egress
+   `*.vercel.app` bloccato da qui → serve il browser dell'utente. In alternativa girare
+   `scripts/verify-fase4.ts` dove l'egress `*.supabase.co` è consentito (login admin
+   reale → motore end-to-end).
+2. **Tracciati ufficiali dei formati (runbook §10)** → chiude M4a #4. Gli adattatori
+   Fondimpresa/FonCoop sono **interim** (`ufficiale:false`): contengono tutti i dati ma
+   intestazioni/ordine colonne non sono il tracciato del fondo (cambia per *avviso*).
+   Con la documentazione ufficiale aggiornata: aggiornare solo `report-fondo-formati.ts`
+   (il motore `report-fondo.ts` non si tocca) e mettere `ufficiale:true`. Per XLSX/PDF
+   valutare una libreria (oggi nessuna nello stack → CSV zero-dep).
+3. **Task 6 Fase 3 — adattatore API Teams → gate M3**: ⛔ runbook esterno (Azure AD +
+   segreti + egress Graph), vedi nota Fase 3. Indipendente da Fase 4.
+4. **Fase 5 (Attestato)**: **NON iniziare senza brief dedicato e conferma esplicita.**
 
 Promemoria di metodo (invarianti da non rompere):
-- mai INSERT diretto in `evento` né nel grezzo: si passa solo per `audit_append` e
-  `pipeline_ingest_grezzo`/`pipeline_riconcilia_grezzo` (SECURITY DEFINER);
-- presenze/correzioni = Eventi senza PII nel payload (attori pseudonimi); la
-  frequenza/idoneità si ricalcola dagli Eventi (`compliance.ts`, D8);
-- ogni nuova funzione di scrittura su `public`: **revocare EXECUTE da `anon`**
-  esplicitamente (Supabase lo concede di default) — vale per tutte le RPC di Fase 3.
+- mai INSERT diretto in `evento`/grezzo/snapshot: solo `audit_append`,
+  `pipeline_ingest_grezzo`/`pipeline_riconcilia_grezzo`, `report_fondo_deposita`
+  (tutte SECURITY DEFINER);
+- Eventi senza PII nel payload (attori pseudonimi); ore/frequenza/idoneità e il dataset
+  del report fondo si **ricalcolano dagli Eventi** (`compliance.ts`/`report-fondo.ts`, D8);
+- PII (nomi/CF) ammessa nello **snapshot/file** (documento per il fondo) ma MAI nel log
+  (l'Evento di deposito porta solo l'hash, D18);
+- ogni nuova funzione di scrittura su `public`: **revocare EXECUTE da `anon`** esplicitamente.
 
 Restano aperti, non bloccanti:
-- **Verifiche UI nel browser** di Fase 2 Task 4/5 sul deploy (network policy
-  blocca `*.vercel.app` da qui).
+- **Verifiche UI nel browser** (Fase 2 Task 4/5; Fase 3 `/admin/sessioni`; Fase 4
+  `/admin/report-fondo`) sul deploy (network policy blocca `*.vercel.app` da qui).
+- **Tracciati ufficiali dei formati fondo** (M4a #4) e **adattatore Teams** (M3): runbook esterni.
 - **TODO di Fase 1** qui sotto (prima della consegna a clienti veri).
-- **Fase 4 (report fondi) e Fase 5 (Attestato)**: fuori scope finché Fase 3 non
-  chiude e senza il relativo brief. **Non iniziarle senza conferma esplicita.**
+- **Fase 5 (Attestato)**: fuori scope senza brief + conferma esplicita.
 
 ### TODO Fase 1 ancora aperti (non bloccanti per M1, ma da chiudere prima di mettere in mano clienti veri)
 
@@ -536,10 +586,18 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
 
 ## Cosa NON fare
 
-- **NON iniziare Fase 4+ senza conferma esplicita dell'utente e senza il relativo
-  brief.** Fase 3 è in corso (mandato in `docs/brief-fase-3.md`), scope fino a M3a.
-  Fase 4 (report fondi) e Fase 5 (Attestato) restano fuori finché Fase 3 non chiude.
+- **NON iniziare Fase 5 (Attestato) senza conferma esplicita dell'utente e senza il
+  relativo brief.** Fase 4 (report fondi) è chiusa fino a M4 (mandato in
+  `docs/brief-fase-4.md`). Fase 5 resta fuori finché non c'è brief + via libera.
   Replicare il pattern dei gate: non costruire sopra fondamenta non verificate.
+- **NON dichiarare "conforme" il formato dei report fondo** finché gli adattatori sono
+  `ufficiale:false`: il tracciato ufficiale per-avviso va recepito dalla documentazione
+  aggiornata (runbook §10). NON andare a memoria sul tracciato.
+- **NON mettere PII (nomi/CF/email) nel payload degli Eventi** — vale anche per
+  `report_fondo_depositato`: nello snapshot/file sì (documento per il fondo), nel log mai.
+- **NON aggiungere la contabilità di dettaglio del rendiconto** (importi, voci di spesa,
+  co-finanziamento, detrazioni pro-quota): scope OUT di Fase 4 (D32). Il generatore
+  *segnala* i non conformi, non calcola detrazioni.
 - **NON implementare l'adattatore Zoom né la co-docenza** (scope OUT di Fase 3,
   §4 del brief): solo Teams, e la Sessione ha un solo `incarico_id`.
 - **NON aggiungere features fuori scope** rispetto al brief della fase

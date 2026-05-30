@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:push": "supabase db push --linked",
     "bootstrap": "tsx scripts/bootstrap.ts",
-    "test:m1a": "vitest run tests/m1a"
+    "test:m1a": "vitest run tests/m1a",
+    "test:fase4": "vitest run tests/fase4"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
