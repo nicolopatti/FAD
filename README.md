@@ -48,7 +48,7 @@ del set richiesto.
 3. **Bootstrap dati demo** (utenti + corso FAD del Task 4)
    ```bash
    # Da una session Claude Code on the web con gli env impostati
-   npm install
+   npm ci   # il container Claude Code on the web parte SENZA node_modules
    npm run bootstrap
    ```
    Lo script `scripts/bootstrap.ts` è **idempotente** (upsert): crea/aggiorna i
