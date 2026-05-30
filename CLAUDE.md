@@ -8,6 +8,22 @@
 > mandato) — e in caso di conflitto `piattaforma-elearning-stato-progetto-v8.md`
 > (non in repo) con le decisioni D1–D37.
 
+## Manutenzione / hardening (2026-05-30)
+
+Sessione di hardening dopo la chiusura della Fase 4 — **nessun cambiamento
+funzionale, tutti i gate restano verdi**. Mergiata su `main` → deploy Vercel
+Production.
+- Rimossi 4 file `.bak` finiti per errore sotto version control (copie dei
+  sorgenti del generatore report fondo) + aggiunta la regola `*.bak` a
+  `.gitignore` per evitare che ricapiti.
+- Pulito `tsconfig.json`: rimosso `baseUrl` deprecato (TS5101; con
+  `moduleResolution:"bundler"` e TS 5.6 i `paths` `@/*` si risolvono comunque
+  relativi al tsconfig) e la chiave top-level spuria `"resolexnove":"node"`.
+  `jsx:"preserve"` preservato.
+- Verifica post-hardening (dopo `npm ci`, vedi trabocchetto #12): `typecheck`
+  0 errori (sparito il warning `baseUrl`), `build` OK (27 route),
+  `npm run test:fase4` **15/15**.
+
 ## Stato di avanzamento (Fase 1)
 
 **Fase 1 chiusa.** Tutti i task ✅, gate M1a e M1 ✅ verdi. Deploy production
@@ -583,6 +599,12 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
     confronta i campi dell'utente rotto con quelli di un utente buono
     (`select confirmation_token, recovery_token, … from auth.users where
     email in (…)`) — i NULL saltano fuori subito.
+12. **Container senza `node_modules` all'avvio**: la sessione Claude Code on
+    the web parte con la repo clonata ma le dipendenze NON installate. Eseguire
+    **`npm ci`** prima di `npm run typecheck`/`build`/`test:fase4`, altrimenti
+    `next`/`vitest`/`tsc` rispondono "not found" / exit 127. I test di Fase 4
+    sono vitest in `tests/fase4/` (15: `validazioni.test.ts` 7 + `formati.test.ts` 8),
+    eseguibili con `npm run test:fase4`.
 
 ## Cosa NON fare
 
