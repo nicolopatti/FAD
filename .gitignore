@@ -10,3 +10,6 @@ out
 .vercel
 supabase/.branches
 supabase/.temp
+
+# stray editor/script backups
+*.bak
