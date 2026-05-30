@@ -147,8 +147,9 @@ nel browser sul deploy.
 ## Stato di avanzamento (Fase 4)
 
 **Fase 4 — generatore di report fondi. Task 1–6 ✅, gate M4a ✅ + M4 ✅ verificati a
-livello DB** (2026-05-29; **mergiata su `main` → deploy Vercel production, PR #1**).
-Mandato: `docs/brief-fase-4.md`. Decisioni §10 ratificate
+livello DB** (2026-05-29; **PR #1 mergiata su `main` (commit `ff5a4b1`) → deploy Vercel
+production `READY` su `fad-wine.vercel.app`, 2026-05-30**). Mandato: `docs/brief-fase-4.md`.
+Decisioni §10 ratificate
 con l'utente: congelamento = **snapshot write-once**; deposito sul portale = **manuale**;
 primo formato = **Fondimpresa** (unica edizione finanziata seed); warning **bloccanti**
 = CUP mancante + CF mancante (gli altri = avvisi). **Formati interim**: gli adattatori
