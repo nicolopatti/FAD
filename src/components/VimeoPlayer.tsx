@@ -76,7 +76,16 @@ export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) 
 
   return (
     <div>
-      <div style={{ position: 'relative', paddingTop: '56.25%' }}>
+      <div
+        style={{
+          position: 'relative',
+          paddingTop: '56.25%',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          background: '#1a1814',
+          boxShadow: 'var(--shadow-1)',
+        }}
+      >
         <iframe
           ref={iframeRef}
           src={`https://player.vimeo.com/video/${vimeoId}?dnt=1`}
@@ -86,7 +95,7 @@ export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) 
         />
       </div>
       {status && (
-        <p className="muted mono" style={{ marginTop: 8 }}>
+        <p className="muted mono" style={{ marginTop: 10 }}>
           Ultimo evento inviato: {status}
         </p>
       )}

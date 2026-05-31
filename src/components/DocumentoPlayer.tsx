@@ -89,7 +89,12 @@ export function DocumentoPlayer({
         <iframe
           src={signedUrl}
           title={filename ?? 'Documento'}
-          style={{ width: '100%', height: '70vh', border: '1px solid #e1e1e1', borderRadius: 6 }}
+          style={{
+            width: '100%',
+            height: '70vh',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)',
+          }}
         />
       ) : (
         !error && <div className="muted">Carico il PDF…</div>

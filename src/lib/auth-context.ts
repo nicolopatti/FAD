@@ -6,6 +6,8 @@ export type SessionContext = {
   email: string;
   personaId: string;
   tenantId: string;
+  nome: string;
+  cognome: string;
   isAuditor: boolean;
   isAdmin: boolean;
 };
@@ -19,7 +21,7 @@ export async function requireSession(): Promise<SessionContext> {
 
   const { data: persona, error } = await supabase
     .from('persona')
-    .select('id, tenant_id')
+    .select('id, tenant_id, nome, cognome')
     .eq('auth_user_id', user.id)
     .single();
   if (error || !persona) {
@@ -32,6 +34,8 @@ export async function requireSession(): Promise<SessionContext> {
     email: user.email ?? '',
     personaId: persona.id,
     tenantId: persona.tenant_id,
+    nome: persona.nome ?? '',
+    cognome: persona.cognome ?? '',
     isAuditor: appMeta.role === 'auditor',
     isAdmin: appMeta.role === 'admin',
   };

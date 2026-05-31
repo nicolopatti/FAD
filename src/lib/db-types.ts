@@ -5,7 +5,7 @@
  * manca / non è leggibile via RLS).
  */
 
-export type CorsoMini = { id: string; titolo: string };
+export type CorsoMini = { id: string; titolo: string; descrizione?: string | null };
 
 export type EdizioneConCorso = {
   id: string;
