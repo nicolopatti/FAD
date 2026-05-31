@@ -8,6 +8,80 @@
 > mandato) — e in caso di conflitto `piattaforma-elearning-stato-progetto-v8.md`
 > (non in repo) con le decisioni D1–D37.
 
+## UI — Restyling area amministratore + import in blocco (2026-05-31)
+
+Sessione di **restyling UI dell'area admin** (tema "Atlante") + **due nuove
+funzionalità** richieste dal committente, su mockup "Claude Design"
+(`design_handoff_admin_atlante`). Branch `claude/loving-meitner-5JPzj`. Verifica:
+`typecheck` 0 errori, `build` OK. **Due migration applicate sul Supabase live**
+(autorizzato dall'utente in questa sessione: "write and apply to live").
+
+**Tema admin scopato.** Tutto il CSS nuovo è sotto `.admin-scope` in
+`globals.css` (la wrap `app/admin/layout.tsx` via `AppShell scopeClassName`),
+così le classi generiche del design (`.card .course-card .lo-row .tbl .kpi
+.dropzone .seg .switch .field .input .banner .empty .dual …`) **non toccano le
+pagine discente/auditor** che condividono lo stesso `globals.css`. Gli alias di
+variabili (`--teal/--ocra/--line/--panel…`) mappano i token del design sui token
+Atlante già esistenti. Primitive condivise in `src/components/admin/Atlante.tsx`
+(`Icon` con `ICON_PATHS`, `Cover` immagine+segnaposto per categoria, `coverUrl`,
+formattatori, `durataVideoSecondi`, `regolaLabel`).
+
+**Sidebar admin a 5 voci** (`AppShell`/`SidebarNav`): Dashboard, Corsi,
+Contenuti, Sessioni, Report fondi — con conteggi per voce (`counts` calcolati nel
+layout admin). `/admin` non è più un redirect: è la **Dashboard** (KPI corsi/
+edizioni attive/iscritti/sessioni imminenti + corsi recenti + attività recente
+derivata dagli ultimi Eventi).
+
+**Pagine riviste** (Server Component fetch → Client Component per
+ricerca/filtri/azioni): `/admin/corsi` (catalogo course-card con cover, ricerca,
+filtri stato/edizioni + ordinamento → `CorsiCatalog`); `/admin/corsi/[id]`
+(**Course Builder a 5 sezioni** → `CorsoEditor`: 1 Dati+copertina drag&drop,
+2 Struttura **drag&drop HTML5** che chiama `reorder_struttura`, 3 Aggiungi
+contenuto Manuale/CSV, 4 Edizioni, 5 Iscritti); `/admin/learning-objects`
+(libreria densa con "Usato in N corsi", filtri tipo/stato/ordinamento, archivia
+→ `ContenutiTable`); `/admin/corsi/new` (form Atlante + categoria).
+
+**Funzionalità NUOVE.**
+1. **Copertine corso**: colonna `corso.cover_path` + bucket Storage **pubblico**
+   `copertine` (RLS scrittura solo admin del tenant, path `{tenant}/{corso}.ext`);
+   upload client diretto a Storage, poi `PATCH /api/admin/corsi/[id]` salva il path
+   (Evento `corso.cover_updated`). La copertina **resta modificabile a corso
+   congelato** (non è campo strutturale). Aggiunta anche `corso.categoria`
+   (campo strutturale → **congelato con D22**: la funzione del trigger reale
+   `tg_corso_freeze` ora include `categoria` — vedi fix `…000003`).
+2. **Import in blocco**: LO nella struttura (`POST …/struttura/import`, riuso per
+   titolo o creazione video al volo, dedup, Evento `struttura.imported`) e
+   **Iscritti** (sezione 5 del builder: manuale + CSV). Helper `src/lib/iscritti.ts`
+   `addIscritto` (find-or-create azienda per ragione sociale, persona dedup per
+   email nel tenant + completa CF, iscrizione dedup per persona+edizione) con
+   Eventi `persona.created`/`iscrizione.created`/`iscrizione.imported` **senza PII
+   nel payload** (D18: solo UUID/flag). Route `POST …/edizioni/[id]/iscritti(/import)`
+   e `DELETE /api/admin/iscrizioni/[id]`. Parsing CSV client-side con
+   `parseDelimited` (da `src/lib/csv.ts`) + mappatura colonne tollerante; anteprima
+   con esito per riga (nuovo/libreria/duplicato/errore). **Excel → l'utente salva
+   come CSV** (niente SheetJS aggiunto allo stack).
+
+**Migration applicate sul live:**
+- `20260531000001_fase_ui_admin_copertine.sql`: `corso.categoria`+`corso.cover_path`,
+  bucket `copertine` + 3 policy. (NB: toccava per errore `corso_freeze_guard`, funzione
+  non agganciata ad alcun trigger → corretto da `…000003`.)
+- `20260531000002_admin_iscritti_rls.sql`: policy RLS write mancanti —
+  `persona_insert_admin`/`persona_update_admin`, `iscrizione_insert_admin`/
+  `iscrizione_delete_admin` (prima c'erano solo le SELECT admin).
+- `20260531000003_corso_freeze_categoria_fix.sql`: il trigger D22 reale è
+  `corso_freeze → tg_corso_freeze`; aggiorna la funzione giusta perché `categoria`
+  sia davvero congelata e rimuove la funzione spuria. Verificato in rollback sul live
+  (categoria bloccata su congelato, cover_path consentita su congelato, categoria
+  consentita su bozza).
+
+Invarianti rispettate: nessun INSERT diretto in `evento` (sempre `appendEvent`→
+`audit_append`); niente PII nei payload; riordino struttura via RPC atomica;
+freeze D22 lato DB intatto (categoria ora inclusa). **Da verificare nel browser**
+sul deploy (egress `*.vercel.app` bloccato da qui): upload copertine, drag&drop
+struttura, import CSV LO/iscritti. I 2 corsi demo live sono **congelati** → categoria
+resta `null` (segnaposto "FORMAZIONE"): per testare le copertine/categoria serve un
+corso in bozza.
+
 ## Manutenzione / hardening (2026-05-30)
 
 Sessione di hardening dopo la chiusura della Fase 4 — **nessun cambiamento

@@ -7,6 +7,8 @@ type UpdateBody = {
   titolo?: string;
   descrizione?: string | null;
   sblocco_sequenziale?: boolean;
+  categoria?: string | null;
+  cover_path?: string | null;
 };
 
 export async function PATCH(
@@ -24,12 +26,16 @@ export async function PATCH(
     updates.titolo = t;
   }
   if (body.descrizione !== undefined) {
-    updates.descrizione = typeof body.descrizione === 'string'
-      ? (body.descrizione.trim() || null)
-      : null;
+    updates.descrizione = typeof body.descrizione === 'string' ? (body.descrizione.trim() || null) : null;
   }
   if (typeof body.sblocco_sequenziale === 'boolean') {
     updates.sblocco_sequenziale = body.sblocco_sequenziale;
+  }
+  if (body.categoria !== undefined) {
+    updates.categoria = typeof body.categoria === 'string' ? (body.categoria.trim() || null) : null;
+  }
+  if (body.cover_path !== undefined) {
+    updates.cover_path = typeof body.cover_path === 'string' ? (body.cover_path.trim() || null) : null;
   }
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ ok: false, error: 'nessun campo da aggiornare' }, { status: 400 });
@@ -40,17 +46,22 @@ export async function PATCH(
     .from('corso')
     .update(updates)
     .eq('id', params.id)
-    .select('id, titolo, descrizione, sblocco_sequenziale, creato_il')
+    .select('id, titolo, descrizione, sblocco_sequenziale, categoria, cover_path, creato_il')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
+  // Se l'unico cambiamento è la copertina, è un evento dedicato (avviene anche
+  // a corso congelato: la copertina non è un campo strutturale).
+  const onlyCover = Object.keys(updates).length === 1 && 'cover_path' in updates;
   await appendEvent(supabase, {
     tenantId: session.tenantId,
-    eventType: 'corso.updated',
+    eventType: onlyCover ? 'corso.cover_updated' : 'corso.updated',
     actor: { persona_id: session.personaId, type: 'persona' },
     subjectType: 'corso',
     subjectId: data.id,
-    payload: { titolo: data.titolo, sblocco_sequenziale: data.sblocco_sequenziale },
+    payload: onlyCover
+      ? { has_cover: data.cover_path !== null }
+      : { titolo: data.titolo, sblocco_sequenziale: data.sblocco_sequenziale },
   });
 
   return NextResponse.json({ ok: true, corso: data });

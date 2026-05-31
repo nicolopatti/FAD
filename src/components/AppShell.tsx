@@ -61,9 +61,10 @@ const NAV_BY_ROLE: Record<Role, { section: string; items: NavItem[] }> = {
   admin: {
     section: 'Amministrazione',
     items: [
-      { key: 'lo', label: 'Learning Object', href: '/admin/learning-objects', ico: 'audit' },
-      { key: 'corsi', label: 'Corsi', href: '/admin/corsi', ico: 'courses' },
-      { key: 'sessioni', label: 'Sessioni', href: '/admin/sessioni', ico: 'log' },
+      { key: 'dashboard', label: 'Dashboard', href: '/admin', ico: 'dashboard' },
+      { key: 'corsi', label: 'Corsi', href: '/admin/corsi', ico: 'corsi' },
+      { key: 'contenuti', label: 'Contenuti', href: '/admin/learning-objects', ico: 'libreria' },
+      { key: 'sessioni', label: 'Sessioni', href: '/admin/sessioni', ico: 'sessioni' },
       { key: 'report', label: 'Report fondi', href: '/admin/report-fondo', ico: 'report' },
     ],
   },
@@ -74,6 +75,8 @@ export function AppShell({
   role = 'discente',
   children,
   wide = false,
+  counts,
+  scopeClassName,
 }: {
   user: { name?: string; email: string };
   role?: Role;
@@ -81,8 +84,16 @@ export function AppShell({
   active?: string;
   children: React.ReactNode;
   wide?: boolean;
+  /** conteggi opzionali per voce di nav, indicizzati per `key` */
+  counts?: Record<string, number>;
+  /** classe extra sull'area contenuto (es. "admin-scope" per il tema admin) */
+  scopeClassName?: string;
 }) {
-  const { section, items } = NAV_BY_ROLE[role];
+  const base = NAV_BY_ROLE[role];
+  const section = base.section;
+  const items = counts
+    ? base.items.map((it) => (counts[it.key] != null ? { ...it, count: counts[it.key] } : it))
+    : base.items;
   const displayName = user.name?.trim() || user.email;
   const initial = (user.name?.trim() || user.email || 'U').slice(0, 1).toUpperCase();
 
@@ -111,7 +122,9 @@ export function AppShell({
       </aside>
 
       <main>
-        <div className={`content ${wide ? 'content--wide' : ''}`}>{children}</div>
+        <div className={`content ${wide ? 'content--wide' : ''} ${scopeClassName ?? ''}`}>
+          {children}
+        </div>
       </main>
     </div>
   );
