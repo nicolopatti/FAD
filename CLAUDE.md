@@ -82,6 +82,35 @@ struttura, import CSV LO/iscritti. I 2 corsi demo live sono **congelati** → ca
 resta `null` (segnaposto "FORMAZIONE"): per testare le copertine/categoria serve un
 corso in bozza.
 
+**Merge e rifiniture (stesso giorno).** Il lavoro è stato consegnato in due PR,
+**entrambe mergiate su `main`** (deploy Vercel Production):
+- **PR #2** — re-skin + due funzionalità nuove (sopra).
+- **PR #3** — hotfix + completamento del re-skin:
+  1. *Padding card legacy*: la regola `.admin-scope .card { padding: 0 }` (giusta per
+     le card nuove, dove il padding lo dà `.card__body`) azzerava lo spazio interno
+     anche sulle pagine admin ancora in markup legacy → testo a filo del bordo
+     (segnalato su `/admin/sessioni`). Fix CSS difensivo:
+     `.admin-scope .card:not(:has(.card__head)):not(:has(.card__body)) { padding: 22px }`.
+  2. *Restyling completo*: portate al markup Atlante (`card__head`/`card__body`,
+     `field/input/select/textarea`, `tbl`, `page-head`, `chip`, `banner`, `seg`,
+     `empty`) **tutte** le pagine admin rimaste legacy: `/admin/sessioni` (lista +
+     `NewSessioneForm`), `/admin/sessioni/[id]` (+ `CsvImportForm`, `CodaResolver`,
+     `PresenzeManager`), `/admin/report-fondo` (+ `DepositaPanel`),
+     `/admin/learning-objects/new` e `/[id]` (+ relativi form), `ContenutiTable`
+     (tabella in `card__body--flush`). Ora **nessuna `.card` usa più il contenuto
+     diretto**: l'area admin è graficamente uniforme col mockup.
+
+  Nota di processo: la PR #3 era stata diramata da `main` *prima* del merge della #2,
+  quindi al merge ha dato un conflitto add/add su `globals.css` e `ContenutiTable.tsx`
+  (gli stessi file da due storie diverse; la #2 era entrata come squash). Risolto
+  mergiando `main` nel branch e prendendo la versione del branch (superset). Per la
+  prossima sessione: **lavorare sul branch di sessione partendo da `main` aggiornato**
+  ed evitare PR parallele che toccano gli stessi file.
+
+  Verifiche prima di ogni merge: `build` verde, `typecheck` 0 errori,
+  `npm run test:fase4` 15/15, CI GitHub Actions verde (typecheck+build, M1a gated).
+  **Resta da fare la sola verifica visiva nel browser** sul deploy Production.
+
 ## Manutenzione / hardening (2026-05-30)
 
 Sessione di hardening dopo la chiusura della Fase 4 — **nessun cambiamento
