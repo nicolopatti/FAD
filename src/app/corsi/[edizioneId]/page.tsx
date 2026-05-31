@@ -92,7 +92,7 @@ export default async function DettaglioCorsoPage({
         </div>
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32, alignItems: 'start' }}>
+      <div className="detail-layout">
         {/* Programma */}
         <section>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 }}>

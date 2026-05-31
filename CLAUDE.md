@@ -88,9 +88,13 @@ VimeoPlayer,DocumentoPlayer}.tsx`, `lib/auth-context.ts`, `lib/db-types.ts`,
 pagine `app/{login,corsi,corsi/[edizioneId],corsi/[edizioneId]/lo/[loId]}`,
 layout `app/{audit,admin}/layout.tsx`.
 
-Possibili prossimi passi UI (non bloccanti): rimuovere `TopBar.tsx` (dead code);
-rifiniture responsive su `/corso` e `/lo` (le griglie `1fr 340px` non collassano
-su mobile); eventuale variante dark coerente con Atlante.
+Rifiniture fatte (2026-05-31, stesso branch): rimosso `TopBar.tsx` (dead code);
+responsive `@media (max-width:860px)` in `globals.css` — sidebar dell'app impilata
+sopra il contenuto, griglie `.player-layout`/`.detail-layout` a singola colonna,
+`.page-head` in colonna (il dettaglio corso ora usa la classe `.detail-layout`
+invece dello stile inline). Possibili prossimi passi UI (non bloccanti): nav
+mobile dedicata (hamburger) al posto della sidebar impilata; eventuale variante
+dark coerente con Atlante.
 
 ## Stato di avanzamento (Fase 1)
 

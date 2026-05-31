@@ -522,6 +522,11 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-
   display: grid; grid-template-columns: 1fr 360px; gap: 28px;
   align-items: start;
 }
+/* Dettaglio corso: main + sidebar avanzamento */
+.detail-layout {
+  display: grid; grid-template-columns: 1fr 340px; gap: 32px;
+  align-items: start;
+}
 .player-stage {
   background: var(--surface);
   border-radius: var(--radius-lg);
@@ -789,6 +794,19 @@ table:not(.modern) th { color: var(--muted); font-weight: 600; }
   .login-split { grid-template-columns: 1fr; }
   .login-visual { display: none; }
   .login-formside { padding: 40px 24px; }
+
+  /* App: sidebar impilata sopra il contenuto (no nav mobile dedicata) */
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  .content { padding: 24px 20px 64px; }
+
+  /* Griglie a due colonne → singola colonna */
+  .player-layout,
+  .detail-layout { grid-template-columns: 1fr; }
+  .player-sidebar { position: static; }
+
+  /* Header di pagina: titolo sopra, KPI sotto */
+  .page-head { flex-direction: column; align-items: flex-start; }
 }
 
 /* ===== TEMA · Atlante — override componenti (look strutturale) ===== */
