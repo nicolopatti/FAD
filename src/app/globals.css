@@ -925,6 +925,11 @@ input[type='text'], input[type='search'] {
 
 /* card/panel — bordi, niente padding sul wrapper (usa __head/__body) */
 .admin-scope .card { background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--r-lg); padding: 0; margin-bottom: 18px; box-shadow: none; }
+/* Pagine admin non ancora migrate al nuovo markup (sessioni, report-fondo,
+   dettaglio/nuovo contenuto): usano .card "legacy" col contenuto diretto, senza
+   .card__head/.card__body. Lì il padding:0 qui sopra azzererebbe lo spazio
+   interno → ripristinalo solo per le card che NON hanno l'impalcatura nuova. */
+.admin-scope .card:not(:has(.card__head)):not(:has(.card__body)) { padding: 22px; }
 .admin-scope .card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
 .admin-scope .card__head h2, .admin-scope .card__head h3 { margin: 0; }
 .admin-scope .card__head .sub { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
