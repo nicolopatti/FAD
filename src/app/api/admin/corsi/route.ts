@@ -7,6 +7,7 @@ type CreateBody = {
   titolo?: string;
   descrizione?: string | null;
   sblocco_sequenziale?: boolean;
+  categoria?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -27,8 +28,9 @@ export async function POST(request: Request) {
       titolo,
       descrizione: body.descrizione?.trim() || null,
       sblocco_sequenziale: body.sblocco_sequenziale ?? true,
+      categoria: body.categoria?.trim() || null,
     })
-    .select('id, titolo, descrizione, sblocco_sequenziale, creato_il')
+    .select('id, titolo, descrizione, sblocco_sequenziale, categoria, cover_path, creato_il')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 

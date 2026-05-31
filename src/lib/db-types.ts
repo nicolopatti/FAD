@@ -82,6 +82,8 @@ export type CorsoRow = {
   titolo: string;
   descrizione: string | null;
   sblocco_sequenziale: boolean;
+  categoria: string | null;
+  cover_path: string | null;
   creato_il: string;
 };
 

@@ -1,78 +1,61 @@
-import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import type { CorsoRow } from '@/lib/db-types';
+import { durataVideoSecondi } from '@/components/admin/Atlante';
+import { CorsiCatalog, type CorsoCard } from './CorsiCatalog';
 
 export const dynamic = 'force-dynamic';
 
-type CorsoConCount = CorsoRow & { struttura_count: number };
+type StrutturaJoin = {
+  corso_id: string;
+  learning_object: { type: string; config: Record<string, unknown> } | null;
+};
 
 export default async function CorsiListPage() {
   await requireAdmin();
   const supabase = createSupabaseServerClient();
 
-  const { data: corsi, error } = await supabase
-    .from('corso')
-    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, creato_il')
-    .order('creato_il', { ascending: false })
-    .returns<CorsoRow[]>();
-
-  // Conta gli LO della Struttura per ogni corso (lo facciamo qui invece di un
-  // count(*) nel select perché PostgREST richiederebbe una vista o un trick).
-  const corsoIds = (corsi ?? []).map((c) => c.id);
-  let counts: Record<string, number> = {};
-  if (corsoIds.length) {
-    const { data: rows } = await supabase
+  const [corsiR, strutturaR, edizioniR] = await Promise.all([
+    supabase
+      .from('corso')
+      .select('id, titolo, descrizione, categoria, cover_path, sblocco_sequenziale, creato_il')
+      .order('creato_il', { ascending: false }),
+    supabase
       .from('struttura_corso')
-      .select('corso_id')
-      .in('corso_id', corsoIds);
-    counts = (rows ?? []).reduce<Record<string, number>>((acc, r) => {
-      const id = (r as { corso_id: string }).corso_id;
-      acc[id] = (acc[id] ?? 0) + 1;
-      return acc;
-    }, {});
+      .select('corso_id, learning_object:learning_object_id ( type, config )')
+      .returns<StrutturaJoin[]>(),
+    supabase.from('edizione').select('corso_id'),
+  ]);
+
+  const struttura = strutturaR.data ?? [];
+  const edizioni = edizioniR.data ?? [];
+
+  const byCorsoLo = new Map<string, { type: string; config: Record<string, unknown> }[]>();
+  for (const s of struttura) {
+    if (!s.learning_object) continue;
+    const arr = byCorsoLo.get(s.corso_id) ?? [];
+    arr.push(s.learning_object);
+    byCorsoLo.set(s.corso_id, arr);
   }
+  const ediCount = new Map<string, number>();
+  for (const e of edizioni) ediCount.set(e.corso_id as string, (ediCount.get(e.corso_id as string) ?? 0) + 1);
 
-  const enriched: CorsoConCount[] = (corsi ?? []).map((c) => ({
-    ...c,
-    struttura_count: counts[c.id] ?? 0,
-  }));
+  const cards: CorsoCard[] = (corsiR.data ?? []).map((c) => {
+    const los = byCorsoLo.get(c.id) ?? [];
+    const ne = ediCount.get(c.id) ?? 0;
+    return {
+      id: c.id,
+      titolo: c.titolo,
+      descrizione: c.descrizione,
+      categoria: c.categoria,
+      cover_path: c.cover_path,
+      sblocco_sequenziale: c.sblocco_sequenziale,
+      creato_il: c.creato_il,
+      n_oggetti: los.length,
+      n_edizioni: ne,
+      durata_sec: durataVideoSecondi(los),
+      congelato: ne > 0,
+    };
+  });
 
-  return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Corsi</h1>
-        <Link className="btn" href="/admin/corsi/new">
-          + Nuovo
-        </Link>
-      </div>
-
-      {error && <div className="alert">Errore: {error.message}</div>}
-
-      {enriched.length === 0 ? (
-        <div className="card muted">Nessun corso ancora creato.</div>
-      ) : (
-        enriched.map((c) => (
-          <Link
-            key={c.id}
-            href={`/admin/corsi/${c.id}`}
-            style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
-          >
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <h3 style={{ margin: 0 }}>{c.titolo}</h3>
-                <span className="muted">
-                  {c.struttura_count} LO
-                  {c.sblocco_sequenziale && ' · sblocco sequenziale'}
-                </span>
-              </div>
-              {c.descrizione && (
-                <div className="muted" style={{ marginTop: 4 }}>{c.descrizione}</div>
-              )}
-            </div>
-          </Link>
-        ))
-      )}
-    </>
-  );
+  return <CorsiCatalog corsi={cards} />;
 }

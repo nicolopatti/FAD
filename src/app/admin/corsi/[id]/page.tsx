@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type {
@@ -8,9 +7,16 @@ import type {
   LearningObjectRow,
   StrutturaCorsoConLO,
 } from '@/lib/db-types';
-import { CorsoEditor } from './CorsoEditor';
+import { CorsoEditor, type IscrittoRow } from './CorsoEditor';
 
 export const dynamic = 'force-dynamic';
+
+type IscrizioneJoin = {
+  id: string;
+  edizione_id: string;
+  persona: { id: string; nome: string; cognome: string; email: string; codice_fiscale: string | null } | null;
+  azienda: { ragione_sociale: string } | null;
+};
 
 export default async function CorsoDetailPage({ params }: { params: { id: string } }) {
   await requireAdmin();
@@ -18,7 +24,7 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
 
   const { data: corso } = await supabase
     .from('corso')
-    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, creato_il')
+    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, categoria, cover_path, creato_il')
     .eq('id', params.id)
     .maybeSingle<CorsoRow>();
   if (!corso) notFound();
@@ -45,7 +51,6 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
     .order('creato_il', { ascending: false })
     .returns<EdizioneRow[]>();
 
-  // LO disponibili per essere aggiunti: non archiviati e non già nella struttura.
   const usedLoIds = new Set((struttura ?? []).map((s) => s.learning_object_id));
   const { data: allLo } = await supabase
     .from('learning_object')
@@ -55,19 +60,43 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
     .returns<LearningObjectRow[]>();
   const availableLo = (allLo ?? []).filter((lo) => !usedLoIds.has(lo.id));
 
+  // Iscritti per ogni edizione del corso (persona + azienda).
+  const edizioneIds = (edizioni ?? []).map((e) => e.id);
+  let iscrittiByEdizione: Record<string, IscrittoRow[]> = {};
+  if (edizioneIds.length) {
+    const { data: iscrizioni } = await supabase
+      .from('iscrizione')
+      .select(`
+        id, edizione_id,
+        persona:persona_id ( id, nome, cognome, email, codice_fiscale ),
+        azienda:azienda_id ( ragione_sociale )
+      `)
+      .in('edizione_id', edizioneIds)
+      .returns<IscrizioneJoin[]>();
+    iscrittiByEdizione = (iscrizioni ?? []).reduce<Record<string, IscrittoRow[]>>((acc, r) => {
+      const arr = acc[r.edizione_id] ?? (acc[r.edizione_id] = []);
+      arr.push({
+        iscrizione_id: r.id,
+        nome: r.persona?.nome ?? '',
+        cognome: r.persona?.cognome ?? '',
+        email: r.persona?.email ?? '',
+        codice_fiscale: r.persona?.codice_fiscale ?? null,
+        azienda: r.azienda?.ragione_sociale ?? null,
+      });
+      return acc;
+    }, {});
+    for (const id of Object.keys(iscrittiByEdizione)) {
+      iscrittiByEdizione[id].sort((a, b) => `${a.cognome}${a.nome}`.localeCompare(`${b.cognome}${b.nome}`, 'it'));
+    }
+  }
+
   return (
-    <>
-      <div style={{ marginBottom: 16 }}>
-        <Link href="/admin/corsi" className="muted">
-          ← Tutti i corsi
-        </Link>
-      </div>
-      <CorsoEditor
-        corso={corso}
-        struttura={struttura ?? []}
-        edizioni={edizioni ?? []}
-        availableLo={availableLo}
-      />
-    </>
+    <CorsoEditor
+      corso={corso}
+      struttura={struttura ?? []}
+      edizioni={edizioni ?? []}
+      availableLo={availableLo}
+      iscrittiByEdizione={iscrittiByEdizione}
+    />
   );
 }
