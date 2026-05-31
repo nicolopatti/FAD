@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { formatEventDetail, type StreamEvent } from '@/lib/event-stream';
+import { useEffect, useRef } from 'react';
 
 declare global {
   interface Window {
@@ -18,15 +17,12 @@ type Props = {
   vimeoId: string;
   iscrizioneId: string;
   learningObjectId: string;
-  initialEvents?: StreamEvent[];
 };
 
 const VIMEO_SDK = 'https://player.vimeo.com/api/player.js';
 
-export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId, initialEvents = [] }: Props) {
+export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [status, setStatus] = useState<string>('');
-  const [events, setEvents] = useState<StreamEvent[]>(initialEvents);
 
   useEffect(() => {
     let player: VimeoPlayerInstance | null = null;
@@ -34,18 +30,9 @@ export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId, initialEv
     function attach() {
       if (!window.Vimeo || !iframeRef.current) return;
       player = new window.Vimeo.Player(iframeRef.current);
+      // Il tracciamento è silenzioso: gli eventi vanno al log del tenant via API,
+      // ma non sono mostrati al discente (la vista grezza è dell'auditor).
       const send = (eventType: string, payload: Record<string, unknown>) => {
-        setStatus(eventType);
-        setEvents((prev) =>
-          [
-            ...prev,
-            {
-              t: new Date().toLocaleTimeString('it-IT', { hour12: false }),
-              e: eventType,
-              d: formatEventDetail(eventType, payload),
-            },
-          ].slice(-50),
-        );
         fetch('/api/events/video', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -106,35 +93,6 @@ export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId, initialEv
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen
         />
-      </div>
-      <div style={{ marginTop: 18 }}>
-        <div className="row row--between" style={{ marginBottom: 10 }}>
-          <span className="eyebrow">Stream eventi · dal log del tenant</span>
-          {status ? (
-            <span className="chip chip--ok">
-              <span className="dot" />
-              {status}
-            </span>
-          ) : (
-            <span className="chip chip--ghost">in ascolto…</span>
-          )}
-        </div>
-        <div className="event-stream" role="log" aria-live="polite">
-          {events.length === 0 ? (
-            <div style={{ color: 'var(--muted)' }}>
-              <span className="ts">··:··:··</span>
-              <span>Gli eventi del player (play / pause / seek / ended) appariranno qui e nel log del tenant.</span>
-            </div>
-          ) : (
-            events.map((ev, i) => (
-              <div key={i}>
-                <span className="ts">{ev.t}</span>
-                <span className="ev">{ev.e}</span>
-                <span className="pl">{ev.d}</span>
-              </div>
-            ))
-          )}
-        </div>
       </div>
     </div>
   );
