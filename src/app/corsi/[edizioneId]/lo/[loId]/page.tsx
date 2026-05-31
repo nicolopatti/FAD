@@ -6,6 +6,7 @@ import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { AppShell, Crumb, Ico } from '@/components/AppShell';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { DocumentoPlayer } from '@/components/DocumentoPlayer';
+import { formatEventDetail, fmtTime, type StreamEvent } from '@/lib/event-stream';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,22 @@ export default async function LearningObjectPage({
   if (!item) notFound();
 
   const indice = prog.items.findIndex((i) => i.learning_object_id === params.loId) + 1;
+
+  // Stream eventi "dal log": eventi di questo LO per la persona corrente.
+  // La RLS (evento_read) restringe già alle righe con actor.persona_id = sé,
+  // quindi non servono filtri aggiuntivi sull'attore.
+  const { data: logEvents } = await supabase
+    .from('evento')
+    .select('event_type, occurred_at, payload')
+    .eq('subject_type', 'learning_object')
+    .eq('subject_id', params.loId)
+    .order('seq', { ascending: true })
+    .returns<{ event_type: string; occurred_at: string; payload: Record<string, unknown> | null }[]>();
+  const initialEvents: StreamEvent[] = (logEvents ?? []).map((ev) => ({
+    t: fmtTime(ev.occurred_at),
+    e: ev.event_type,
+    d: formatEventDetail(ev.event_type, ev.payload),
+  }));
 
   // D26: enforcement server-side. Se non sbloccato, l'accesso è negato.
   if (!item.sbloccato) {
@@ -92,6 +109,7 @@ export default async function LearningObjectPage({
                   vimeoId={String((item.lo_config as { vimeo_id?: string }).vimeo_id ?? '')}
                   iscrizioneId={iscrizione.id}
                   learningObjectId={item.learning_object_id}
+                  initialEvents={initialEvents}
                 />
               ) : item.lo_type === 'documento' ? (
                 <DocumentoPlayer
@@ -99,6 +117,7 @@ export default async function LearningObjectPage({
                   learningObjectId={item.learning_object_id}
                   filename={(item.lo_config as { filename?: string }).filename}
                   alreadyCompleted={item.completato}
+                  initialEvents={initialEvents}
                 />
               ) : (
                 <div className="alert">Tipo di Learning Object non supportato.</div>

@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { formatEventDetail, type StreamEvent } from '@/lib/event-stream';
 
 type Props = {
   iscrizioneId: string;
   learningObjectId: string;
   filename?: string;
   alreadyCompleted: boolean;
+  initialEvents?: StreamEvent[];
 };
 
 export function DocumentoPlayer({
@@ -14,12 +16,26 @@ export function DocumentoPlayer({
   learningObjectId,
   filename,
   alreadyCompleted,
+  initialEvents = [],
 }: Props) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedClient, setCompletedClient] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [events, setEvents] = useState<StreamEvent[]>(initialEvents);
   const openedSent = useRef(false);
+
+  const pushEvent = (eventType: string, payload: Record<string, unknown>) =>
+    setEvents((prev) =>
+      [
+        ...prev,
+        {
+          t: new Date().toLocaleTimeString('it-IT', { hour12: false }),
+          e: eventType,
+          d: formatEventDetail(eventType, payload),
+        },
+      ].slice(-50),
+    );
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +59,7 @@ export function DocumentoPlayer({
   useEffect(() => {
     if (!signedUrl || openedSent.current) return;
     openedSent.current = true;
+    pushEvent('documento.opened', filename ? { filename } : {});
     fetch('/api/events/documento', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -71,6 +88,7 @@ export function DocumentoPlayer({
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      pushEvent('documento.completed', {});
       setCompletedClient(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -117,6 +135,28 @@ export function DocumentoPlayer({
           La regola di completamento è <code>documento_completed</code>: l'LO risulta
           completato dopo aver dichiarato la lettura, gli eventi vanno nel log.
         </span>
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <div className="row row--between" style={{ marginBottom: 10 }}>
+          <span className="eyebrow">Stream eventi · dal log del tenant</span>
+        </div>
+        <div className="event-stream" role="log" aria-live="polite">
+          {events.length === 0 ? (
+            <div style={{ color: 'var(--muted)' }}>
+              <span className="ts">··:··:··</span>
+              <span>Apertura e completamento del documento appariranno qui e nel log del tenant.</span>
+            </div>
+          ) : (
+            events.map((ev, i) => (
+              <div key={i}>
+                <span className="ts">{ev.t}</span>
+                <span className="ev">{ev.e}</span>
+                <span className="pl">{ev.d}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
