@@ -24,6 +24,74 @@ Production.
   0 errori (sparito il warning `baseUrl`), `build` OK (27 route),
   `npm run test:fase4` **15/15**.
 
+## UI — Restyling area discente + shell condivisa (2026-05-31)
+
+Sessione di **restyling UI** (nessun cambiamento di schema/RLS, nessuna migration,
+tutti i gate restano verdi). Branch `claude/youthful-cerf-5MYJu`, **mergiata su
+`main` → deploy Vercel Production**. Verifica UI fatta dall'utente nel browser.
+Punto di partenza: un mockup "Claude Design" fornito dall'utente
+(`docs`/upload, bundle React) di cui si è adottato **tema + componenti**,
+**vincolati ai dati e agli invarianti reali** (niente decorazioni che mentono sui
+dati, niente scorciatoie che violano D26).
+
+**Tema "Atlante" come tema base.** `src/app/globals.css` riscritto dal CSS del
+mockup: palette teal `#1c504f` / ocra `#b07c1f` su sabbia, radii piccoli (3–10px),
+look "strutturale" (bordi al posto delle ombre), chip mono maiuscole, righe dense.
+Le classi legacy (`.shell .card .btn .badge table .alert .form-row .mono .muted`…)
+sono **preservate e ri-tematizzate** (così tutto eredita il tema via variabili).
+**Dark mode rimosso** (Atlante non ha variante scura → tema uniforme). Font via
+`next/font` in `layout.tsx`: **Geist** (pacchetto `geist`, perché `next/font/google`
+su Next 14.2 non esporta `Geist`) = sans, **Bricolage Grotesque** = display,
+**IBM Plex Mono** = mono, **Plus Jakarta Sans** = fallback. Google Fonts è
+raggiungibile dal container al build (a differenza di `*.vercel.app`).
+
+**Shell condivisa.** Nuovo `src/components/AppShell.tsx` (sidebar role-aware
+discente/auditor/admin + area contenuto) **sostituisce `TopBar` ovunque** — i
+layout `audit/layout.tsx` e `admin/layout.tsx` e le pagine discente ora usano
+`AppShell`. La voce attiva è derivata dal pathname dal client component
+`src/components/SidebarNav.tsx` (`usePathname`), niente prop `active` da passare.
+Helper esportati da AppShell: `Ico`, `Crumb`, `Cover` (solo gradiente+iniziale,
+**niente immagini di copertina**: non sono nel modello dati), `StatusChip`.
+`TopBar.tsx` non è più importato da nessuna pagina (lasciato nel repo, inerte).
+`LogoutButton` ha una variante `iconOnly` per la sidebar.
+
+**Dati reali esposti.** `requireSession` (`auth-context.ts`) ora carica
+`nome/cognome` della persona (saluto + iniziale avatar). `CorsoMini` esteso con
+`descrizione`. Pagine discente riscritte:
+- `/corsi`: header con saluto + KPI (in corso / idonei / da iniziare), `course-card`
+  con chip stato, %, obbligatori `x/y`, descrizione corso (tutto già da
+  `compliance.ts`). **Omessi copertine e durate** (non nel modello).
+- `/corsi/[edizioneId]`: hero (gradiente), lista LO `ok/current/locked`
+  (`current` = primo `sbloccato && !completato`), sidebar avanzamento.
+  **Rimosso il pannello "Certificato"** (è Fase 5, fuori scope).
+- `/corsi/[edizioneId]/lo/[loId]`: player a due colonne + outline corso.
+  **Nessun bottone "Segna come completata" sul video** (D26: solo `video.ended`).
+  Documento: il bottone "Ho terminato la lettura" **resta** (è il meccanismo
+  legittimo `documento.completed`). Resta la nota "Riproduzione/Lettura tracciata".
+- `login`: split-screen editoriale, **auth Supabase reale invariata**.
+
+**Stream eventi nel player: aggiunto e poi RIMOSSO dalla vista discente** (scelta
+UX dell'utente). Era stato implementato sia client-side sia "dal log" (la RLS
+`evento_read` consente già al discente di leggere i propri eventi —
+`actor.persona_id = current_persona_id()`, verificato sul DB live, **nessuna
+migration servirebbe**). Poi rimosso perché lo stream grezzo è linguaggio da
+auditor, non da discente: la vista autoritativa resta su `/audit/log`. Rimosso
+`src/lib/event-stream.ts`; la classe CSS `.event-stream` resta nel tema (inerte).
+
+Decisioni di questa sessione (ratificate con l'utente): copertine/durate **omesse**;
+Certificati **esclusi** (Fase 5); stream eventi **non mostrato** al discente.
+Verifica: `typecheck` 0 errori, `build` 27 route OK, `npm run test:fase4` **15/15**;
+UI confermata nel browser dall'utente. **Niente migration, niente PII nei payload,
+nessun INSERT diretto su `evento`** (i player continuano a passare per `/api/events/*`).
+File chiave: `globals.css`, `layout.tsx`, `components/{AppShell,SidebarNav,LogoutButton,
+VimeoPlayer,DocumentoPlayer}.tsx`, `lib/auth-context.ts`, `lib/db-types.ts`,
+pagine `app/{login,corsi,corsi/[edizioneId],corsi/[edizioneId]/lo/[loId]}`,
+layout `app/{audit,admin}/layout.tsx`.
+
+Possibili prossimi passi UI (non bloccanti): rimuovere `TopBar.tsx` (dead code);
+rifiniture responsive su `/corso` e `/lo` (le griglie `1fr 340px` non collassano
+su mobile); eventuale variante dark coerente con Atlante.
+
 ## Stato di avanzamento (Fase 1)
 
 **Fase 1 chiusa.** Tutti i task ✅, gate M1a e M1 ✅ verdi. Deploy production
