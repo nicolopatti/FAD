@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Route } from 'next';
 import { LogoutButton } from './LogoutButton';
+import { SidebarNav, type NavItem } from './SidebarNav';
 
 // ============================================================================
 // Icone — set minimale portato dal mockup (path SVG semplici).
@@ -45,8 +46,6 @@ export function Ico({ name, size = 18 }: { name: string; size?: number }) {
 
 type Role = 'discente' | 'auditor' | 'admin';
 
-type NavItem = { key: string; label: string; href: string; ico: string };
-
 const NAV_BY_ROLE: Record<Role, { section: string; items: NavItem[] }> = {
   discente: {
     section: 'Apprendimento',
@@ -73,12 +72,12 @@ const NAV_BY_ROLE: Record<Role, { section: string; items: NavItem[] }> = {
 export function AppShell({
   user,
   role = 'discente',
-  active,
   children,
   wide = false,
 }: {
   user: { name?: string; email: string };
   role?: Role;
+  /** @deprecated la voce attiva è derivata dal pathname in SidebarNav */
   active?: string;
   children: React.ReactNode;
   wide?: boolean;
@@ -99,18 +98,7 @@ export function AppShell({
         </div>
 
         <div className="sidebar__section">{section}</div>
-        {items.map((n) => (
-          <Link
-            key={n.key}
-            href={n.href as Route}
-            className={`sidebar__item ${active === n.key ? 'is-active' : ''}`}
-          >
-            <span className="ico">
-              <Ico name={n.ico} />
-            </span>
-            <span>{n.label}</span>
-          </Link>
-        ))}
+        <SidebarNav items={items} />
 
         <div className="sidebar__bottom">
           <div className="sidebar__avatar">{initial}</div>

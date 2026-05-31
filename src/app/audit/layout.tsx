@@ -1,12 +1,11 @@
 import { requireAuditor } from '@/lib/auth-context';
-import { TopBar } from '@/components/TopBar';
+import { AppShell } from '@/components/AppShell';
 
 export default async function AuditLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAuditor();
   return (
-    <>
-      <TopBar email={session.email} isAuditor={session.isAuditor} />
-      <main className="shell">{children}</main>
-    </>
+    <AppShell user={{ name: session.nome, email: session.email }} role="auditor" wide>
+      {children}
+    </AppShell>
   );
 }

@@ -21,9 +21,17 @@ type Props = {
 
 const VIMEO_SDK = 'https://player.vimeo.com/api/player.js';
 
+type StreamEvent = { t: string; e: string; d: string };
+
+function fmtSec(v: unknown): string {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(1) : '—';
+}
+
 export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [status, setStatus] = useState<string>('');
+  const [events, setEvents] = useState<StreamEvent[]>([]);
 
   useEffect(() => {
     let player: VimeoPlayerInstance | null = null;
@@ -31,8 +39,31 @@ export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) 
     function attach() {
       if (!window.Vimeo || !iframeRef.current) return;
       player = new window.Vimeo.Player(iframeRef.current);
+      const detail = (eventType: string, payload: Record<string, unknown>): string => {
+        switch (eventType) {
+          case 'video.play':
+          case 'video.pause':
+            return `pos=${fmtSec(payload.posizione_secondi)}`;
+          case 'video.seek':
+            return `${fmtSec(payload.from_secondi)}→${fmtSec(payload.to_secondi)}`;
+          case 'video.ended':
+            return `durata=${fmtSec(payload.durata_secondi)}`;
+          default:
+            return '';
+        }
+      };
       const send = (eventType: string, payload: Record<string, unknown>) => {
         setStatus(eventType);
+        setEvents((prev) =>
+          [
+            ...prev,
+            {
+              t: new Date().toLocaleTimeString('it-IT'),
+              e: eventType,
+              d: detail(eventType, payload),
+            },
+          ].slice(-50),
+        );
         fetch('/api/events/video', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -94,11 +125,35 @@ export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) 
           allowFullScreen
         />
       </div>
-      {status && (
-        <p className="muted mono" style={{ marginTop: 10 }}>
-          Ultimo evento inviato: {status}
-        </p>
-      )}
+      <div style={{ marginTop: 18 }}>
+        <div className="row row--between" style={{ marginBottom: 10 }}>
+          <span className="eyebrow">Stream eventi · questa sessione</span>
+          {status ? (
+            <span className="chip chip--ok">
+              <span className="dot" />
+              {status}
+            </span>
+          ) : (
+            <span className="chip chip--ghost">in attesa…</span>
+          )}
+        </div>
+        <div className="event-stream" role="log" aria-live="polite">
+          {events.length === 0 ? (
+            <div style={{ color: 'var(--muted)' }}>
+              <span className="ts">··:··:··</span>
+              <span>Gli eventi del player (play / pause / seek / ended) appariranno qui e nel log del tenant.</span>
+            </div>
+          ) : (
+            events.map((ev, i) => (
+              <div key={i}>
+                <span className="ts">{ev.t}</span>
+                <span className="ev">{ev.e}</span>
+                <span className="pl">{ev.d}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
