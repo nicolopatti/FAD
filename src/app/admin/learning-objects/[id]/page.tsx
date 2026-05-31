@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { LearningObjectRow } from '@/lib/db-types';
+import { Icon, fmtDataOra } from '@/components/admin/Atlante';
 import { EditLearningObjectForm } from './EditLearningObjectForm';
 
 export const dynamic = 'force-dynamic';
@@ -21,53 +21,34 @@ export default async function EditLearningObjectPage({ params }: { params: { id:
 
   return (
     <>
-      <div style={{ marginBottom: 16 }}>
-        <Link href="/admin/learning-objects" className="muted">
-          ← Tutti i Learning Object
-        </Link>
-      </div>
-      <h1>{lo.titolo}</h1>
-      <div className="muted" style={{ marginBottom: 16 }}>
-        <span className="badge muted">{lo.type}</span>
-        {lo.archiviato_at && (
-          <>
-            {' · '}
-            <span className="badge warn">archiviato {formatDate(lo.archiviato_at)}</span>
-          </>
-        )}
+      <div className="page-head">
+        <div className="page-head__lead">
+          <span className="eyebrow">Contenuto</span>
+          <h1>{lo.titolo}</h1>
+          <div className="row row--wrap" style={{ marginTop: 8 }}>
+            <span className={`chip ${lo.type === 'video' ? 'chip--teal' : 'chip--ocra'}`}>{lo.type === 'video' ? 'Video' : 'PDF'}</span>
+            {lo.archiviato_at && <span className="chip chip--muted">archiviato · {fmtDataOra(lo.archiviato_at)}</span>}
+          </div>
+        </div>
+        <div className="page-head__actions">
+          <a className="btn btn--secondary" href="/admin/learning-objects"><Icon name="arrowLeft" /> Contenuti</a>
+        </div>
       </div>
 
-      <ConfigSummary lo={lo} />
+      <div className="card">
+        <div className="card__head"><h3>Contenuto</h3></div>
+        <div className="card__body">
+          <pre className="mono" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0, fontSize: 12 }}>
+            {JSON.stringify(lo.config, null, 2)}
+          </pre>
+          <div className="field__hint" style={{ marginTop: 10 }}>
+            Per sostituire il contenuto: archivia questo oggetto e creane uno nuovo (le proprietà
+            sono intrinseche; la sostituzione resta tracciabile nel log).
+          </div>
+        </div>
+      </div>
+
       <EditLearningObjectForm lo={lo} />
     </>
   );
-}
-
-function ConfigSummary({ lo }: { lo: LearningObjectRow }) {
-  return (
-    <div className="card">
-      <h3 style={{ marginTop: 0 }}>Contenuto</h3>
-      <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }} className="mono">
-        {JSON.stringify(lo.config, null, 2)}
-      </pre>
-      <div className="muted" style={{ marginTop: 8, fontSize: '0.85em' }}>
-        Per sostituire il contenuto: archivia questo Learning Object e creane uno nuovo
-        (D24 — proprietà intrinseche; la sostituzione resta tracciabile nel log).
-      </div>
-    </div>
-  );
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString('it-IT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
 }

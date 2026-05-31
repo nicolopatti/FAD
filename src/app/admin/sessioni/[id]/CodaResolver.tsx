@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Icon } from '@/components/admin/Atlante';
 
 export type IscrittoOption = { id: string; label: string };
 export type CodaItem = {
@@ -20,26 +21,26 @@ export function CodaResolver({
   items: CodaItem[];
   tuttiIscritti: IscrittoOption[];
 }) {
-  if (items.length === 0) {
-    return (
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Coda di riconciliazione</h3>
-        <div className="muted">Nessuna riga da risolvere: tutti i partecipanti sono stati riconciliati.</div>
-      </div>
-    );
-  }
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>Coda di riconciliazione ({items.length} da risolvere)</h3>
-      <div className="muted" style={{ marginBottom: 12, fontSize: '0.9em' }}>
-        Righe del report che non hanno prodotto una presenza automatica: match
-        <strong> ambiguo</strong> (più iscritti candidati) o <strong>assente</strong> (nessun
-        iscritto con quell&apos;email). Scegli l&apos;iscritto corretto e conferma, oppure ignora.
-        Ogni scelta è un Evento con motivazione (mai una modifica).
+      <div className="card__head">
+        <div>
+          <h3>Coda di riconciliazione</h3>
+          <div className="sub">
+            Righe del report senza presenza automatica: match <strong>ambiguo</strong> (più iscritti
+            candidati) o <strong>assente</strong> (nessun iscritto con quell&apos;email). Scegli
+            l&apos;iscritto e conferma, oppure ignora. Ogni scelta è un Evento con motivazione.
+          </div>
+        </div>
+        <span className="chip chip--muted">{items.length} da risolvere</span>
       </div>
-      {items.map((it) => (
-        <CodaRow key={it.id} item={it} tuttiIscritti={tuttiIscritti} />
-      ))}
+      <div className="card__body">
+        {items.length === 0 ? (
+          <div className="muted">Nessuna riga da risolvere: tutti i partecipanti sono stati riconciliati.</div>
+        ) : (
+          items.map((it) => <CodaRow key={it.id} item={it} tuttiIscritti={tuttiIscritti} />)
+        )}
+      </div>
     </div>
   );
 }
@@ -71,61 +72,46 @@ function CodaRow({ item, tuttiIscritti }: { item: CodaItem; tuttiIscritti: Iscri
   }
 
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+    <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: 14, marginBottom: 10 }}>
+      <div className="row between">
         <div>
           <span className="mono">riga {item.riga}</span>{' '}
           <strong>{item.rowNome || '(senza nome)'}</strong>{' '}
           {item.rowEmail && <span className="muted">&lt;{item.rowEmail}&gt;</span>}
         </div>
-        <span className={`badge ${item.tipo === 'ambiguo' ? 'warn' : 'muted'}`}>{item.tipo}</span>
+        <span className={`chip ${item.tipo === 'ambiguo' ? 'chip--ocra' : 'chip--muted'}`}>{item.tipo}</span>
       </div>
 
-      {error && <div className="alert" style={{ marginTop: 8 }}>{error}</div>}
+      {error && <div className="banner banner--err" style={{ marginTop: 10, marginBottom: 0 }}><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-        <div className="form-row" style={{ marginBottom: 0 }}>
+      <div className="grid-2" style={{ marginTop: 10 }}>
+        <div className="field" style={{ marginBottom: 0 }}>
           <label>Iscritto</label>
-          <select
-            value={iscrizioneId}
-            onChange={(e) => setIscrizioneId(e.target.value)}
-            disabled={busy || options.length === 0}
-            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}
-          >
+          <select className="select" value={iscrizioneId} onChange={(e) => setIscrizioneId(e.target.value)} disabled={busy || options.length === 0}>
             {options.length === 0 && <option value="">(nessun iscritto disponibile)</option>}
-            {options.map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
-            ))}
+            {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
         </div>
-        <div className="form-row" style={{ marginBottom: 0 }}>
+        <div className="field" style={{ marginBottom: 0 }}>
           <label>Motivazione (obbligatoria)</label>
-          <input
-            type="text"
-            value={motivazione}
-            onChange={(e) => setMotivazione(e.target.value)}
-            disabled={busy}
-            placeholder="es. confermato dall'elenco iscritti"
-          />
+          <input className="input" value={motivazione} onChange={(e) => setMotivazione(e.target.value)} disabled={busy} placeholder="es. confermato dall'elenco iscritti" />
         </div>
       </div>
 
-      <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+      <div className="row" style={{ marginTop: 10 }}>
         <button
           type="button"
-          className="btn"
+          className="btn btn--sm"
           disabled={busy || !iscrizioneId || !motivazione.trim()}
           onClick={() => call(`/api/admin/coda/${item.id}/risolvi`, { iscrizione_id: iscrizioneId, motivazione })}
-          style={{ fontSize: '0.85em', padding: '6px 12px' }}
         >
           {busy ? '…' : 'Registra presenza'}
         </button>
         <button
           type="button"
-          className="btn secondary"
+          className="btn btn--ghost btn--sm"
           disabled={busy || !motivazione.trim()}
           onClick={() => call(`/api/admin/coda/${item.id}/ignora`, { motivazione })}
-          style={{ fontSize: '0.85em', padding: '6px 12px' }}
           title="Scrive partecipante_non_riconciliato (nessuna presenza)"
         >
           Ignora

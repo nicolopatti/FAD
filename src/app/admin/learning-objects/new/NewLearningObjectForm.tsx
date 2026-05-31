@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { Icon } from '@/components/admin/Atlante';
 
 type LoType = 'video' | 'documento';
 
@@ -30,45 +31,25 @@ export function NewLearningObjectForm({ tenantId }: { tenantId: string }) {
         if (vimeoId.trim() === '') throw new Error('Vimeo ID obbligatorio');
         const dur = Number(durata);
         if (!Number.isFinite(dur) || dur <= 0) throw new Error('Durata non valida');
-        body = {
-          type: 'video',
-          titolo,
-          config: { vimeo_id: vimeoId.trim(), durata_secondi: dur },
-        };
+        body = { type: 'video', titolo, config: { vimeo_id: vimeoId.trim(), durata_secondi: dur } };
       } else {
         if (!file) throw new Error('Seleziona un PDF');
         if (file.type !== 'application/pdf') throw new Error('Il file deve essere un PDF');
-
-        // Genera id LO lato client per usare lo stesso id sia come PK riga sia
-        // come parte del path Storage. Path: {tenantId}/{loId}.pdf — il primo
-        // segmento è verificato dalle policy RLS di storage.objects.
         const loId = crypto.randomUUID();
         const storageKey = `${tenantId}/${loId}.pdf`;
-
-        setProgress('Carico il PDF su Supabase Storage…');
+        setProgress('Carico il PDF su Storage…');
         const supabase = createSupabaseBrowserClient();
-        const upload = await supabase.storage
-          .from('documenti')
-          .upload(storageKey, file, {
-            contentType: 'application/pdf',
-            upsert: false,
-          });
+        const upload = await supabase.storage.from('documenti').upload(storageKey, file, { contentType: 'application/pdf', upsert: false });
         if (upload.error) throw new Error(`Upload fallito: ${upload.error.message}`);
-
         body = {
           id: loId,
           type: 'documento',
           titolo,
-          config: {
-            storage_key: storageKey,
-            mime: 'application/pdf',
-            size: file.size,
-            filename: file.name,
-          },
+          config: { storage_key: storageKey, mime: 'application/pdf', size: file.size, filename: file.name },
         };
       }
 
-      setProgress('Creo il Learning Object…');
+      setProgress('Creo il contenuto…');
       const res = await fetch('/api/admin/learning-objects', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -87,86 +68,45 @@ export function NewLearningObjectForm({ tenantId }: { tenantId: string }) {
   }
 
   return (
-    <form className="card" onSubmit={submit}>
-      {error && <div className="alert">{error}</div>}
-      {progress && <div className="muted">{progress}</div>}
+    <form className="card" onSubmit={submit} style={{ maxWidth: 640 }}>
+      <div className="card__body">
+        {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
+        {progress && <div className="muted" style={{ marginBottom: 12 }}>{progress}</div>}
 
-      <div className="form-row">
-        <label htmlFor="type">Tipo</label>
-        <select
-          id="type"
-          value={type}
-          onChange={(e) => setType(e.target.value as LoType)}
-          disabled={busy}
-        >
-          <option value="video">Video (Vimeo)</option>
-          <option value="documento">Documento (PDF)</option>
-        </select>
-      </div>
-
-      <div className="form-row">
-        <label htmlFor="titolo">Titolo</label>
-        <input
-          id="titolo"
-          type="text"
-          value={titolo}
-          onChange={(e) => setTitolo(e.target.value)}
-          disabled={busy}
-          required
-        />
-      </div>
-
-      {type === 'video' && (
-        <>
-          <div className="form-row">
-            <label htmlFor="vimeo">Vimeo ID</label>
-            <input
-              id="vimeo"
-              type="text"
-              value={vimeoId}
-              onChange={(e) => setVimeoId(e.target.value)}
-              disabled={busy}
-              placeholder="es. 1084894652"
-              required
-            />
+        <div className="field">
+          <label>Tipo</label>
+          <div className="seg seg--mono">
+            <button type="button" className={type === 'video' ? 'is-active' : ''} onClick={() => setType('video')} disabled={busy}>Video</button>
+            <button type="button" className={type === 'documento' ? 'is-active' : ''} onClick={() => setType('documento')} disabled={busy}>Documento</button>
           </div>
-          <div className="form-row">
-            <label htmlFor="durata">Durata (secondi)</label>
-            <input
-              id="durata"
-              type="number"
-              min={1}
-              value={durata}
-              onChange={(e) => setDurata(e.target.value)}
-              disabled={busy}
-              required
-            />
-          </div>
-        </>
-      )}
-
-      {type === 'documento' && (
-        <div className="form-row">
-          <label htmlFor="file">File PDF</label>
-          <input
-            id="file"
-            type="file"
-            accept="application/pdf"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            disabled={busy}
-            required
-          />
-          {file && (
-            <div className="muted">
-              {file.name} · {Math.round(file.size / 1024)} KB
-            </div>
-          )}
         </div>
-      )}
 
-      <button type="submit" className="btn" disabled={busy}>
-        {busy ? 'Salvataggio…' : 'Crea Learning Object'}
-      </button>
+        <div className="field">
+          <label>Titolo</label>
+          <input className="input" value={titolo} onChange={(e) => setTitolo(e.target.value)} disabled={busy} required />
+        </div>
+
+        {type === 'video' ? (
+          <div className="grid-2">
+            <div className="field">
+              <label>Vimeo ID</label>
+              <input className="input" value={vimeoId} onChange={(e) => setVimeoId(e.target.value)} disabled={busy} placeholder="es. 1084894652" required />
+            </div>
+            <div className="field">
+              <label>Durata (secondi)</label>
+              <input className="input" type="number" min={1} value={durata} onChange={(e) => setDurata(e.target.value)} disabled={busy} required />
+            </div>
+          </div>
+        ) : (
+          <div className="field">
+            <label>File PDF</label>
+            <input className="input" type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} disabled={busy} required />
+            {file && <div className="field__hint">{file.name} · {Math.round(file.size / 1024)} KB</div>}
+          </div>
+        )}
+
+        <button type="submit" className="btn" disabled={busy}>{busy ? 'Salvataggio…' : 'Crea contenuto'}</button>
+      </div>
     </form>
   );
 }

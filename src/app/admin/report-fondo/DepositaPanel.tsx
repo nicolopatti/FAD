@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Icon, fmtDataOra } from '@/components/admin/Atlante';
 
 export type SnapshotRow = {
   id: string;
@@ -44,7 +45,7 @@ export function DepositaPanel({
       const json = await res.json();
       if (res.status === 409 && json.bloccanti) {
         setNeedsOverride(true);
-        setError(json.error ?? 'Warning bloccanti presenti.');
+        setError(json.error ?? 'Rilievi bloccanti presenti.');
         return;
       }
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
@@ -72,89 +73,62 @@ export function DepositaPanel({
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>Deposito (snapshot write-once)</h3>
-      <p className="muted" style={{ fontSize: '0.85em' }}>
-        Il deposito congela i dati risolti adesso in uno snapshot immutabile e scrive un Evento con
-        l&apos;hash nel log (l&apos;auditor lo vede in <span className="mono">/audit/log</span> e può
-        verificarne l&apos;integrità). Rigenerare crea un <strong>nuovo</strong> snapshot; i precedenti
-        restano invariati.
-      </p>
-
-      {error && <div className="alert">{error}</div>}
-      {ok && <div className="alert ok">{ok}</div>}
-
-      {!needsOverride ? (
-        <button className="btn" disabled={busy} onClick={() => deposita(false)}>
-          {busy ? 'Deposito…' : `Deposita (${formato})`}
-        </button>
-      ) : (
-        <div style={{ border: '1px dashed var(--border)', borderRadius: 8, padding: 12 }}>
-          <div className="muted" style={{ marginBottom: 8 }}>
-            Ci sono <strong>{bloccanti}</strong> warning bloccanti. Confermi il deposito comunque?
-          </div>
-          <button className="btn" disabled={busy} onClick={() => deposita(true)}>
-            {busy ? 'Deposito…' : 'Deposita comunque'}
-          </button>{' '}
-          <button
-            className="btn secondary"
-            disabled={busy}
-            onClick={() => {
-              setNeedsOverride(false);
-              setError(null);
-            }}
-          >
-            Annulla
-          </button>
+      <div className="card__head"><h3>Deposito (snapshot write-once)</h3></div>
+      <div className="card__body">
+        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
+          Il deposito congela i dati risolti adesso in uno snapshot immutabile e scrive un Evento con
+          l&apos;hash nel log (l&apos;auditor lo vede in <span className="mono">/audit/log</span> e ne
+          verifica l&apos;integrità). Rigenerare crea un <strong>nuovo</strong> snapshot; i precedenti
+          restano invariati.
         </div>
-      )}
 
-      <h4 style={{ marginBottom: 8, marginTop: 16 }}>Snapshot depositati ({snapshots.length})</h4>
-      {snapshots.length === 0 ? (
-        <div className="muted">Nessuno snapshot ancora depositato per questa coppia.</div>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Quando</th>
-              <th>Formato</th>
-              <th>Hash (Evento)</th>
-              <th>Integrità</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {snapshots.map((s) => (
-              <tr key={s.id}>
-                <td className="muted">{new Date(s.generato_at).toLocaleString('it-IT')}</td>
-                <td>{s.formato}</td>
-                <td className="mono">{s.hash_evento ? `${s.hash_evento.slice(0, 16)}…` : '—'}</td>
-                <td>
-                  {verifiche[s.id] === 'integra' ? (
-                    <span className="badge ok">integra</span>
-                  ) : verifiche[s.id] === 'manomesso' ? (
-                    <span className="badge bad">manomesso</span>
-                  ) : verifiche[s.id] === '…' ? (
-                    <span className="muted">…</span>
-                  ) : verifiche[s.id] === 'errore' ? (
-                    <span className="badge bad">errore</span>
-                  ) : (
-                    <button
-                      className="btn secondary"
-                      style={{ fontSize: '0.8em', padding: '2px 8px' }}
-                      onClick={() => verifica(s.id)}
-                    >
-                      verifica
-                    </button>
-                  )}
-                </td>
-                <td>
-                  <a href={`/api/admin/report-fondo/snapshot?snapshot=${s.id}`}>scarica</a>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+        {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
+        {ok && <div className="banner banner--info"><Icon name="check" className="banner__icon" /><div className="banner__body">{ok}</div></div>}
+
+        {!needsOverride ? (
+          <button className="btn" disabled={busy} onClick={() => deposita(false)}>
+            {busy ? 'Deposito…' : `Deposita (${formato})`}
+          </button>
+        ) : (
+          <div style={{ border: '1px dashed var(--line-strong)', borderRadius: 'var(--r-lg)', padding: 16 }}>
+            <div className="muted" style={{ marginBottom: 10 }}>
+              Ci sono <strong>{bloccanti}</strong> rilievi bloccanti. Confermi il deposito comunque?
+            </div>
+            <div className="row">
+              <button className="btn" disabled={busy} onClick={() => deposita(true)}>{busy ? 'Deposito…' : 'Deposita comunque'}</button>
+              <button className="btn btn--ghost" disabled={busy} onClick={() => { setNeedsOverride(false); setError(null); }}>Annulla</button>
+            </div>
+          </div>
+        )}
+
+        <h4 style={{ margin: '18px 0 12px' }}>Snapshot depositati ({snapshots.length})</h4>
+        {snapshots.length === 0 ? (
+          <div className="muted">Nessuno snapshot ancora depositato per questa coppia.</div>
+        ) : (
+          <table className="tbl tbl--zebra">
+            <thead>
+              <tr><th>Quando</th><th>Formato</th><th>Hash (Evento)</th><th>Integrità</th><th></th></tr>
+            </thead>
+            <tbody>
+              {snapshots.map((s) => (
+                <tr key={s.id}>
+                  <td className="muted">{fmtDataOra(s.generato_at)}</td>
+                  <td>{s.formato}</td>
+                  <td className="mono">{s.hash_evento ? `${s.hash_evento.slice(0, 16)}…` : '—'}</td>
+                  <td>
+                    {verifiche[s.id] === 'integra' ? <span className="chip chip--teal">integra</span>
+                      : verifiche[s.id] === 'manomesso' ? <span className="chip chip--err">manomesso</span>
+                      : verifiche[s.id] === '…' ? <span className="muted">…</span>
+                      : verifiche[s.id] === 'errore' ? <span className="chip chip--err">errore</span>
+                      : <button className="btn btn--ghost btn--xs" onClick={() => verifica(s.id)}>verifica</button>}
+                  </td>
+                  <td><a className="linklike" href={`/api/admin/report-fondo/snapshot?snapshot=${s.id}`}>scarica</a></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

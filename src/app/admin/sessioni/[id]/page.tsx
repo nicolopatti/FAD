@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { SessioneConEdizione } from '@/lib/db-types';
+import { Icon, fmtDataOra } from '@/components/admin/Atlante';
 import { CsvImportForm } from './CsvImportForm';
 import { CodaResolver, type CodaItem, type IscrittoOption } from './CodaResolver';
 import { PresenzeManager, type PresenzaItem } from './PresenzeManager';
@@ -18,13 +19,6 @@ type GrezzoConContenuto = {
 };
 type CodaRowDb = { id: string; riga: number; tipo: 'ambiguo' | 'assente'; candidati: string[]; grezzo_id: string };
 type IscrittoDb = { id: string; persona: { nome: string; cognome: string; email: string } | null };
-
-function fmtData(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' });
-}
 
 export default async function SessioneDetailPage({ params }: { params: { id: string } }) {
   const session = await requireAdmin();
@@ -58,7 +52,6 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
     righe: Array.isArray(g.contenuto) ? g.contenuto.length : null,
   }));
 
-  // Lookup (grezzo_id:riga) → riga normalizzata, per mostrare nome/email nella coda.
   const rowByKey = new Map<string, { nome: string | null; email: string | null }>();
   for (const g of grezziRaw ?? []) {
     if (!Array.isArray(g.contenuto)) continue;
@@ -68,7 +61,6 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
     }
   }
 
-  // Iscritti dell'Edizione (admin può leggerli, policy Fase 3): per dropdown + label candidati.
   const { data: iscrittiDb } = edizioneId
     ? await supabase
         .from('iscrizione')
@@ -85,7 +77,6 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
     return opt;
   });
 
-  // Coda pending della sessione → arricchita per la UI.
   const { data: codaDb } = await supabase
     .from('coda_riconciliazione')
     .select('id, riga, tipo, candidati, grezzo_id')
@@ -108,8 +99,6 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
     };
   });
 
-  // Presenze registrate (Eventi, admin-readable via policy Fase 3). Una
-  // correzione "supera" l'Evento referenziato (mostrato barrato).
   type PresEvtDb = {
     id: string;
     event_type: string;
@@ -142,57 +131,71 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
 
   return (
     <>
-      <div className="muted" style={{ marginBottom: 8 }}>
-        <Link href="/admin/sessioni">← Sessioni</Link>
-      </div>
-      <h1 style={{ marginBottom: 4 }}>
-        {sessione.titolo}
-        {sessione.annullato_at && <span className="badge bad" style={{ marginLeft: 8 }}>annullata</span>}
-      </h1>
-      <div className="muted" style={{ marginBottom: 16 }}>
-        {sessione.edizione?.corso?.titolo ?? '—'}
-        {sessione.edizione?.codice && <span className="mono"> · {sessione.edizione.codice}</span>}
-      </div>
-
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Dettagli</h3>
-        <table>
-          <tbody>
-            <tr><th style={{ width: 200 }}>Modalità</th><td>{sessione.modalita === 'vcs' ? `VCS · ${sessione.vcs_piattaforma ?? '?'}` : 'aula'}</td></tr>
-            <tr><th>Quando</th><td>{fmtData(sessione.data_ora)}{sessione.durata_minuti != null && ` · ${sessione.durata_minuti} min`}</td></tr>
-            {sessione.modalita === 'vcs' && (
-              <tr><th>ID riunione VCS</th><td className="mono">{sessione.vcs_meeting_id ?? '—'}</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Report di partecipazione importati ({grezzi.length})</h3>
-        <div className="muted" style={{ marginBottom: 8, fontSize: '0.9em' }}>
-          Ogni import è <strong>write-once</strong> (D20): prova immutabile. L&apos;hash del
-          contenuto è attestato nel <em>log eventi</em> (vista auditor). La riconciliazione
-          gira in automatico all&apos;import; le righe non risolte finiscono in coda qui sotto.
+      <div className="page-head">
+        <div className="page-head__lead">
+          <span className="eyebrow">Sessione</span>
+          <h1>
+            {sessione.titolo}
+            {sessione.annullato_at && <span className="chip chip--err" style={{ marginLeft: 12, verticalAlign: 'middle' }}>annullata</span>}
+          </h1>
+          <p>
+            {sessione.edizione?.corso?.titolo ?? '—'}
+            {sessione.edizione?.codice && <span className="mono"> · {sessione.edizione.codice}</span>}
+          </p>
         </div>
-        {grezzi.length === 0 ? (
-          <div className="muted">Nessun report importato per questa sessione.</div>
-        ) : (
-          <table>
-            <thead>
-              <tr><th>Importato il</th><th>Fonte</th><th>Righe</th><th>Importato da</th></tr>
-            </thead>
+        <div className="page-head__actions">
+          <Link className="btn btn--secondary" href="/admin/sessioni"><Icon name="arrowLeft" /> Sessioni</Link>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card__head"><h3>Dettagli</h3></div>
+        <div className="card__body">
+          <table className="tbl">
             <tbody>
-              {grezzi.map((g) => (
-                <tr key={g.id}>
-                  <td className="muted">{fmtData(g.creato_il)}</td>
-                  <td><span className="badge muted">{g.fonte}</span></td>
-                  <td>{g.righe ?? '—'}</td>
-                  <td className="mono">{g.importato_da === session.personaId ? 'tu' : (g.importato_da ?? 'automatico')}</td>
-                </tr>
-              ))}
+              <tr><th style={{ width: 200 }}>Modalità</th><td>{sessione.modalita === 'vcs' ? `Webinar · ${sessione.vcs_piattaforma ?? '?'}` : 'Aula'}</td></tr>
+              <tr><th>Quando</th><td>{fmtDataOra(sessione.data_ora)}{sessione.durata_minuti != null && ` · ${sessione.durata_minuti} min`}</td></tr>
+              {sessione.modalita === 'vcs' && (
+                <tr><th>ID riunione</th><td className="mono">{sessione.vcs_meeting_id ?? '—'}</td></tr>
+              )}
             </tbody>
           </table>
-        )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card__head">
+          <div>
+            <h3>Report di partecipazione importati</h3>
+            <div className="sub">
+              Ogni import è write-once: prova immutabile. L&apos;hash del contenuto è attestato nel log
+              eventi (vista auditor). La riconciliazione gira in automatico; le righe non risolte
+              finiscono nella coda qui sotto.
+            </div>
+          </div>
+          <span className="chip chip--muted">{grezzi.length}</span>
+        </div>
+        <div className="card__body card__body--flush">
+          {grezzi.length === 0 ? (
+            <div className="card__body"><div className="muted">Nessun report importato per questa sessione.</div></div>
+          ) : (
+            <table className="tbl tbl--zebra">
+              <thead>
+                <tr><th>Importato il</th><th>Fonte</th><th>Righe</th><th>Importato da</th></tr>
+              </thead>
+              <tbody>
+                {grezzi.map((g) => (
+                  <tr key={g.id}>
+                    <td className="muted">{fmtDataOra(g.creato_il)}</td>
+                    <td><span className="chip chip--muted">{g.fonte}</span></td>
+                    <td>{g.righe ?? '—'}</td>
+                    <td className="mono">{g.importato_da === session.personaId ? 'tu' : (g.importato_da ?? 'automatico')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       <CodaResolver items={codaItems} tuttiIscritti={tuttiIscritti} />
