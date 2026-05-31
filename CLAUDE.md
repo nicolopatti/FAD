@@ -96,6 +96,39 @@ invece dello stile inline). Possibili prossimi passi UI (non bloccanti): nav
 mobile dedicata (hamburger) al posto della sidebar impilata; eventuale variante
 dark coerente con Atlante.
 
+## Prossima sessione: redesign area ADMIN (mockup-first) — IN ATTESA DEL MOCKUP
+
+L'utente vuole rifare l'**area admin** (non lo convince l'impostazione, soprattutto
+con molti corsi). Analisi e decisioni prese (2026-05-31), **nessun codice ancora
+scritto** per questo: si è scelto l'approccio **mockup-first** (come per il discente).
+
+**Mandato operativo completo + prompt pronto da incollare su Claude Design:**
+**`docs/admin-redesign-brief.md`** (leggere quello per primo).
+
+Decisioni ratificate con l'utente:
+1. **Mockup-first**: l'utente genera il mockup su Claude Design (prompt già scritto nel
+   brief); poi Claude Code lo decodifica (ricetta del discente: blob gzip+base64 in
+   `__bundler/manifest`, template json-escaped nell'ultima riga) e allinea ai dati reali.
+2. **Corso-first (ibrido)**: il corso è lo spazio di lavoro; i contenuti si creano/
+   aggiungono *dentro* il builder (crea nuovo / aggiungi da libreria). La libreria LO
+   resta ma arricchita (ricerca, filtri, "usato in N corsi", durata formattata).
+3. **Dashboard sì**: home `/admin` con KPI + azioni rapide (oggi `/admin` fa solo redirect).
+
+Problemi rilevati nell'admin attuale (tutti da risolvere nel redesign): nessuna dashboard;
+libreria LO piatta senza ricerca/filtri; `CorsoEditor`/`EdizioniSection` fuori-Atlante
+(colori hardcoded `#f0f4ff`/`#e1e1e1`, tabelle inline, riordino a frecce, "aggiungi LO"
+senza ricerca, regola grezza invece di `regolaLabel()`); `corso` **senza campo immagine**
+di copertina; Sessioni/Report fondi spogli e con linguaggio "da brief" (D30/D27 esposti).
+
+Impianto implementativo previsto (post-mockup, vedi brief per dettaglio): migration
+`corso.immagine_url` (campo **non** strutturale, non bloccato dal freeze D22) + bucket
+Storage `copertine` con RLS (modello bucket `documenti`); drag-and-drop sulla Struttura
+(riuso RPC `reorder_struttura`); creazione contenuti inline; dashboard; refactor Atlante.
+Asset da riusare: `regolaLabel()` (`compliance.ts`), `edizioneStato()` (`db-types.ts`),
+pattern upload di `NewLearningObjectForm`, `AppShell`/`SidebarNav`, `config.durata_secondi`
+(già popolata). Invarianti: D22 (copertina esclusa dal freeze, da verificare sul trigger
+`corso_freeze`), D24/D25, nessun INSERT diretto su `evento`, RLS per-tenant sul nuovo bucket.
+
 ## Stato di avanzamento (Fase 1)
 
 **Fase 1 chiusa.** Tutti i task ✅, gate M1a e M1 ✅ verdi. Deploy production
