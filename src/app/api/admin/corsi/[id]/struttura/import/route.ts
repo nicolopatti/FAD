@@ -57,7 +57,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!titolo) { saltati.push({ titolo: '(vuoto)', motivo: 'titolo mancante' }); continue; }
     const key = titolo.toLowerCase();
 
-    let loId: string | null = null;
+    let loId: string;
     const existing = byTitle.get(key);
     if (existing) {
       loId = existing.id;
