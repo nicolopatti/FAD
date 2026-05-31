@@ -1,5 +1,6 @@
 import './globals.css';
 import { Plus_Jakarta_Sans, Bricolage_Grotesque, IBM_Plex_Mono } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -29,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="it"
-      className={`${jakarta.variable} ${bricolage.variable} ${plexMono.variable}`}
+      className={`${GeistSans.variable} ${jakarta.variable} ${bricolage.variable} ${plexMono.variable}`}
     >
       <body>{children}</body>
     </html>

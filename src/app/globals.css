@@ -78,6 +78,67 @@
   color: var(--ink-2);
 }
 
+/* ===== TEMA · Atlante — override variabili del tema base =====
+ * Palette teal/ocra su sabbia, radii piccoli, ombre piatte. Sans = Geist. */
+:root {
+  --font-sans:    var(--font-geist-sans), var(--font-jakarta), -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-geist-sans), sans-serif;
+
+  --bg:               #eeece6;
+  --surface:          #f8f6ee;
+  --surface-2:        #e6e3d9;
+  --surface-sunken:   #d8d4c6;
+
+  --ink:              #171c25;
+  --ink-2:            #3c424f;
+  --muted:            #6e7480;
+  --muted-2:          #9a9fa9;
+
+  --border:           #d2cebd;
+  --border-strong:    #b5b0a0;
+
+  --primary:          #1c504f;
+  --primary-hover:    #143735;
+  --primary-fg:       #f8f6ee;
+  --primary-soft:     #dde9e7;
+  --primary-soft-2:   #c2d8d6;
+
+  --accent:           #b07c1f;
+  --accent-soft:      #f0e0b8;
+
+  --ok:               #1c504f;
+  --ok-soft:          #dde9e7;
+  --warn:             #b07c1f;
+  --warn-soft:        #f0e0b8;
+  --bad:              #8a2828;
+  --bad-soft:         #f0d8d8;
+
+  --focus-ring:       #b07c1f;
+
+  --audit-ink:        #0d1018;
+  --audit-ink-fg:     #d2cebd;
+
+  --hero-grad-1:      linear-gradient(160deg, #1c504f 0%, #0a2a29 100%);
+  --hero-grad-2:      linear-gradient(135deg, #b07c1f 0%, #6b4a0e 100%);
+  --hero-accent:      #d8b97a;
+
+  --radius-sm:  3px;
+  --radius:     5px;
+  --radius-lg:  8px;
+  --radius-xl:  10px;
+
+  --shadow-1:    0 0 0 rgba(0,0,0,0);
+  --shadow-2:    0 6px 18px -10px rgba(23,28,37,.14);
+  --shadow-hover:0 10px 24px -12px rgba(23,28,37,.20);
+
+  --sim-chrome-bg:    #d8d4c6;
+  --sim-chrome-fg:    #3c424f;
+  --sim-chrome-border:#b5b0a0;
+  --sim-addr-bg:      #f8f6ee;
+  --sim-pill-bg:      #f8f6ee;
+  --sim-pill-fg:      #171c25;
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink-2); }
 body {
@@ -632,61 +693,6 @@ table.modern tbody tr:hover { background: var(--surface-2); }
 .flex-1 { flex: 1; }
 
 
-/* ============================================================================
- * Dark mode — palette "notte" del mockup, applicata via preferenza di sistema.
- * ========================================================================== */
-@media (prefers-color-scheme: dark) {
-  :root {
-  --bg:               #0e1116;
-  --surface:          #161a22;
-  --surface-2:        #1c2129;
-  --surface-sunken:   #0b0d12;
-
-  --ink:              #f5f1e8;
-  --ink-2:            #c4bda9;
-  --muted:            #7d7768;
-  --muted-2:          #4d473b;
-
-  --border:           #262a33;
-  --border-strong:    #3a3f4a;
-
-  --primary:          #f5b988;
-  --primary-hover:    #f3a76a;
-  --primary-fg:       #1a1814;
-  --primary-soft:     #2a1f17;
-  --primary-soft-2:   #3a2a1f;
-
-  --accent:           #5fb8a3;
-  --accent-soft:      #1a2a26;
-
-  --ok:               #5fb8a3;
-  --ok-soft:          #16241f;
-  --warn:             #f5b988;
-  --warn-soft:        #2a1f17;
-  --bad:              #e08585;
-  --bad-soft:         #2a1717;
-
-  --focus-ring:       #f5b988;
-
-  --audit-ink:        #050709;
-  --audit-ink-fg:     #c4bda9;
-
-  --hero-grad-1:      linear-gradient(160deg, #1c2129 0%, #050709 100%);
-  --hero-grad-2:      linear-gradient(135deg, #2a1f17 0%, #050709 100%);
-  --hero-accent:      #f5b988;
-
-  --shadow-1:    0 1px 0 rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.5);
-  --shadow-2:    0 12px 32px -8px rgba(0,0,0,.6), 0 4px 12px rgba(0,0,0,.4);
-  --shadow-hover:0 18px 42px -12px rgba(0,0,0,.7), 0 4px 10px rgba(0,0,0,.4);
-
-  --sim-chrome-bg:    #050709;
-  --sim-chrome-fg:    #c4bda9;
-  --sim-chrome-border:#1a1d24;
-  --sim-addr-bg:      #161a22;
-  --sim-pill-bg:      #161a22;
-  --sim-pill-fg:      #f5f1e8;
-  }
-}
 
 /* ============================================================================
  * Compat — classi legacy usate dall'area admin/auditor (TopBar, card, tabelle).
@@ -784,3 +790,72 @@ table:not(.modern) th { color: var(--muted); font-weight: 600; }
   .login-visual { display: none; }
   .login-formside { padding: 40px 24px; }
 }
+
+/* ===== TEMA · Atlante — override componenti (look strutturale) ===== */
+body { font-size: 14px; line-height: 1.5; }
+h1 { font-size: 38px; letter-spacing: -0.022em; font-weight: 600; }
+h2 { font-size: 22px; letter-spacing: -0.012em; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+.kpi__value { font-family: var(--font-display); letter-spacing: -0.02em; font-size: 30px; font-weight: 700; }
+.kpi__label { letter-spacing: 0.16em; }
+.eyebrow { letter-spacing: 0.18em; color: var(--primary); font-size: 10.5px; }
+.meta, .muted { font-size: 12.5px; }
+
+/* Atlante — bordi strutturali su tutto */
+.panel,
+.surface,
+.course-card,
+.kpi { border: 1px solid var(--border-strong); box-shadow: none; }
+.kpi { padding: 14px 16px; }
+.kpi__value { font-size: 26px; }
+.panel { padding: 18px 20px; }
+
+/* Atlante — sidebar più istituzionale */
+.sidebar { background: var(--surface); border-right-color: var(--border-strong); padding: 18px 12px; }
+.sidebar__mark { border-radius: 4px; background: var(--ink); }
+.sidebar__item { font-size: 13px; padding: 8px 10px; border-radius: 4px; }
+.sidebar__item.is-active { background: var(--primary-soft); color: var(--primary); }
+.sidebar__avatar { border-radius: 4px; background: var(--primary); }
+
+/* Atlante — bottoni squadrati */
+.btn { border-radius: 4px; min-height: 38px; padding: 8px 16px; font-size: 13px; }
+.btn--sm { min-height: 30px; padding: 5px 12px; font-size: 12px; }
+.btn--lg { min-height: 44px; padding: 11px 22px; font-size: 14px; }
+.btn--secondary { background: transparent; }
+
+/* Atlante — chip rettangolari mono */
+.chip {
+  border-radius: 3px; font-family: var(--font-mono); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;
+}
+
+/* Atlante — LO row più densa */
+.lo-row { padding: 10px 14px; border-radius: 4px; }
+.lo-row__index { border-radius: 4px; background: var(--surface-2); font-family: var(--font-mono); font-size: 12px; font-weight: 500; }
+.lo-row.is-ok .lo-row__index { background: var(--primary); }
+.lo-row.is-current { border-color: var(--primary); box-shadow: none; }
+
+/* Atlante — tabelle ad alta leggibilita' */
+table.modern { font-size: 12.5px; }
+table.modern thead th { background: var(--surface-2); border-bottom: 1px solid var(--border-strong); letter-spacing: 0.1em; font-size: 10.5px; }
+table.modern tbody td { padding: 10px 14px; }
+
+/* Atlante — appbar */
+.appbar.is-scrolled { background: rgba(238,236,230,.94); border-bottom-color: var(--border-strong); }
+.appbar__search input { background: var(--surface); border-radius: 4px; border-color: var(--border-strong); }
+
+/* Atlante — input strutturati */
+input[type='email'], input[type='password'],
+input[type='text'], input[type='search'] {
+  border-radius: 4px; padding: 10px 14px; font-size: 13.5px;
+}
+
+/* Atlante — progress strutturati */
+.progress, .progress__bar { border-radius: 2px; }
+.progress { background: var(--surface-2); border: 1px solid var(--border-strong); height: 8px; }
+
+/* Atlante — event type più tecnici */
+.event-type { font-family: var(--font-mono); background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 3px; }
+.event-stream { background: #0d1018; color: #d2cebd; border-radius: 5px; }
+.event-stream .ev { color: #d8b97a; }
+
