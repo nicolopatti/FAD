@@ -47,8 +47,8 @@ contenuto Manuale/CSV, 4 Edizioni, 5 Iscritti); `/admin/learning-objects`
    upload client diretto a Storage, poi `PATCH /api/admin/corsi/[id]` salva il path
    (Evento `corso.cover_updated`). La copertina **resta modificabile a corso
    congelato** (non è campo strutturale). Aggiunta anche `corso.categoria`
-   (campo strutturale → **congelato con D22**: la guardia `corso_freeze_guard` ora
-   include `categoria`).
+   (campo strutturale → **congelato con D22**: la funzione del trigger reale
+   `tg_corso_freeze` ora include `categoria` — vedi fix `…000003`).
 2. **Import in blocco**: LO nella struttura (`POST …/struttura/import`, riuso per
    titolo o creazione video al volo, dedup, Evento `struttura.imported`) e
    **Iscritti** (sezione 5 del builder: manuale + CSV). Helper `src/lib/iscritti.ts`
@@ -63,10 +63,16 @@ contenuto Manuale/CSV, 4 Edizioni, 5 Iscritti); `/admin/learning-objects`
 
 **Migration applicate sul live:**
 - `20260531000001_fase_ui_admin_copertine.sql`: `corso.categoria`+`corso.cover_path`,
-  `corso_freeze_guard` riscritta (freezing di categoria), bucket `copertine` + 3 policy.
+  bucket `copertine` + 3 policy. (NB: toccava per errore `corso_freeze_guard`, funzione
+  non agganciata ad alcun trigger → corretto da `…000003`.)
 - `20260531000002_admin_iscritti_rls.sql`: policy RLS write mancanti —
   `persona_insert_admin`/`persona_update_admin`, `iscrizione_insert_admin`/
   `iscrizione_delete_admin` (prima c'erano solo le SELECT admin).
+- `20260531000003_corso_freeze_categoria_fix.sql`: il trigger D22 reale è
+  `corso_freeze → tg_corso_freeze`; aggiorna la funzione giusta perché `categoria`
+  sia davvero congelata e rimuove la funzione spuria. Verificato in rollback sul live
+  (categoria bloccata su congelato, cover_path consentita su congelato, categoria
+  consentita su bozza).
 
 Invarianti rispettate: nessun INSERT diretto in `evento` (sempre `appendEvent`→
 `audit_append`); niente PII nei payload; riordino struttura via RPC atomica;
