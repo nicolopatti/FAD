@@ -122,6 +122,7 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
         </div>
       ) : (
         <div className="card">
+          <div className="card__body card__body--flush">
           <table className="tbl tbl--zebra">
             <thead>
               <tr>
@@ -175,6 +176,7 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </>

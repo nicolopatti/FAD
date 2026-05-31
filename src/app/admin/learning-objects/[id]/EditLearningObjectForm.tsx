@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LearningObjectRow } from '@/lib/db-types';
+import { Icon } from '@/components/admin/Atlante';
 
 export function EditLearningObjectForm({ lo }: { lo: LearningObjectRow }) {
   const router = useRouter();
@@ -39,9 +40,7 @@ export function EditLearningObjectForm({ lo }: { lo: LearningObjectRow }) {
     setBusy(true);
     try {
       const path = archived ? 'unarchive' : 'archive';
-      const res = await fetch(`/api/admin/learning-objects/${lo.id}/${path}`, {
-        method: 'POST',
-      });
+      const res = await fetch(`/api/admin/learning-objects/${lo.id}/${path}`, { method: 'POST' });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       router.refresh();
@@ -55,38 +54,29 @@ export function EditLearningObjectForm({ lo }: { lo: LearningObjectRow }) {
   return (
     <>
       <form className="card" onSubmit={saveTitolo}>
-        <h3 style={{ marginTop: 0 }}>Modifica</h3>
-        {error && <div className="alert">{error}</div>}
-        <div className="form-row">
-          <label htmlFor="titolo">Titolo</label>
-          <input
-            id="titolo"
-            type="text"
-            value={titolo}
-            onChange={(e) => setTitolo(e.target.value)}
-            disabled={busy}
-          />
+        <div className="card__head"><h3>Modifica</h3></div>
+        <div className="card__body">
+          {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
+          <div className="field">
+            <label>Titolo</label>
+            <input className="input" value={titolo} onChange={(e) => setTitolo(e.target.value)} disabled={busy} />
+          </div>
+          <button type="submit" className="btn" disabled={busy || !dirty}>{busy ? 'Salvo…' : 'Salva titolo'}</button>
         </div>
-        <button type="submit" className="btn" disabled={busy || !dirty}>
-          {busy ? 'Salvo…' : 'Salva titolo'}
-        </button>
       </form>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>{archived ? 'Ripristina' : 'Archivia'}</h3>
-        <p className="muted">
-          {archived
-            ? 'Il Learning Object torna disponibile per essere aggiunto a nuove Strutture corso.'
-            : 'Soft-archive (D15/D22): la riga resta consultabile, ma non potrà più essere aggiunta a nuove Strutture corso. Nessun DELETE fisico.'}
-        </p>
-        <button
-          type="button"
-          className="btn"
-          onClick={archiveOrUnarchive}
-          disabled={busy}
-        >
-          {busy ? '…' : archived ? 'Ripristina' : 'Archivia'}
-        </button>
+        <div className="card__head"><h3>{archived ? 'Ripristina' : 'Archivia'}</h3></div>
+        <div className="card__body">
+          <p className="muted" style={{ marginBottom: 12 }}>
+            {archived
+              ? 'Il contenuto torna disponibile per essere aggiunto a nuove strutture corso.'
+              : 'Soft-archive: la riga resta consultabile ma non potrà più essere aggiunta a nuove strutture corso. Nessun DELETE fisico.'}
+          </p>
+          <button type="button" className={`btn ${archived ? '' : 'btn--danger'}`} onClick={archiveOrUnarchive} disabled={busy}>
+            <Icon name="archive" /> {busy ? '…' : archived ? 'Ripristina' : 'Archivia'}
+          </button>
+        </div>
       </div>
     </>
   );

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { IngestGrezzoResult } from '@/lib/pipeline';
+import { Icon } from '@/components/admin/Atlante';
 
 type MappingState = { nome: string; email: string; durata: string; join: string; leave: string };
 const EMPTY_MAPPING: MappingState = { nome: '', email: '', durata: '', join: '', leave: '' };
@@ -32,7 +33,6 @@ export function CsvImportForm({ sessioneId }: { sessioneId: string }) {
     setResult(null);
     setBusy(true);
     try {
-      // mappatura: invia solo i campi valorizzati (override)
       const mapEntries = Object.entries(mapping).filter(([, v]) => v.trim());
       const mappingPayload = mapEntries.length ? Object.fromEntries(mapEntries) : undefined;
 
@@ -55,11 +55,10 @@ export function CsvImportForm({ sessioneId }: { sessioneId: string }) {
   }
 
   const field = (key: keyof MappingState, label: string, required: boolean) => (
-    <div className="form-row">
-      <label htmlFor={`map-${key}`}>{label}{required && ' *'}</label>
+    <div className="field">
+      <label>{label}{required && ' *'}</label>
       <input
-        id={`map-${key}`}
-        type="text"
+        className="input"
         value={mapping[key]}
         onChange={(e) => setMapping((m) => ({ ...m, [key]: e.target.value }))}
         disabled={busy}
@@ -70,66 +69,71 @@ export function CsvImportForm({ sessioneId }: { sessioneId: string }) {
 
   return (
     <form className="card" onSubmit={submit}>
-      <h3 style={{ marginTop: 0 }}>Importa report di partecipazione (CSV)</h3>
-      <div className="muted" style={{ marginBottom: 12, fontSize: '0.9em' }}>
-        Carica il CSV esportato dalla piattaforma VCS (Teams/Zoom). Colonne attese:
-        nome, email, durata (più, opzionali, ingresso/uscita). Le intestazioni comuni
-        IT/EN sono riconosciute in automatico; se una colonna chiave non viene trovata
-        avrai un errore <em>prima</em> di salvare, e potrai indicarla con la mappatura.
+      <div className="card__head">
+        <div className="section-step"><span className="step-num"><Icon name="upload" style={{ width: 14, height: 14 }} /></span><h3>Importa report di partecipazione (CSV)</h3></div>
       </div>
-
-      {error && <div className="alert">{error}</div>}
-      {result && (
-        <div className="alert ok">
-          Import riuscito: <strong>{result.righe}</strong> righe salvate (write-once).
-          Evento <span className="mono">report_grezzo_importato #{result.evento_seq}</span>.{' '}
-          Hash contenuto: <span className="mono hash">{result.hash.slice(0, 16)}…</span>
+      <div className="card__body">
+        <div className="muted" style={{ marginBottom: 14, fontSize: 13 }}>
+          Carica il CSV esportato dalla piattaforma (Teams/Zoom). Colonne attese: nome, email,
+          durata (più, opzionali, ingresso/uscita). Le intestazioni comuni IT/EN sono riconosciute
+          in automatico; se una colonna chiave non viene trovata avrai un errore <em>prima</em> di
+          salvare, e potrai indicarla con la mappatura. Da Excel: salva come CSV.
         </div>
-      )}
 
-      <div className="form-row">
-        <label htmlFor="file">File CSV</label>
-        <input id="file" type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} disabled={busy} />
-        {filename && <div className="muted" style={{ marginTop: 4, fontSize: '0.85em' }}>Selezionato: {filename}</div>}
-      </div>
+        {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
+        {result && (
+          <div className="banner banner--info">
+            <Icon name="check" className="banner__icon" />
+            <div className="banner__body">
+              Import riuscito: <strong>{result.righe}</strong> righe salvate (write-once).
+              Evento <span className="mono">report_grezzo_importato #{result.evento_seq}</span> ·
+              hash <span className="mono">{result.hash.slice(0, 16)}…</span>
+            </div>
+          </div>
+        )}
 
-      <div className="form-row">
-        <label htmlFor="csvtext">…oppure incolla il contenuto CSV</label>
-        <textarea
-          id="csvtext"
-          rows={6}
-          value={csv}
-          onChange={(e) => { setCsv(e.target.value); setFilename(null); }}
-          disabled={busy}
-          className="mono"
-          style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8 }}
-          placeholder={'Name,Email,Duration\nMario Bianchi,mario.bianchi@cliente.it,120'}
-        />
-      </div>
+        <div className="field">
+          <label>File CSV</label>
+          <input className="input" type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} disabled={busy} />
+          {filename && <div className="field__hint">Selezionato: {filename}</div>}
+        </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <button type="button" className="btn secondary" onClick={() => setShowMapping((v) => !v)} disabled={busy} style={{ fontSize: '0.85em', padding: '4px 10px' }}>
-          {showMapping ? 'Nascondi mappatura colonne' : 'Mappatura colonne (avanzato)'}
+        <div className="field">
+          <label>…oppure incolla il contenuto CSV</label>
+          <textarea
+            className="textarea mono"
+            rows={6}
+            value={csv}
+            onChange={(e) => { setCsv(e.target.value); setFilename(null); }}
+            disabled={busy}
+            placeholder={'Name,Email,Duration\nMario Bianchi,mario.bianchi@cliente.it,120'}
+          />
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowMapping((v) => !v)} disabled={busy}>
+            {showMapping ? 'Nascondi mappatura colonne' : 'Mappatura colonne (avanzato)'}
+          </button>
+        </div>
+
+        {showMapping && (
+          <div style={{ border: '1px dashed var(--line-strong)', borderRadius: 'var(--r-lg)', padding: 16, marginBottom: 14 }}>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+              Indica il nome esatto della colonna del CSV per ciascun campo (sovrascrive il
+              riconoscimento automatico). I campi con * sono obbligatori.
+            </div>
+            {field('nome', 'Nome', true)}
+            {field('email', 'Email', true)}
+            {field('durata', 'Durata', true)}
+            {field('join', 'Ingresso (join)', false)}
+            {field('leave', 'Uscita (leave)', false)}
+          </div>
+        )}
+
+        <button type="submit" className="btn" disabled={busy || !csv.trim()}>
+          {busy ? 'Importo…' : 'Importa CSV'}
         </button>
       </div>
-
-      {showMapping && (
-        <div style={{ border: '1px dashed var(--border)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-          <div className="muted" style={{ fontSize: '0.85em', marginBottom: 8 }}>
-            Indica il nome esatto della colonna del CSV per ciascun campo (sovrascrive
-            il riconoscimento automatico). I campi con * sono obbligatori.
-          </div>
-          {field('nome', 'Nome', true)}
-          {field('email', 'Email', true)}
-          {field('durata', 'Durata', true)}
-          {field('join', 'Ingresso (join)', false)}
-          {field('leave', 'Uscita (leave)', false)}
-        </div>
-      )}
-
-      <button type="submit" className="btn" disabled={busy || !csv.trim()}>
-        {busy ? 'Importo…' : 'Importa CSV'}
-      </button>
     </form>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { EdizioneConCorso, SessioneModalita, VcsPiattaforma } from '@/lib/db-types';
+import { Icon } from '@/components/admin/Atlante';
 
 export function NewSessioneForm({ edizioni }: { edizioni: EdizioneConCorso[] }) {
   const router = useRouter();
@@ -47,99 +48,87 @@ export function NewSessioneForm({ edizioni }: { edizioni: EdizioneConCorso[] }) 
 
   return (
     <form className="card" onSubmit={submit}>
-      <h3 style={{ marginTop: 0 }}>Pianifica una sessione</h3>
-      {error && <div className="alert">{error}</div>}
+      <div className="card__head">
+        <div className="section-step"><span className="step-num"><Icon name="plus" style={{ width: 14, height: 14 }} /></span><h3>Pianifica una sessione</h3></div>
+      </div>
+      <div className="card__body">
+        {error && (
+          <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>
+        )}
 
-      {edizioni.length === 0 ? (
-        <div className="muted">
-          Nessuna Edizione disponibile: crea prima un Corso con un&apos;Edizione in{' '}
-          <a href="/admin/corsi">Corsi</a>.
-        </div>
-      ) : (
-        <>
-          <div className="form-row">
-            <label htmlFor="ediz">Edizione</label>
-            <select
-              id="ediz"
-              value={edizioneId}
-              onChange={(e) => setEdizioneId(e.target.value)}
-              disabled={busy}
-              required
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}
-            >
-              <option value="">— scegli —</option>
-              {edizioni.map((ed) => (
-                <option key={ed.id} value={ed.id}>
-                  {ed.corso?.titolo ?? '(corso?)'} · {ed.codice}
-                </option>
-              ))}
-            </select>
+        {edizioni.length === 0 ? (
+          <div className="empty">
+            <Icon name="calendar" className="empty__icon" />
+            <div className="empty__t">Nessuna edizione disponibile</div>
+            <div className="empty__s">Crea prima un corso con un&apos;edizione per poter pianificare una sessione.</div>
+            <div className="empty__action"><a className="btn" href="/admin/corsi">Vai ai corsi</a></div>
           </div>
-
-          <div className="form-row">
-            <label htmlFor="tit">Titolo</label>
-            <input id="tit" type="text" value={titolo} onChange={(e) => setTitolo(e.target.value)} disabled={busy} placeholder="es. Webinar Modulo 1" required />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-row">
-              <label htmlFor="mod">Modalità</label>
-              <select
-                id="mod"
-                value={modalita}
-                onChange={(e) => setModalita(e.target.value as SessioneModalita)}
-                disabled={busy}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}
-              >
-                <option value="vcs">VCS (videoconferenza)</option>
-                <option value="aula">Aula</option>
-              </select>
-            </div>
-            {modalita === 'vcs' && (
-              <div className="form-row">
-                <label htmlFor="piat">Piattaforma VCS</label>
-                <select
-                  id="piat"
-                  value={piattaforma}
-                  onChange={(e) => setPiattaforma(e.target.value as VcsPiattaforma)}
-                  disabled={busy}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }}
-                >
-                  <option value="teams">Microsoft Teams</option>
-                  <option value="zoom">Zoom</option>
+        ) : (
+          <>
+            <div className="grid-2">
+              <div className="field">
+                <label>Edizione</label>
+                <select className="select" value={edizioneId} onChange={(e) => setEdizioneId(e.target.value)} disabled={busy} required>
+                  <option value="">— scegli —</option>
+                  {edizioni.map((ed) => (
+                    <option key={ed.id} value={ed.id}>{ed.corso?.titolo ?? '(corso?)'} · {ed.codice}</option>
+                  ))}
                 </select>
               </div>
+              <div className="field">
+                <label>Titolo</label>
+                <input className="input" value={titolo} onChange={(e) => setTitolo(e.target.value)} disabled={busy} placeholder="es. Webinar Modulo 1" required />
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="field">
+                <label>Modalità</label>
+                <select className="select" value={modalita} onChange={(e) => setModalita(e.target.value as SessioneModalita)} disabled={busy}>
+                  <option value="vcs">Webinar (videoconferenza)</option>
+                  <option value="aula">Aula</option>
+                </select>
+              </div>
+              {modalita === 'vcs' && (
+                <div className="field">
+                  <label>Piattaforma</label>
+                  <select className="select" value={piattaforma} onChange={(e) => setPiattaforma(e.target.value as VcsPiattaforma)} disabled={busy}>
+                    <option value="teams">Microsoft Teams</option>
+                    <option value="zoom">Zoom</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {modalita === 'vcs' && (
+              <div className="field">
+                <label>ID riunione (per l&apos;import automatico via API)</label>
+                <input className="input" value={meetingId} onChange={(e) => setMeetingId(e.target.value)} disabled={busy} placeholder="es. meeting id Teams" />
+              </div>
             )}
-          </div>
 
-          {modalita === 'vcs' && (
-            <div className="form-row">
-              <label htmlFor="meet">ID riunione VCS (per l&apos;import automatico via API, Task 6)</label>
-              <input id="meet" type="text" value={meetingId} onChange={(e) => setMeetingId(e.target.value)} disabled={busy} placeholder="es. meeting id Teams" />
+            <div className="grid-2">
+              <div className="field">
+                <label>Data e ora</label>
+                <input className="input" type="datetime-local" value={dataOra} onChange={(e) => setDataOra(e.target.value)} disabled={busy} />
+              </div>
+              <div className="field">
+                <label>Durata (minuti)</label>
+                <input className="input" type="number" min={0} value={durata} onChange={(e) => setDurata(e.target.value)} disabled={busy} placeholder="90" />
+              </div>
             </div>
-          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-row">
-              <label htmlFor="data">Data e ora</label>
-              <input id="data" type="datetime-local" value={dataOra} onChange={(e) => setDataOra(e.target.value)} disabled={busy} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }} />
+            <div className="field__hint" style={{ marginBottom: 14 }}>
+              Il docente (incarico) è opzionale e si assegna dopo: una sessione senza docente è
+              comunque pianificabile.
             </div>
-            <div className="form-row">
-              <label htmlFor="dur">Durata (minuti)</label>
-              <input id="dur" type="number" min={0} value={durata} onChange={(e) => setDurata(e.target.value)} disabled={busy} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)' }} />
-            </div>
-          </div>
 
-          <div className="muted" style={{ fontSize: '0.85em', marginBottom: 8 }}>
-            Il docente (incarico) è opzionale e si assegna dopo: una sessione senza
-            docente è comunque pianificabile (D30).
-          </div>
-
-          <button type="submit" className="btn" disabled={busy || !edizioneId}>
-            {busy ? 'Creo…' : 'Pianifica sessione'}
-          </button>
-        </>
-      )}
+            <button type="submit" className="btn" disabled={busy || !edizioneId}>
+              {busy ? 'Creo…' : 'Pianifica sessione'}
+            </button>
+          </>
+        )}
+      </div>
     </form>
   );
 }
