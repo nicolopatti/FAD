@@ -1,0 +1,65 @@
+name: keepalive-supabase
+
+# Tiene "sveglio" il progetto Supabase free `fad-fase-1`.
+# Supabase mette in pausa i progetti del piano free dopo ~7 giorni senza
+# attivita'. Questo job manda periodicamente una richiesta REST al progetto,
+# cosi' il contatore di inattivita' non arriva mai alla soglia che fa scattare
+# la pausa automatica.
+#
+# IMPORTANTE: i workflow schedulati (`on: schedule`) girano SOLO se il file e'
+# presente sul branch di DEFAULT del repo (main). Finche' resta solo su un
+# feature branch il cron NON parte. Va quindi portato su main per attivarsi.
+#
+# Modalita' identica a quella usata sul progetto `acli-gestionale`: ping esterno
+# schedulato, nessun oggetto creato nel database.
+
+on:
+  schedule:
+    # Ogni 2 giorni alle 05:37 UTC. Il minuto "dispari" evita la congestione dei
+    # cron all'ora tonda (quando GitHub puo' ritardare/saltare le run). 2 giorni
+    # danno ampio margine rispetto ai 7 della soglia di pausa.
+    - cron: '37 5 */2 * *'
+  workflow_dispatch: {}   # permette anche l'esecuzione manuale dalla tab Actions
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive-supabase
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: ping Supabase REST
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Valori PUBBLICI: l'URL del progetto e la anon key (chiave pensata per
+      # stare nel browser, protetta da RLS lato DB). Nessun segreto qui dentro.
+      # Se la anon key venisse ruotata, aggiornare questo valore (oppure spostarlo
+      # in un repo variable/secret e referenziarlo con ${{ ... }}).
+      SUPABASE_URL: https://eqtiyqoxwgnerbmdkqff.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdGl5cW94d2duZXJibWRrcWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzOTE1NDksImV4cCI6MjA5NDk2NzU0OX0.fTfbtv9t3InpIcWtoyTgfaG550SALiwj45-_gRpNM_I
+    steps:
+      - name: Ping PostgREST (registra attivita' sul progetto)
+        run: |
+          set -uo pipefail
+          url="$SUPABASE_URL/rest/v1/tenant?select=id&limit=1"
+          ok=0
+          code=000
+          for attempt in 1 2 3; do
+            code=$(curl -sS -m 30 -o /tmp/resp -w '%{http_code}' \
+              "$url" \
+              -H "apikey: $SUPABASE_ANON_KEY" \
+              -H "Authorization: Bearer $SUPABASE_ANON_KEY") || true
+            echo "Tentativo $attempt: HTTP ${code:-?}"
+            case "${code:-}" in
+              2*) ok=1; break ;;
+            esac
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 5)) || true
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::Ping keepalive fallito (ultimo HTTP ${code:-?}). Body: $(cat /tmp/resp 2>/dev/null || true)"
+            exit 1
+          fi
+          echo "Keepalive OK (HTTP $code) - attivita' registrata sul progetto Supabase fad-fase-1."

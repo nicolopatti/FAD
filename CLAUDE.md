@@ -8,6 +8,25 @@
 > mandato) — e in caso di conflitto `piattaforma-elearning-stato-progetto-v8.md`
 > (non in repo) con le decisioni D1–D37.
 
+## Keep-alive Supabase — anti-pausa free tier (2026-06-06)
+
+Supabase mette in pausa i progetti del piano free dopo ~7 giorni di inattività
+(mail di avviso ricevuta il 2026-06-06 per `fad-fase-1`). Mitigazione **identica a
+quella di `acli-gestionale`**: ping esterno schedulato, **nessun oggetto creato nel
+DB** (verificato: acli non ha pg_cron, né Edge Functions, né tabelle/funzioni
+keepalive → la modalità corretta è il ping esterno).
+- Workflow `.github/workflows/keepalive-supabase.yml`: ogni 2 giorni (+
+  `workflow_dispatch`) fa `GET /rest/v1/tenant?select=id&limit=1` con la anon key
+  (pubblica, protetta da RLS) → HTTP 200 + query Postgres reale = attività
+  registrata. Nessun segreto nel repo (URL + anon key sono valori pubblici inline).
+- **Deve stare su `main`**: i workflow `on: schedule` girano solo dal branch di
+  default. Finché il file è solo su un feature branch, il cron **non parte**.
+- Mitigazione immediata già fatta in questa sessione: una query MCP su `fad-fase-1`
+  (count su `evento`/`persona`/`corso`) ha resettato il contatore al 2026-06-06.
+- Caveat GitHub Actions: i cron schedulati vengono disabilitati dopo 60 giorni
+  senza commit sul repo, e possono slittare sotto carico (per questo si pinga ogni
+  2 giorni, non ogni 7).
+
 ## UI — Restyling area amministratore + import in blocco (2026-05-31)
 
 Sessione di **restyling UI dell'area admin** (tema "Atlante") + **due nuove
