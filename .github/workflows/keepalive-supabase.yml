@@ -20,6 +20,12 @@ on:
     # danno ampio margine rispetto ai 7 della soglia di pausa.
     - cron: '37 5 */2 * *'
   workflow_dispatch: {}   # permette anche l'esecuzione manuale dalla tab Actions
+  push:
+    # Smoke-test: gira anche quando si modifica QUESTO file, cosi' ogni modifica
+    # al keepalive viene validata subito con una run reale (utile quando non si
+    # puo' usare workflow_dispatch via API). Non si attiva sugli altri push.
+    paths:
+      - '.github/workflows/keepalive-supabase.yml'
 
 permissions:
   contents: read

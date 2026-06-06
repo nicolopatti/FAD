@@ -16,7 +16,8 @@ quella di `acli-gestionale`**: ping esterno schedulato, **nessun oggetto creato 
 DB** (verificato: acli non ha pg_cron, né Edge Functions, né tabelle/funzioni
 keepalive → la modalità corretta è il ping esterno).
 - Workflow `.github/workflows/keepalive-supabase.yml`: ogni 2 giorni (+
-  `workflow_dispatch`) fa `GET /rest/v1/tenant?select=id&limit=1` con la anon key
+  `workflow_dispatch`, più push sul file stesso come smoke-test) fa
+  `GET /rest/v1/tenant?select=id&limit=1` con la anon key
   (pubblica, protetta da RLS) → HTTP 200 + query Postgres reale = attività
   registrata. Nessun segreto nel repo (URL + anon key sono valori pubblici inline).
 - **Deve stare su `main`**: i workflow `on: schedule` girano solo dal branch di
