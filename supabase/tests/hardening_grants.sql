@@ -1,5 +1,5 @@
 -- Hardening Tappa 1 (2026-10-19) — verifica dei grant e delle guardie dopo la
--- migration 20261019000001_hardening_grants.sql.
+-- migration 20261019000001_hardening_grants.sql (+ …000002 per i default privileges).
 --   • audit_append NON eseguibile da anon/authenticated, SÌ da service_role;
 --   • le altre funzioni SECURITY DEFINER e trigger non eseguibili da anon;
 --   • search_path fissato sulle 7 funzioni segnalate dall'advisor;
@@ -66,8 +66,8 @@ select throws_ok(
        'learning_object','10102222-1010-1010-1010-101010101010','{}'::jsonb) $$,
   '42501', null, '8 il discente non può chiamare audit_append direttamente');
 select lives_ok(
-  $$ select * from public.audit_verify_chain('00000000-0000-0000-0000-000000000000'::uuid) $$,
-  '9 audit_verify_chain resta chiamabile da authenticated');
+  $$ select * from public.audit_verify_chain(public.current_stream_id()) $$,
+  '9 audit_verify_chain (sul proprio stream) resta chiamabile da authenticated');
 select is((select count(*) from public.persona), 1::bigint,
   '10 policy persona: il discente vede solo sé stesso');
 reset role;

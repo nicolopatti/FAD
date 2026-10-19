@@ -36,7 +36,7 @@ dopo verifica in transazione+rollback con 9 check):
   functions from anon` → le funzioni future non nascono esposte.
 - `search_path` fissato sulle 7 funzioni segnalate (advisor 0011); 8 indici FK
   (advisor 0001); policy `persona_read_self_or_auditor` con `(select auth.uid())`
-  (advisor 0003) via `ALTER POLICY`.
+  (advisor 0003) via `ALTER POLICY`. Seconda migration `…000002`: `alter default privileges … revoke execute on functions from public` (anon è membro di PUBLIC: senza questa, una funzione nuova nasceva ancora eseguibile da anon).
 - Test: `supabase/tests/hardening_grants.sql` (pgTAP 14, JWT simulati).
 
 **Conseguenza applicativa:** `appendEvent(input)` in `src/lib/audit.ts` **non prende
