@@ -56,7 +56,10 @@ select is(
 --    (chi aggiunge una funzione deve revocare EXECUTE ad anon nella migration)
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'EXECUTE')),
+   where n.nspname = 'public' and p.prokind = 'f'
+     and has_function_privilege('anon', p.oid, 'EXECUTE')
+     -- escluse le funzioni che appartengono a estensioni (pgtap installato dal test stesso)
+     and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')),
   0::bigint, '7 nessuna funzione di public eseguibile da anon');
 
 -- 6) discente autenticato
