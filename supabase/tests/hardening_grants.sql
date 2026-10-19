@@ -1,5 +1,5 @@
 -- Hardening Tappa 1 (2026-10-19) — verifica dei grant e delle guardie dopo la
--- migration 20261019000001_hardening_grants.sql (+ …000002 per i default privileges).
+-- migration 20261019000001_hardening_grants.sql (+ …000002, …000003).
 --   • audit_append NON eseguibile da anon/authenticated, SÌ da service_role;
 --   • le altre funzioni SECURITY DEFINER e trigger non eseguibili da anon;
 --   • search_path fissato sulle 7 funzioni segnalate dall'advisor;
@@ -52,10 +52,12 @@ select is(
     'report_fondo_piano_idx','grezzo_importato_da_idx','sessione_incarico_idx','struttura_lo_idx')),
   8::bigint, '6 otto indici sulle chiavi esterne');
 
--- 5) privilegi di default: le funzioni nuove non ricevono EXECUTE per anon
-create function public.__tmp_hardening_probe() returns int language sql as $$ select 1 $$;
-select ok(not has_function_privilege('anon','public.__tmp_hardening_probe()','EXECUTE'),
-  '7 una funzione nuova non è eseguibile da anon (default privileges)');
+-- 5) invariante: NESSUNA funzione dello schema public è eseguibile da anon
+--    (chi aggiunge una funzione deve revocare EXECUTE ad anon nella migration)
+select is(
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'EXECUTE')),
+  0::bigint, '7 nessuna funzione di public eseguibile da anon');
 
 -- 6) discente autenticato
 set local role authenticated;

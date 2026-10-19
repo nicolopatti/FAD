@@ -6,5 +6,13 @@
 -- nascono eseguibili solo da authenticated e service_role (i default privileges
 -- espliciti di Supabase restano); l'accesso per anon va concesso a mano quando
 -- serve davvero.
+--
+-- NOTA (verificato dopo l'apply): i default privileges PER SCHEMA si sommano a
+-- quelli globali e NON possono togliere ciò che il default built-in concede
+-- (EXECUTE a PUBLIC): una funzione nuova nasce ancora con `=X/postgres`. Questa
+-- migration resta applicata ma è, in pratica, un no-op. L'invariante "nessuna
+-- funzione di public eseguibile da anon" è garantito dalla regola di metodo
+-- (revoca esplicita in ogni migration che crea funzioni) e dal test pgTAP
+-- hardening_grants.sql #7, che enumera tutte le funzioni dello schema.
 alter default privileges for role postgres in schema public
   revoke execute on functions from public;

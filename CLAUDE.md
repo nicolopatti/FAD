@@ -36,7 +36,7 @@ dopo verifica in transazione+rollback con 9 check):
   functions from anon` → le funzioni future non nascono esposte.
 - `search_path` fissato sulle 7 funzioni segnalate (advisor 0011); 8 indici FK
   (advisor 0001); policy `persona_read_self_or_auditor` con `(select auth.uid())`
-  (advisor 0003) via `ALTER POLICY`. Seconda migration `…000002`: `alter default privileges … revoke execute on functions from public` (anon è membro di PUBLIC: senza questa, una funzione nuova nasceva ancora eseguibile da anon).
+  (advisor 0003) via `ALTER POLICY`. Migration `…000002` (default privileges senza PUBLIC): applicata ma in pratica **no-op** — i default per schema non tolgono l'EXECUTE a PUBLIC del default built-in, una funzione nuova nasce comunque con `=X`. Quindi: **ogni migration che crea una funzione in `public` deve revocare EXECUTE ad anon/PUBLIC** (regola già in vigore) e il test #7 di `hardening_grants.sql` enumera tutte le funzioni dello schema e pretende **zero** eseguibili da anon. Migration `…000003`: revocati anche i 4 helper di hashing (`audit_canonical`, `audit_genesis_hash`, `grezzo_content_hash`, `report_fondo_content_hash`) per rendere vero l'invariante.
 - Test: `supabase/tests/hardening_grants.sql` (pgTAP 14, JWT simulati).
 
 **Conseguenza applicativa:** `appendEvent(input)` in `src/lib/audit.ts` **non prende
