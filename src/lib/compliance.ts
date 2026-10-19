@@ -54,26 +54,22 @@ export async function computeProgressoForIscrizione(
   supabase: SupabaseClient,
   iscrizioneId: string,
 ): Promise<ProgressoIscrizione | null> {
+  // Iscrizione → Edizione → Corso in UNA query (prima erano 3 round trip).
+  type IscrEdCorso = {
+    id: string;
+    persona_id: string;
+    edizione_id: string;
+    edizione: { id: string; corso_id: string; corso: { id: string; titolo: string; sblocco_sequenziale: boolean } | null } | null;
+  };
   const { data: iscrizione, error: errIscr } = await supabase
     .from('iscrizione')
-    .select('id, persona_id, edizione_id')
+    .select('id, persona_id, edizione_id, edizione:edizione_id ( id, corso_id, corso:corso_id ( id, titolo, sblocco_sequenziale ) )')
     .eq('id', iscrizioneId)
-    .single();
+    .returns<IscrEdCorso[]>()
+    .maybeSingle();
   if (errIscr || !iscrizione) return null;
-
-  const { data: edizione, error: errEd } = await supabase
-    .from('edizione')
-    .select('id, corso_id')
-    .eq('id', iscrizione.edizione_id)
-    .single();
-  if (errEd || !edizione) return null;
-
-  const { data: corso, error: errCorso } = await supabase
-    .from('corso')
-    .select('id, titolo, sblocco_sequenziale')
-    .eq('id', edizione.corso_id)
-    .single();
-  if (errCorso || !corso) return null;
+  const corso = iscrizione.edizione?.corso ?? null;
+  if (!corso) return null;
 
   const { data: struttura, error: errStr } = await supabase
     .from('struttura_corso')
@@ -101,8 +97,11 @@ export async function computeProgressoForIscrizione(
 
   const loIds = items.map((i) => i.learning_object_id);
 
-  // Eventi di completamento per la persona, sugli LO di questo corso.
-  // Filtro sull'event_type "video.ended" perché in Fase 1 è la sola regola attiva.
+  // Eventi di completamento di QUESTA persona sugli LO di questo corso.
+  // Il filtro sull'attore è in SQL (indice evento_actor_persona_idx, migration
+  // 20261019000004): prima si leggevano gli eventi di tutti i discenti del corso
+  // e si filtrava in JavaScript — costo proporzionale agli iscritti a ogni
+  // richiesta del player.
   const completionTypes = Array.from(
     new Set(items.map((i) => COMPLETION_EVENT_FOR_RULE[i.regola_completamento.tipo])),
   ).filter(Boolean);
@@ -117,10 +116,12 @@ export async function computeProgressoForIscrizione(
     const { data: events } = await supabase
       .from('evento')
       .select('subject_id, event_type, actor')
+      .eq('actor->>persona_id', iscrizione.persona_id)
       .in('event_type', completionTypes)
       .in('subject_id', loIds)
       .returns<EventoCompletamento[]>();
     for (const e of events ?? []) {
+      // Controllo difensivo: il filtro SQL è già sull'attore.
       if (e.actor?.persona_id === iscrizione.persona_id && e.subject_id) {
         completedLoIds.add(e.subject_id);
       }
@@ -218,25 +219,20 @@ export async function computeFrequenzaForIscrizione(
   supabase: SupabaseClient,
   iscrizioneId: string,
 ): Promise<FrequenzaIscrizione | null> {
+  // Iscrizione → Edizione → Corso in UNA query (prima erano 3 round trip).
+  type IscrEdSoglia = {
+    id: string;
+    edizione_id: string;
+    edizione: { id: string; corso: { id: string; soglia_frequenza_percentuale: number | string | null } | null } | null;
+  };
   const { data: iscrizione } = await supabase
     .from('iscrizione')
-    .select('id, edizione_id')
+    .select('id, edizione_id, edizione:edizione_id ( id, corso:corso_id ( id, soglia_frequenza_percentuale ) )')
     .eq('id', iscrizioneId)
-    .single();
+    .returns<IscrEdSoglia[]>()
+    .maybeSingle();
   if (!iscrizione) return null;
-
-  const { data: edizione } = await supabase
-    .from('edizione')
-    .select('id, corso_id')
-    .eq('id', iscrizione.edizione_id)
-    .single();
-  if (!edizione) return null;
-
-  const { data: corso } = await supabase
-    .from('corso')
-    .select('id, soglia_frequenza_percentuale')
-    .eq('id', edizione.corso_id)
-    .single();
+  const corso = iscrizione.edizione?.corso ?? null;
 
   // Sessioni (non annullate) dell'Edizione → minuti pianificati per sessione.
   const { data: sessioni } = await supabase
@@ -268,7 +264,7 @@ export async function computeFrequenzaForIscrizione(
       'presenza_inserita_manualmente',
       'presenza_corretta_manualmente',
     ])
-    .eq('payload->>iscrizione_id', iscrizioneId)
+    .eq('payload->>iscrizione_id', iscrizioneId) // indice evento_payload_iscrizione_idx
     .order('seq', { ascending: true })
     .returns<PresEvt[]>();
 

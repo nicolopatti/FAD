@@ -57,6 +57,24 @@ conferma che non arriva). Per DDL usare `apply_migration`; nei test in rollback
 evitare `DROP` (es. `ALTER POLICY` invece di `DROP POLICY` + `CREATE`).
 `m1a_audit_log.sql` contiene DROP → non eseguibile via `execute_sql`.
 
+**Blocco B, prima fetta (stessa sessione).** Migration `20261019000004_evento_indici_persona_iscrizione.sql`
+(**applicata sul live**): due indici di espressione su `evento` —
+`((actor->>'persona_id'), event_type, subject_id)` e `((payload->>'iscrizione_id'),
+event_type)` — nessuna colonna nuova (hash/canonical invariati). `compliance.ts`:
+il filtro sull'attore è **in SQL** (`.eq('actor->>persona_id', …)`, prima leggeva gli
+eventi di tutti i discenti del corso e filtrava in JS) e i 3 lookup
+iscrizione→edizione→corso sono una query sola con join (in entrambe le funzioni).
+EXPLAIN sul live: Index Scan su entrambi gli indici. `/audit/log` è **paginato**
+(200 per pagina, `?pagina=N`, default = ultima pagina; prima caricava tutto lo
+stream). Restano del Blocco B: #2 report auditor in una funzione SQL (oggi
+`Promise.all` con ~10 query per iscrizione), #4 politica eventi del player, #5 RPC
+unica per gli eventi video, #7 policy multiple, #8 tenant da env.
+
+**Autorizzazione di sessione (2026-10-19):** l'utente ha autorizzato
+esplicitamente tutte le modifiche senza chiedere conferma, incluso il push su
+`main` (fatto: `main` = branch `claude/hardening-tappa1`, CI verde). Vale per
+questa sessione.
+
 Da fare subito dopo (Tappa 1): backup del DB (dal tuo account: `supabase db dump`
 o Dashboard); attivare "leaked password protection" in Auth; piani Pro; poi Blocco B.
 

@@ -5,7 +5,13 @@ import type { EventoRow } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AuditLogPage() {
+const PAGE_SIZE = 200;
+
+export default async function AuditLogPage({
+  searchParams,
+}: {
+  searchParams?: { pagina?: string };
+}) {
   await requireAuditor();
   const supabase = createSupabaseServerClient();
 
@@ -13,12 +19,37 @@ export default async function AuditLogPage() {
   const { data: streamRpc } = await supabase.rpc('current_stream_id');
   const streamId = typeof streamRpc === 'string' ? streamRpc : null;
 
-  // Eventi dello stream.
+  // Eventi dello stream, PAGINATI per seq (200 per pagina; default: l'ultima
+  // pagina, cioè gli eventi più recenti). Prima la pagina caricava l'intero
+  // stream: a centinaia di migliaia di eventi non reggeva (Blocco B #3).
+  const { count } = await supabase
+    .from('evento')
+    .select('id', { count: 'exact', head: true });
+  const totale = count ?? 0;
+  const pagine = Math.max(1, Math.ceil(totale / PAGE_SIZE));
+  const richiesta = Number.parseInt(searchParams?.pagina ?? '', 10);
+  const pagina = Number.isFinite(richiesta) && richiesta >= 1 ? Math.min(richiesta, pagine) : pagine;
+  const from = (pagina - 1) * PAGE_SIZE;
   const { data: eventi } = await supabase
     .from('evento')
     .select('id, seq, event_type, occurred_at, actor, subject_type, subject_id, payload, prev_hash, hash')
     .order('seq', { ascending: true })
+    .range(from, from + PAGE_SIZE - 1)
     .returns<EventoRow[]>();
+  const primoSeq = eventi?.[0]?.seq;
+  const ultimoSeq = eventi?.[eventi.length - 1]?.seq;
+  const paginatore = (
+    <nav className="muted" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span>
+        Pagina {pagina} di {pagine} · {totale} eventi
+        {primoSeq != null && ultimoSeq != null ? ` · seq ${primoSeq}–${ultimoSeq}` : ''}
+      </span>
+      {pagina > 1 && <a href={`?pagina=1`}>« prima</a>}
+      {pagina > 1 && <a href={`?pagina=${pagina - 1}`}>‹ precedenti</a>}
+      {pagina < pagine && <a href={`?pagina=${pagina + 1}`}>successivi ›</a>}
+      {pagina < pagine && <a href={`?pagina=${pagine}`}>ultima »</a>}
+    </nav>
+  );
 
   // Anagrafica per la risoluzione dei pseudonimi nella cronologia leggibile.
   const personaIds = Array.from(
@@ -67,6 +98,7 @@ export default async function AuditLogPage() {
 
       <section className="card">
         <h2>Cronologia leggibile</h2>
+        {paginatore}
         <table>
           <thead>
             <tr>
@@ -121,6 +153,7 @@ export default async function AuditLogPage() {
           <h2 style={{ margin: 0 }}>Stream grezzo (pseudonimo)</h2>
           {streamId && <ChainVerifyButton streamId={streamId} />}
         </div>
+        {paginatore}
         <table>
           <thead>
             <tr>
