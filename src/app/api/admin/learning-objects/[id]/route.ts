@@ -41,7 +41,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: session.tenantId,
     eventType: 'learning_object.updated',
     actor: { persona_id: session.personaId, type: 'persona' },

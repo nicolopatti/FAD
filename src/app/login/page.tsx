@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('discente@fad.local');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -102,36 +102,6 @@ export default function LoginPage() {
               {busy ? 'Accesso in corso…' : 'Entra in piattaforma'}
             </button>
           </form>
-
-          <div
-            style={{
-              marginTop: 36,
-              padding: '18px 20px',
-              background: 'var(--surface-2)',
-              borderRadius: 12,
-              border: '1px solid var(--border)',
-            }}
-          >
-            <div className="eyebrow" style={{ marginBottom: 10, fontSize: 10 }}>
-              Credenziali demo
-            </div>
-            <div className="mono" style={{ fontSize: 12.5, lineHeight: 2, color: 'var(--ink-2)' }}>
-              <button type="button" className="login-demo" onClick={() => { setEmail('discente@fad.local'); setPassword('discente-pass-123'); }}>
-                discente@fad.local
-              </button>
-              <span style={{ color: 'var(--muted)' }}> · discente</span>
-              <br />
-              <button type="button" className="login-demo" onClick={() => { setEmail('auditor@fad.local'); setPassword('auditor-pass-123'); }}>
-                auditor@fad.local
-              </button>
-              <span style={{ color: 'var(--muted)' }}> · auditor</span>
-              <br />
-              <button type="button" className="login-demo" onClick={() => { setEmail('admin@fad.local'); setPassword('admin-pass-123'); }}>
-                admin@fad.local
-              </button>
-              <span style={{ color: 'var(--muted)' }}> · admin</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

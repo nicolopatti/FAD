@@ -18,7 +18,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const { error } = await supabase.from('iscrizione').delete().eq('id', params.id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: session.tenantId,
     eventType: 'iscrizione.removed',
     actor: { persona_id: session.personaId, type: 'persona' },

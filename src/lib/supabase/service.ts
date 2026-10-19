@@ -1,0 +1,22 @@
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+
+/**
+ * Client Supabase con la service role key. SOLO lato server (route handler,
+ * Server Component, script): la chiave bypassa le RLS e non deve mai
+ * raggiungere il browser. Oggi serve a un solo scopo: scrivere sul log
+ * (`audit_append` è eseguibile solo da `service_role`, migration
+ * 20261019000001). L'autorizzazione dell'operazione resta a carico del
+ * chiamante (requireSession / requireAdmin) PRIMA di arrivare qui.
+ */
+export function createSupabaseServiceClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY (o NEXT_PUBLIC_SUPABASE_URL) mancante: necessaria lato server per scrivere il log',
+    );
+  }
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}

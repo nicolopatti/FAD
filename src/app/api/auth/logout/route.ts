@@ -13,7 +13,7 @@ export async function POST() {
       .eq('auth_user_id', user.id)
       .single();
     if (persona) {
-      await appendEvent(supabase, {
+      await appendEvent({
         tenantId: persona.tenant_id,
         eventType: 'auth.logout',
         actor: { persona_id: persona.id, type: 'persona' },

@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
   // Evento di audit (no PII: titolo della sessione e meeting id non sono PII).
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: session.tenantId,
     eventType: 'sessione.created',
     actor: { persona_id: session.personaId, type: 'persona' },

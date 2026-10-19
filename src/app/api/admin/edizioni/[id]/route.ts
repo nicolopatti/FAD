@@ -53,7 +53,7 @@ export async function PATCH(
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: session.tenantId,
     eventType: 'edizione.updated',
     actor: { persona_id: session.personaId, type: 'persona' },

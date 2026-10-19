@@ -53,7 +53,7 @@ export async function PATCH(
   // Se l'unico cambiamento è la copertina, è un evento dedicato (avviene anche
   // a corso congelato: la copertina non è un campo strutturale).
   const onlyCover = Object.keys(updates).length === 1 && 'cover_path' in updates;
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: session.tenantId,
     eventType: onlyCover ? 'corso.cover_updated' : 'corso.updated',
     actor: { persona_id: session.personaId, type: 'persona' },

@@ -75,7 +75,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       if (loErr || !createdLo) { saltati.push({ titolo, motivo: loErr?.message ?? 'creazione LO fallita' }); continue; }
       loId = createdLo.id;
       byTitle.set(key, { id: createdLo.id, type: 'video' });
-      await appendEvent(supabase, {
+      await appendEvent({
         tenantId: session.tenantId,
         eventType: 'learning_object.created',
         actor: { persona_id: session.personaId, type: 'persona' },
@@ -107,7 +107,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   if (aggiunti > 0) {
-    await appendEvent(supabase, {
+    await appendEvent({
       tenantId: session.tenantId,
       eventType: 'struttura.imported',
       actor: { persona_id: session.personaId, type: 'persona' },

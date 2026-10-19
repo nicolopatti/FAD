@@ -16,7 +16,7 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: 'persona non trovata' }, { status: 404 });
   }
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: persona.tenant_id,
     eventType: 'auth.login',
     actor: { persona_id: persona.id, type: 'persona' },

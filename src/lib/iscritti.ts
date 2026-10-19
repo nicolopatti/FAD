@@ -86,7 +86,7 @@ export async function addIscritto(
     if (error) return { status: 'error', error: `persona: ${error.message}` };
     personaId = created.id as string;
     personaCreata = true;
-    await appendEvent(supabase, {
+    await appendEvent({
       tenantId: ctx.tenantId,
       eventType: 'persona.created',
       actor: { persona_id: ctx.personaId, type: 'persona' },
@@ -113,7 +113,7 @@ export async function addIscritto(
     .single();
   if (iscErr) return { status: 'error', error: `iscrizione: ${iscErr.message}` };
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: ctx.tenantId,
     eventType: 'iscrizione.created',
     actor: { persona_id: ctx.personaId, type: 'persona' },

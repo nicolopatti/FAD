@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: session.tenantId,
     eventType: 'learning_object.created',
     actor: { persona_id: session.personaId, type: 'persona' },

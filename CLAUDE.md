@@ -1,4 +1,4 @@
-# Stato del progetto FAD — Fase 4 (report fondi) — M4 verde a livello DB (handoff session-to-session)
+# Stato del progetto FAD — Fase 4 chiusa (M4 verde a livello DB) + hardening Tappa 1 in corso (handoff session-to-session)
 
 > Questo file è il primo da leggere all'inizio di ogni nuova sessione.
 > Riassume cosa è stato fatto, cosa resta, e come riprendere senza dover
@@ -7,6 +7,58 @@
 > (Fase 3, chiusa fino a M3a) e `docs/brief-fase-4.md` (Fase 4, **corrente** — è il
 > mandato) — e in caso di conflitto `piattaforma-elearning-stato-progetto-v8.md`
 > (non in repo) con le decisioni D1–D37.
+
+## Hardening Tappa 1 — grant, guardia audit_append, service role (2026-10-19)
+
+Ripresa dopo 4 mesi di fermo. **Il progetto Supabase era in pausa dal 2026-06-09**
+(il keepalive ogni 2 giorni non è bastato; il cron GitHub si è autodisabilitato il
+2026-08-07 per 60 giorni senza commit). Ripristinato via MCP `restore_project` il
+2026-10-19 fuori dalla finestra ufficiale di 90 giorni: dati integri (79 eventi,
+catena 0 problemi). **Senza piano Pro o ping giornaliero torna in pausa in ~7 giorni.**
+Piano di completamento (5 blocchi + roadmap) nel doc Claude "FAD — Piano di
+completamento" (artifact `13300d45-3520-4cfb-965f-7ad73a3fe042`).
+
+**Falla chiusa (Blocco A).** `audit_append` era eseguibile da `anon` e `authenticated`
+(privilegi di default di Supabase sulle funzioni di `public`: il `revoke … from
+public` della migration 000002 non li toglie) e non verificava il chiamante →
+chiunque con la anon key poteva appendere eventi a nome di chiunque; un discente
+poteva aggirare D26 chiamando la RPC. Migration
+`20261019000001_hardening_grants.sql` (**applicata sul live** in questa sessione,
+dopo verifica in transazione+rollback con 9 check):
+- `audit_append` eseguibile **solo da `service_role`** (+ proprietario); guardia
+  difensiva se `auth.uid()` non è NULL (tenant = chiamante; attore = chiamante salvo
+  admin). Le RPC SECURITY DEFINER di Fase 3/4 la chiamano ancora internamente
+  (girano come owner) — verificato con `presenza_inserisci_manuale` da admin JWT.
+- EXECUTE revocato ad `anon`/PUBLIC su `audit_verify_chain`, `current_*`,
+  `helper_corso_has_edizioni`, `reorder_struttura`, `is_admin`, `is_auditor`; alle
+  funzioni trigger anche ad `authenticated` (i trigger scattano comunque: verificato
+  freeze D22 sotto admin JWT). `alter default privileges … revoke execute on
+  functions from anon` → le funzioni future non nascono esposte.
+- `search_path` fissato sulle 7 funzioni segnalate (advisor 0011); 8 indici FK
+  (advisor 0001); policy `persona_read_self_or_auditor` con `(select auth.uid())`
+  (advisor 0003) via `ALTER POLICY`.
+- Test: `supabase/tests/hardening_grants.sql` (pgTAP 14, JWT simulati).
+
+**Conseguenza applicativa:** `appendEvent(input)` in `src/lib/audit.ts` **non prende
+più il client** e usa `createSupabaseServiceClient()` (`src/lib/supabase/service.ts`,
+service role, solo server). Tutte le 23 chiamate aggiornate. L'autorizzazione resta
+a monte (`requireSession`/`requireAdmin`). **Finché questo branch non è su `main`, il
+deploy Production NON riesce a scrivere eventi** (login/logout/video/documento
+restituiscono errore): la revoca è già attiva sul DB. `SUPABASE_SERVICE_ROLE_KEY`
+deve essere presente su Vercel (lo è, Production + Preview).
+
+Altri accorgimenti della sessione: rimossi i pulsanti con le credenziali demo dalla
+`/login` (TODO Fase 1 #5 chiuso; i 3 utenti demo esistono ancora nel DB); keepalive
+portato a **giornaliero** (palliativo: con Supabase Pro va rimosso).
+
+Trabocchetto nuovo (#13): **MCP `execute_sql` resta appeso 60 s e va in timeout su
+qualsiasi batch che contiene `DROP`** (lo tratta come distruttivo e attende una
+conferma che non arriva). Per DDL usare `apply_migration`; nei test in rollback
+evitare `DROP` (es. `ALTER POLICY` invece di `DROP POLICY` + `CREATE`).
+`m1a_audit_log.sql` contiene DROP → non eseguibile via `execute_sql`.
+
+Da fare subito dopo (Tappa 1): backup del DB (dal tuo account: `supabase db dump`
+o Dashboard); attivare "leaked password protection" in Auth; piani Pro; poi Blocco B.
 
 ## Keep-alive Supabase — anti-pausa free tier (2026-06-06)
 

@@ -15,10 +15,10 @@ name: keepalive-supabase
 
 on:
   schedule:
-    # Ogni 2 giorni alle 05:37 UTC. Il minuto "dispari" evita la congestione dei
+    # Ogni giorno alle 05:37 UTC (prima ogni 2 giorni: non è bastato, pausa il 2026-06-09). Il minuto "dispari" evita la congestione dei
     # cron all'ora tonda (quando GitHub puo' ritardare/saltare le run). 2 giorni
     # danno ampio margine rispetto ai 7 della soglia di pausa.
-    - cron: '37 5 */2 * *'
+    - cron: '37 5 * * *'
   workflow_dispatch: {}   # permette anche l'esecuzione manuale dalla tab Actions
   push:
     # Smoke-test: gira anche quando si modifica QUESTO file, cosi' ogni modifica

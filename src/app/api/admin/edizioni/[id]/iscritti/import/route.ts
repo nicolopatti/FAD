@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   if (creati > 0) {
-    await appendEvent(supabase, {
+    await appendEvent({
       tenantId: session.tenantId,
       eventType: 'iscrizione.imported',
       actor: { persona_id: session.personaId, type: 'persona' },

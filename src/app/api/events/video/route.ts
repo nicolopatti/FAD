@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     );
   }
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: persona.tenant_id,
     eventType,
     actor: { persona_id: persona.id, type: 'persona' },

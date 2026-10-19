@@ -33,7 +33,7 @@ export async function PATCH(
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: session.tenantId,
     eventType: 'struttura.updated',
     actor: { persona_id: session.personaId, type: 'persona' },
@@ -64,7 +64,7 @@ export async function DELETE(
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
-  await appendEvent(supabase, {
+  await appendEvent({
     tenantId: session.tenantId,
     eventType: 'struttura.removed',
     actor: { persona_id: session.personaId, type: 'persona' },
