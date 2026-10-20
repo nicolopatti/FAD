@@ -58,6 +58,10 @@ export default async function LearningObjectPage({ params }: { params: { edizion
   const corsoHref = `/corsi/${params.edizioneId}` as Route;
   const hrefDi = (loId: string) => `/corsi/${params.edizioneId}/lo/${loId}` as Route;
   const durata = durataLabel(item.lo_config as Record<string, unknown>);
+  // Nomi dei passi nei pulsanti: il test si chiama test, non "Lezione N".
+  const isQuiz = (i: { lo_type: string }) => i.lo_type === 'quiz';
+  const pulsante = (i: { lo_type: string; ordine: number }) => (isQuiz(i) ? 'Vai al test finale' : `Lezione ${i.ordine}`);
+  const nome = (i: { lo_type: string; ordine: number }) => (isQuiz(i) ? 'Il test finale' : `La lezione ${i.ordine}`);
 
   // D26: enforcement server-side. Se non sbloccato, l'accesso è negato.
   if (!item.sbloccato) {
@@ -66,10 +70,12 @@ export default async function LearningObjectPage({ params }: { params: { edizion
       <AppShell user={{ name: session.nome, email: session.email }} role="discente" wide>
         <Link href={corsoHref} className="back-link" style={{ marginBottom: 16 }}><Ico name="chevL" size={16} /> {prog.corso_titolo}</Link>
         <div className="panel" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <h1 style={{ fontSize: 'var(--text-xl)' }}>Questa lezione non è ancora aperta</h1>
-          <p className="page-lead" style={{ margin: 0, fontSize: 15 }}>Le lezioni si aprono una dopo l&apos;altra: completa prima quelle precedenti.</p>
+          <h1 style={{ fontSize: 'var(--text-xl)' }}>{isQuiz(item) ? 'Il test non è ancora aperto' : 'Questa lezione non è ancora aperta'}</h1>
+          <p className="page-lead" style={{ margin: 0, fontSize: 15 }}>
+            {isQuiz(item) ? 'Il test finale si apre quando hai completato tutte le lezioni.' : 'Le lezioni si aprono una dopo l’altra: completa prima quelle precedenti.'}
+          </p>
           {daFare && (
-            <div><Link className="btn" href={hrefDi(daFare.learning_object_id)}>Vai alla lezione {daFare.ordine} <Ico name="arrowR" size={14} /></Link></div>
+            <div><Link className="btn" href={hrefDi(daFare.learning_object_id)}>{isQuiz(daFare) ? 'Vai al test finale' : `Vai alla lezione ${daFare.ordine}`} <Ico name="arrowR" size={14} /></Link></div>
           )}
         </div>
       </AppShell>
@@ -77,7 +83,7 @@ export default async function LearningObjectPage({ params }: { params: { edizion
   }
 
   const nextHref = nextItem ? hrefDi(nextItem.learning_object_id) : undefined;
-  const nextLabel = nextItem ? (nextItem.sbloccato || item.completato ? `Lezione ${nextItem.ordine}` : `Lezione ${nextItem.ordine}`) : undefined;
+  const nextLabel = nextItem ? pulsante(nextItem) : undefined;
   const quizCfg = item.lo_type === 'quiz' ? configQuizDa(item.lo_config) : null;
   const domande = quizCfg && item.sbloccato ? await domandeDelTest(supabase, item.learning_object_id, quizCfg.ordine_casuale) : null;
   const metaQuiz = quizCfg && domande ? `${domande.length} domand${domande.length === 1 ? 'a' : 'e'} · soglia ${quizCfg.soglia_percentuale}%` : null;
@@ -140,12 +146,12 @@ export default async function LearningObjectPage({ params }: { params: { edizion
 
           <div className="lesson-nav">
             {prev ? (
-              <Link className="btn btn--secondary btn--sm" href={hrefDi(prev.learning_object_id)}><Ico name="chevL" size={14} /> Lezione {prev.ordine}</Link>
+              <Link className="btn btn--secondary btn--sm" href={hrefDi(prev.learning_object_id)}><Ico name="chevL" size={14} /> {isQuiz(prev) ? 'Test finale' : `Lezione ${prev.ordine}`}</Link>
             ) : <span />}
             {nextItem && (nextItem.sbloccato || item.completato) ? (
-              <Link className="btn btn--sm" href={hrefDi(nextItem.learning_object_id)}>Lezione {nextItem.ordine} <Ico name="chevR" size={14} /></Link>
+              <Link className="btn btn--sm" href={hrefDi(nextItem.learning_object_id)}>{pulsante(nextItem)} <Ico name="chevR" size={14} /></Link>
             ) : nextItem ? (
-              <span className="page-lead" style={{ alignSelf: 'center' }}>La lezione {nextItem.ordine} si apre al completamento di questa</span>
+              <span className="page-lead" style={{ alignSelf: 'center' }}>{nome(nextItem)} si apre al completamento di questa</span>
             ) : null}
           </div>
 
@@ -176,7 +182,7 @@ export default async function LearningObjectPage({ params }: { params: { edizion
                 const inner = (
                   <>
                     <span className="outline-row__icon">
-                      {lo.completato ? <Ico name="check" size={16} /> : !lo.sbloccato ? <Ico name="lock" size={14} /> : <span style={{ fontSize: 12, fontWeight: 600 }}>{i + 1}</span>}
+                      {lo.completato ? <Ico name="check" size={16} /> : !lo.sbloccato ? <Ico name="lock" size={14} /> : isQuiz(lo) ? <Ico name="quiz" size={15} /> : <span style={{ fontSize: 12, fontWeight: 600 }}>{i + 1}</span>}
                     </span>
                     <span className="outline-row__title">{lo.lo_titolo}</span>
                     <span className="outline-row__num">{active ? 'ora' : ''}</span>

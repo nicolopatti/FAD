@@ -23,6 +23,7 @@ export const ICON_PATHS: Record<string, string> = {
   eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
   doc2: 'M6 3h9l4 4v14H6zM9 12h6M9 16h6',
   cap: 'M12 3l9 4.5-9 4.5-9-4.5L12 3zM3 12l9 4.5 9-4.5',
+  quiz: 'M8 3h8v2H8zM6 5h12v16H6zM9 12l2 2 4-4M9 17h6',
   // voci dell'area admin (stile lineare coerente)
   dashboard: 'M4 4h6v8H4zM14 4h6v5h-6zM14 13h6v7h-6zM4 16h6v4H4z',
   corsi: 'M5 4h13v16H6a2 2 0 0 1-2-2V5z',

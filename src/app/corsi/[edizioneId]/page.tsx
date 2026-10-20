@@ -50,10 +50,10 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
       </Link>
 
       {prog.idonea ? (
-        /* Momento di chiusura: il corso è completato e l'idoneità è registrata. */
-        <section className="seal-panel" aria-labelledby="idoneita">
+        /* Momento di chiusura: il corso è completato e il risultato è registrato. */
+        <section className="seal-panel" aria-labelledby="completato">
           <div className="seal-panel__art">
-            <svg role="img" aria-label="Idoneità registrata" width="160" height="160" viewBox="0 0 160 160" fill="none">
+            <svg role="img" aria-label="Corso completato" width="160" height="160" viewBox="0 0 160 160" fill="none">
               <circle cx="80" cy="80" r="72" stroke="rgba(255,255,255,.12)" strokeWidth="2" />
               <circle className="ring" cx="80" cy="80" r="68" strokeWidth="3" strokeLinecap="round" transform="rotate(-90 80 80)" />
               <circle cx="80" cy="80" r="54" fill="rgba(124,240,195,.1)" />
@@ -62,9 +62,9 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
           </div>
           <div className="seal-panel__body">
             <div className="seal-panel__kicker">Corso completato</div>
-            <h1 id="idoneita" className="seal-panel__title">Hai ottenuto l&apos;idoneità per &quot;{prog.corso_titolo}&quot;</h1>
+            <h1 id="completato" className="seal-panel__title">Hai completato &quot;{prog.corso_titolo}&quot;</h1>
             <p className="seal-panel__text">
-              {idoneaIl ? `Registrata il ${fmtDataOra(idoneaIl)}. ` : ''}
+              {idoneaIl ? `Completato il ${fmtDataOra(idoneaIl)}. ` : ''}
               Il tuo percorso è stato registrato in modo che nessuno possa modificarlo, e il tuo ente può verificarlo in qualsiasi momento.
             </p>
             <div className="seal-panel__meta">
@@ -81,7 +81,7 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
             {next && (
               <div className="course-hero__actions">
                 <Link className="btn btn--lg" style={{ background: '#fff', color: 'var(--ink)' }} href={`/corsi/${params.edizioneId}/lo/${next.learning_object_id}`}>
-                  {prog.completati === 0 ? 'Inizia il corso' : `Riprendi: lezione ${next.ordine}`}
+                  {next.lo_type === 'quiz' ? 'Vai al test finale' : prog.completati === 0 ? 'Inizia il corso' : `Riprendi: lezione ${next.ordine}`}
                   <Ico name="arrowR" size={16} />
                 </Link>
               </div>
@@ -124,7 +124,7 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
               return (
                 <div key={it.struttura_id} className={`lo-row ${cls}`}>
                   <div className="lo-row__index">
-                    {it.completato ? <Ico name="check" size={16} /> : !it.sbloccato ? <Ico name="lock" size={14} /> : String(it.ordine)}
+                    {it.completato ? <Ico name="check" size={16} /> : !it.sbloccato ? <Ico name="lock" size={14} /> : it.lo_type === 'quiz' ? <Ico name="quiz" size={16} /> : String(it.ordine)}
                   </div>
                   <div>
                     <div className="lo-row__title">{it.lo_titolo}</div>
@@ -174,7 +174,7 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
               {prog.obbligatori_totale !== prog.totale && (
                 <div className="row row--between"><span className="page-lead">Obbligatorie</span><strong>{prog.obbligatori_completati} di {prog.obbligatori_totale}</strong></div>
               )}
-              <div className="row row--between"><span className="page-lead">Idoneità</span><strong className={prog.idonea ? 'status-ok' : ''}>{prog.idonea ? 'Ottenuta' : 'Non ancora'}</strong></div>
+              <div className="row row--between"><span className="page-lead">Stato</span><strong className={prog.idonea ? 'status-ok' : ''}>{prog.idonea ? 'Completato' : prog.completati === 0 ? 'Da iniziare' : 'In corso'}</strong></div>
             </div>
           </div>
           {prog.sblocco_sequenziale && !prog.idonea && (

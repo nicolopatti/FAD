@@ -198,7 +198,7 @@ export function StatusChip({
     return (
       <span className="chip chip--ok">
         <span className="dot" />
-        Idoneità ottenuta
+        Completato
       </span>
     );
   if (completati === 0) return <span className="chip chip--ghost">Da iniziare</span>;

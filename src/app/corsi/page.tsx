@@ -41,7 +41,7 @@ export default async function MieiCorsiPage({ searchParams }: { searchParams?: {
   const nome = session.nome?.trim().split(' ')[0];
   const riepilogo = [
     inCorso > 0 ? `${inCorso} in corso` : null,
-    idonei > 0 ? `${idonei} idoneit${idonei === 1 ? 'à ottenuta' : 'à ottenute'}` : null,
+    idonei > 0 ? `${idonei} completat${idonei === 1 ? 'o' : 'i'}` : null,
   ].filter(Boolean).join(' · ');
 
   return (
@@ -103,11 +103,13 @@ export default async function MieiCorsiPage({ searchParams }: { searchParams?: {
 
                 <div className="corso-card__cta">
                   <span className={`btn btn--sm ${idonea ? 'btn--secondary' : ''}`}>
-                    {completati === 0
-                      ? 'Inizia il corso'
-                      : idonea
-                        ? 'Rivedi le lezioni'
-                        : `Riprendi${prossima ? `: lezione ${prossima.ordine}` : ''}`}
+                    {idonea
+                      ? 'Rivedi le lezioni'
+                      : prossima?.lo_type === 'quiz'
+                        ? 'Vai al test finale'
+                        : completati === 0
+                          ? 'Inizia il corso'
+                          : `Riprendi${prossima ? `: lezione ${prossima.ordine}` : ''}`}
                     <Ico name="arrowR" size={14} />
                   </span>
                 </div>
