@@ -25,7 +25,9 @@ jobs:
     if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
     runs-on: ubuntu-latest
     env:
-      URL: ${{ github.event.deployment_status.environment_url || github.event.inputs.url || 'https://fad-wine.vercel.app' }}
+      # In produzione si prova l'alias canonico: l'URL del singolo deploy
+      # (fad-<hash>-…) è protetto da Vercel come le anteprime.
+      URL: ${{ (github.event_name == 'deployment_status' && github.event.deployment.environment == 'Production') && 'https://fad-wine.vercel.app' || github.event.deployment_status.environment_url || github.event.inputs.url || 'https://fad-wine.vercel.app' }}
       HA_SECRETS: ${{ secrets.E2E_DISCENTE_PASSWORD != '' && secrets.E2E_AUDITOR_PASSWORD != '' && secrets.E2E_ADMIN_PASSWORD != '' }}
       # Le anteprime Vercel sono protette (Deployment Protection): senza il
       # "Protection Bypass for Automation" (Vercel → Project → Settings →
@@ -41,7 +43,12 @@ jobs:
           set -euo pipefail
           H=()
           if [ -n "$BYPASS" ]; then H=(-H "x-vercel-protection-bypass: $BYPASS"); fi
-          code=$(curl -sS -L "${H[@]}" -D /tmp/intestazioni.txt -o /tmp/login.html -w '%{http_code}' "$URL/login")
+          # L'alias di produzione si aggiorna qualche secondo dopo l'evento: fino a 6 tentativi.
+          for tentativo in 1 2 3 4 5 6; do
+            code=$(curl -sS -L "${H[@]}" -D /tmp/intestazioni.txt -o /tmp/login.html -w '%{http_code}' "$URL/login")
+            if [ "$code" = "200" ] && grep -q "Bentornato" /tmp/login.html; then break; fi
+            [ "$tentativo" = "6" ] || sleep 20
+          done
           if [ "$code" != "200" ] || ! grep -q "Bentornato" /tmp/login.html; then
             echo "login: HTTP $code, pagina dell'app non riconosciuta"
             echo "--- intestazioni:"; grep -i "^HTTP\|^x-vercel\|^set-cookie\|^location" /tmp/intestazioni.txt | cut -c1-160 || true
