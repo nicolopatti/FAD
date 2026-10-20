@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Route } from 'next';
 import { LogoutButton } from './LogoutButton';
+import { ThemeToggle } from './ThemeToggle';
 import { SidebarNav, TopNav, TabNav, type NavItem } from './SidebarNav';
 
 import { ICON_PATHS } from './icons';
@@ -105,6 +106,7 @@ export function AppShell({
           <div className="topbar__user">
             <span>{displayName}</span>
             <span className="topbar__avatar" aria-hidden="true">{initial}</span>
+            <ThemeToggle compact />
             <LogoutButton iconOnly />
           </div>
         </header>
@@ -132,6 +134,9 @@ export function AppShell({
         <div className="sidebar__section">{section}</div>
         <SidebarNav items={items} />
 
+        <div className="sidebar__theme">
+          <ThemeToggle />
+        </div>
         <div className="sidebar__bottom">
           <div className="sidebar__avatar">{initial}</div>
           <div className="sidebar__user">

@@ -127,11 +127,15 @@ export function fmtMinuti(sec: number | null | undefined): string {
   return `${Math.round(sec / 60)} min`;
 }
 
+// Tutte le date si leggono nel fuso di Roma, qualunque sia quello del server
+// (Vercel e il container girano in UTC).
+const TZ = 'Europe/Rome';
+
 export function fmtData(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', timeZone: TZ });
 }
 
 export function fmtDataOra(iso: string | null | undefined): string {
@@ -139,9 +143,21 @@ export function fmtDataOra(iso: string | null | undefined): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return (
-    d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) +
+    d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', timeZone: TZ }) +
     ' · ' +
-    d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+    d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
+  );
+}
+
+// Istante completo per il log di audit: "20 ott 2026, 14:32:05".
+export function fmtIstante(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return (
+    d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', timeZone: TZ }) +
+    ', ' +
+    d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: TZ })
   );
 }
 

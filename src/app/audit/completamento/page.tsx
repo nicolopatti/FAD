@@ -3,6 +3,7 @@ import { unwrap } from '@/lib/db-result';
 import { requireAuditor } from '@/lib/auth-context';
 import { computeProgressoForIscrizione, computeFrequenzaForIscrizione, regolaLabel } from '@/lib/compliance';
 import type { IscrizioneAuditRow } from '@/lib/db-types';
+import { CompletamentoTable, type RigaCompletamento } from './CompletamentoTable';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,137 +22,59 @@ export default async function CompletamentoPage() {
     `)
     .returns<IscrizioneAuditRow[]>(), 'le iscrizioni');
 
-  const rows = await Promise.all(
+  // Ricalcolo dagli Eventi per ogni iscrizione (D8): la verità è il registro,
+  // non le colonne-cache. (Blocco B #2: da portare in una funzione SQL.)
+  const righe: RigaCompletamento[] = await Promise.all(
     iscrizioni.map(async (i) => {
       const [prog, freq] = await Promise.all([
         computeProgressoForIscrizione(supabase, i.id),
         computeFrequenzaForIscrizione(supabase, i.id),
       ]);
-      return { i, prog, freq };
+      return {
+        iscrizione_id: i.id,
+        persona: i.persona,
+        corso: i.edizione?.corso?.titolo ?? null,
+        corso_id: i.edizione?.corso?.id ?? null,
+        edizione: i.edizione?.codice ?? null,
+        totale: prog?.totale ?? 0,
+        completati: prog?.completati ?? 0,
+        obbligatori_totale: prog?.obbligatori_totale ?? 0,
+        obbligatori_completati: prog?.obbligatori_completati ?? 0,
+        idonea: Boolean(prog?.idonea),
+        frequenza: freq && freq.soglia != null
+          ? { percentuale: freq.frequenza_percentuale, soglia: freq.soglia, ore: freq.ore_frequentate, ore_pianificate: round1(freq.minuti_pianificati / 60), idoneo: freq.idoneo_frequenza, non_parsate: freq.durate_non_parsate }
+          : null,
+        presenze: freq?.presenze ?? 0,
+        items: (prog?.items ?? []).map((it) => ({
+          struttura_id: it.struttura_id,
+          ordine: it.ordine,
+          titolo: it.lo_titolo,
+          tipo: it.lo_type,
+          obbligatorio: it.obbligatorio,
+          regola: regolaLabel(it.regola_completamento.tipo),
+          integrale: Boolean(prog?.visione_integrale),
+          copertura: it.copertura_percentuale ?? null,
+          stato: it.completato ? 'ok' : it.sbloccato ? 'da_fare' : 'bloccato',
+          completato_il: it.completato_il ?? null,
+        })),
+      };
     }),
   );
+  righe.sort((a, b) => `${a.persona?.cognome ?? ''} ${a.persona?.nome ?? ''}`.localeCompare(`${b.persona?.cognome ?? ''} ${b.persona?.nome ?? ''}`, 'it') || (a.corso ?? '').localeCompare(b.corso ?? '', 'it'));
 
   return (
     <>
-      <h1>Completamento attività</h1>
-      <p className="muted">
-        Stato ricalcolato dagli <em>Eventi</em> a ogni apertura. Le colonne-cache
-        sull'Iscrizione non vengono lette qui (D8): la verità è il log.
-        L'idoneità richiede il completamento di tutti gli LO <strong>obbligatori</strong>,
-        ciascuno secondo la sua <em>regola di completamento</em>; gli LO
-        facoltativi contano nell'avanzamento ma non bloccano l'idoneità (D35).
-      </p>
-      <div className="card">
-        <div className="tbl-wrap"><table className="tbl">
-          <thead>
-            <tr>
-              <th>Discente</th>
-              <th>Corso / Edizione</th>
-              <th>Avanzamento</th>
-              <th>Idoneità</th>
-              <th>Frequenza webinar</th>
-              <th>Dettaglio LO</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ i, prog, freq }) => (
-              <tr key={i.id}>
-                <td>
-                  {i.persona ? (
-                    <>
-                      {i.persona.nome} {i.persona.cognome}
-                      <div className="muted">{i.persona.email}</div>
-                    </>
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
-                </td>
-                <td>
-                  {i.edizione?.corso?.titolo ?? <span className="muted">—</span>}
-                  <div className="muted">ed. {i.edizione?.codice ?? '—'}</div>
-                </td>
-                <td>
-                  {prog ? (
-                    <>
-                      {prog.completati}/{prog.totale} totali
-                      <div className="muted">
-                        obbligatori {prog.obbligatori_completati}/{prog.obbligatori_totale}
-                      </div>
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td>
-                  {prog?.idonea ? (
-                    <span className="badge ok">idoneo</span>
-                  ) : (
-                    <span className="badge warn">in corso</span>
-                  )}
-                </td>
-                <td>
-                  {freq && freq.soglia != null ? (
-                    <>
-                      <span className={`badge ${freq.idoneo_frequenza ? 'ok' : 'warn'}`}>
-                        {freq.frequenza_percentuale}%
-                      </span>
-                      <div className="muted" style={{ fontSize: '0.85em' }}>
-                        soglia {freq.soglia}% · {freq.ore_frequentate}h / {round1(freq.minuti_pianificati / 60)}h
-                      </div>
-                      {freq.durate_non_parsate > 0 && (
-                        <div className="muted" style={{ fontSize: '0.8em' }}>
-                          {freq.durate_non_parsate} durate non interpretate
-                        </div>
-                      )}
-                    </>
-                  ) : freq && freq.presenze > 0 ? (
-                    <span className="muted">{freq.presenze} presenze</span>
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
-                </td>
-                <td>
-                  {prog && (
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                      {prog.items.map((it) => (
-                        <li key={it.struttura_id} style={{ marginBottom: 4 }}>
-                          <span className="mono">{it.ordine}.</span>{' '}
-                          {it.lo_titolo}{' '}
-                          <span className="badge muted">{it.lo_type}</span>{' '}
-                          {it.obbligatorio ? (
-                            <span className="badge">obbligatorio</span>
-                          ) : (
-                            <span className="badge muted">facoltativo</span>
-                          )}{' '}
-                          <span className="muted" style={{ fontSize: '0.85em' }}>
-                            regola: {regolaLabel(it.regola_completamento.tipo)}
-                            {prog.visione_integrale && it.lo_type === 'video' ? ' (integrale ≥95%)' : ''}
-                            {it.copertura_percentuale != null ? ` · visto ${it.copertura_percentuale}%` : ''}
-                          </span>{' '}
-                          {it.completato ? (
-                            <span className="badge ok">ok</span>
-                          ) : it.sbloccato ? (
-                            <span className="badge warn">da fare</span>
-                          ) : (
-                            <span className="badge muted">bloccato</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="muted">
-                  Nessuna iscrizione presente.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table></div>
+      <div className="page-head">
+        <div className="page-head__lead">
+          <span className="eyebrow">Area auditor</span>
+          <h1>Completamento</h1>
+          <p>
+            Per ogni iscrizione, lo stato delle lezioni e l&apos;idoneità sono ricalcolati a ogni apertura dagli eventi del registro.
+            L&apos;idoneità richiede tutte le lezioni obbligatorie, ciascuna secondo la sua regola; le facoltative contano nell&apos;avanzamento ma non la bloccano.
+          </p>
+        </div>
       </div>
+      <CompletamentoTable righe={righe} />
     </>
   );
 }

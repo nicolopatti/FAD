@@ -166,6 +166,37 @@ attiva e a corso congelato il pulsante diventa "Salva descrizione" (PATCH con la
   nel browser dall'utente**: Duplica corso, modifica edizione, assegnazione piano,
   nuovo piano, riordino da tastiera.
 
+**Ondata 4 fatta (auditor + tema scuro, 2026-10-20):**
+- `/audit/log` → **una tabella sola** (`LogTable`, riga espandibile con payload,
+  attore grezzo, soggetto, hash completi + copia; hash abbreviati in riga), ordine
+  **decrescente** (pagina 1 = più recenti, 100 per pagina), date **Europe/Rome** con
+  secondi (`fmtIstante` in Atlante; anche `fmtData`/`fmtDataOra` ora forzano il
+  fuso di Roma), nomi risolti per persona/corso/edizione/contenuto/sessione/
+  iscrizione, etichette italiane + tipo grezzo (`src/lib/eventi-etichette.ts`:
+  catalogo `EVENTI`/`GRUPPI`, `riassuntoEvento`). **Filtri in SQL** via GET
+  (`?gruppo=&tipo=&persona=&da=&a=&pagina=`, `src/lib/audit-filtri.ts`:
+  `parseFiltri`/`applicaFiltri` — muta il builder, niente generici: TS2589 —,
+  `offsetRoma` per i giorni interi). **Export CSV** `GET /api/audit/export` con gli
+  stessi filtri (a lotti di 1000, max 20000, `;`, BOM, hash hex).
+- **Sigillo** `.chain-seal` (`ChainVerifyButton` riscritto): pannello blu con anello
+  che si disegna; `/api/audit/verify` ora ritorna anche `eventi`, `testa {seq, hash,
+  occurred_at}`, `verificato_il`. Verificato sul live: 170 eventi, catena integra.
+- `/audit/completamento` → `CompletamentoTable`: striscia totali (iscrizioni/idonei/
+  in corso/frequenza sotto soglia), ricerca, filtro corso, Tutti/Idonei/In corso,
+  paginazione, **dettaglio lezioni a scomparsa**, export CSV client-side.
+- **Tema scuro**: token notturni in `globals.css` sotto `@media (prefers-color-scheme:
+  dark)` (salvo `data-theme="light"`) e `:root[data-theme="dark"]`; nuovo token
+  `--deep` (#16326c chiaro / #13224a scuro) per i pannelli blu pieni (hero, sigillo,
+  login, player, cover) così `--primary` può schiarirsi nel buio. `ThemeToggle`
+  (auto → chiaro → scuro, `localStorage['fad-theme']`, script inline nel layout radice
+  contro il lampo) nella sidebar admin/auditor e nella testata discente; icone
+  `sun/moon/themeAuto` in `icons.ts`.
+- Verifiche: typecheck 0, build 30 route, unit 20/20, fase4 15/15; Playwright
+  `scratchpad/pw/func4.mjs` (22 check funzionali auditor: ordine, date, hash, riga
+  espansa, copia, filtri famiglia/evento/data, export CSV filtrato, sigillo, totali,
+  filtri completamento, dettaglio, download CSV, toggle tema persistente) tutti ok;
+  schermate chiaro/scuro a 1440/390 (auditor, discente, admin, login) senza overflow.
+
 **Prossime ondate** (vedi artifact revisione, sezione "Piano per ondate"):
 2 discente (login nuovo, fine lezione/corso, nav mobile A, testi senza gergo,
 movimento) → 3 admin → 4 auditor + tema scuro. Per far girare l'app in

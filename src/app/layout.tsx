@@ -26,12 +26,20 @@ export const metadata = {
   description: 'Piattaforma e-learning — formazione verificabile e a prova di audit',
 };
 
+// Applica il tema salvato prima del primo disegno (niente lampo chiaro/scuro).
+// Senza scelta esplicita vale `prefers-color-scheme` via CSS.
+const TEMA_SCRIPT = `try{var t=localStorage.getItem('fad-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="it"
       className={`${display.variable} ${text.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: TEMA_SCRIPT }} />
+      </head>
       <body>
         <FeedbackProvider>{children}</FeedbackProvider>
       </body>
