@@ -138,6 +138,9 @@ export default async function DettaglioCorsoPage({
                       <span>· {it.obbligatorio ? 'Obbligatorio' : 'Facoltativo'}</span>
                       {it.completato && <span style={{ color: 'var(--primary)' }}>· Completato</span>}
                       {isCurrent && <span style={{ color: 'var(--accent)' }}>· Da fare</span>}
+                      {!it.completato && it.copertura_percentuale != null && it.copertura_percentuale > 0 && (
+                        <span>· Visto {it.copertura_percentuale}%{prog.visione_integrale ? ' (serve il 95%)' : ''}</span>
+                      )}
                       {stato === 'locked' && (
                         <span style={{ color: 'var(--muted-2)' }}>· Si sblocca al completamento del precedente</span>
                       )}

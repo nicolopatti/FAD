@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { appendEvent } from '@/lib/audit';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
+import { coperturaSecondi, normalizzaSegmenti } from '@/lib/visione';
 
 const ALLOWED = new Set(['video.play', 'video.pause', 'video.seek', 'video.ended']);
 
@@ -65,6 +66,26 @@ export async function POST(request: Request) {
     );
   }
 
+  // Tratti riprodotti (visione integrale): il client li manda come
+  // `segmenti_visti`; qui si validano e si ritagliano sulla durata del video
+  // (quella riportata dal player o, in mancanza, quella dichiarata nel LO).
+  const cleanPayload: Record<string, unknown> = { ...(payload ?? {}) };
+  delete cleanPayload.segmenti_visti;
+  delete cleanPayload.copertura_secondi;
+  if (payload && 'segmenti_visti' in payload) {
+    const cfgDurata = Number((item.lo_config as { durata_secondi?: unknown }).durata_secondi);
+    const playerDurata = Number(payload.durata_secondi);
+    const durataMax = Math.max(
+      Number.isFinite(cfgDurata) ? cfgDurata : 0,
+      Number.isFinite(playerDurata) ? playerDurata : 0,
+    );
+    const segmenti = normalizzaSegmenti(payload.segmenti_visti, durataMax);
+    if (segmenti.length) {
+      cleanPayload.segmenti_visti = segmenti;
+      cleanPayload.copertura_secondi = coperturaSecondi(segmenti);
+    }
+  }
+
   await appendEvent({
     tenantId: persona.tenant_id,
     eventType,
@@ -73,7 +94,7 @@ export async function POST(request: Request) {
     subjectId: learningObjectId,
     payload: {
       iscrizione_id: iscrizione.id,
-      ...(payload ?? {}),
+      ...cleanPayload,
     },
   });
 

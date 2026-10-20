@@ -12,6 +12,7 @@ export function NewCorsoForm() {
   const [categoria, setCategoria] = useState('');
   const [descrizione, setDescrizione] = useState('');
   const [sblocco, setSblocco] = useState(true);
+  const [integrale, setIntegrale] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +29,7 @@ export function NewCorsoForm() {
           descrizione: descrizione || null,
           categoria: categoria || null,
           sblocco_sequenziale: sblocco,
+          visione_integrale: integrale,
         }),
       });
       const json = await res.json();
@@ -81,6 +83,16 @@ export function NewCorsoForm() {
             </div>
             <label className="switch">
               <input type="checkbox" checked={sblocco} onChange={(e) => setSblocco(e.target.checked)} disabled={busy} />
+              <span className="switch__track" />
+            </label>
+          </div>
+          <div className="row between" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: '12px 14px', background: 'var(--bg)' }}>
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: 13 }}>Visione integrale dei video</div>
+              <div className="muted" style={{ fontSize: 12 }}>Per i corsi finanziati: un video conta come completato solo se riprodotto davvero (almeno il 95%) e il discente non può saltare avanti. Spento = fruizione libera.</div>
+            </div>
+            <label className="switch">
+              <input type="checkbox" checked={integrale} onChange={(e) => setIntegrale(e.target.checked)} disabled={busy} />
               <span className="switch__track" />
             </label>
           </div>

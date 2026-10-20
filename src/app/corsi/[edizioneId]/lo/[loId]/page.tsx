@@ -91,6 +91,7 @@ export default async function LearningObjectPage({
                 <VimeoPlayer
                   vimeoId={String((item.lo_config as { vimeo_id?: string }).vimeo_id ?? '')}
                   vimeoHash={(item.lo_config as { vimeo_hash?: string }).vimeo_hash}
+                  visioneIntegrale={prog.visione_integrale}
                   iscrizioneId={iscrizione.id}
                   learningObjectId={item.learning_object_id}
                 />
@@ -112,8 +113,20 @@ export default async function LearningObjectPage({
                     <>
                       <strong>Riproduzione tracciata.</strong> Gli eventi del player (play /
                       pause / seek / ended) sono firmati e accodati al log immutabile del
-                      tenant. L&apos;oggetto si considera completato solo all&apos;invio
-                      dell&apos;evento <code>video.ended</code>: non esistono scorciatoie.
+                      tenant.{' '}
+                      {prog.visione_integrale ? (
+                        <>
+                          Questo corso richiede la <strong>visione integrale</strong>: l&apos;oggetto si
+                          considera completato solo se almeno il 95% del video risulta riprodotto
+                          (tratti visti registrati nel log) e all&apos;invio dell&apos;evento{' '}
+                          <code>video.ended</code>. Non è possibile saltare avanti.
+                        </>
+                      ) : (
+                        <>
+                          L&apos;oggetto si considera completato solo all&apos;invio
+                          dell&apos;evento <code>video.ended</code>: non esistono scorciatoie.
+                        </>
+                      )}
                     </>
                   ) : (
                     <>

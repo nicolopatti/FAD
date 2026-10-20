@@ -124,6 +124,8 @@ export default async function CompletamentoPage() {
                           )}{' '}
                           <span className="muted" style={{ fontSize: '0.85em' }}>
                             regola: {regolaLabel(it.regola_completamento.tipo)}
+                            {prog.visione_integrale && it.lo_type === 'video' ? ' (integrale ≥95%)' : ''}
+                            {it.copertura_percentuale != null ? ` · visto ${it.copertura_percentuale}%` : ''}
                           </span>{' '}
                           {it.completato ? (
                             <span className="badge ok">ok</span>

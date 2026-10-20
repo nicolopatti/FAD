@@ -7,6 +7,7 @@ type CreateBody = {
   titolo?: string;
   descrizione?: string | null;
   sblocco_sequenziale?: boolean;
+  visione_integrale?: boolean;
   categoria?: string | null;
 };
 
@@ -28,9 +29,10 @@ export async function POST(request: Request) {
       titolo,
       descrizione: body.descrizione?.trim() || null,
       sblocco_sequenziale: body.sblocco_sequenziale ?? true,
+      visione_integrale: body.visione_integrale === true,
       categoria: body.categoria?.trim() || null,
     })
-    .select('id, titolo, descrizione, sblocco_sequenziale, categoria, cover_path, creato_il')
+    .select('id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, creato_il')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
     actor: { persona_id: session.personaId, type: 'persona' },
     subjectType: 'corso',
     subjectId: data.id,
-    payload: { titolo: data.titolo, sblocco_sequenziale: data.sblocco_sequenziale },
+    payload: { titolo: data.titolo, sblocco_sequenziale: data.sblocco_sequenziale, visione_integrale: data.visione_integrale },
   });
 
   return NextResponse.json({ ok: true, corso: data });

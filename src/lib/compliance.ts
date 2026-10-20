@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LearningObjectType, StrutturaRow } from './db-types';
+import { coperturaPercentuale, unisciSegmenti, visioneIntegraleCompleta, type Segmento } from './visione';
 
 export type StrutturaItem = {
   struttura_id: string;
@@ -15,6 +16,8 @@ export type StrutturaItem = {
 export type ProgressoLO = StrutturaItem & {
   completato: boolean;
   sbloccato: boolean;
+  /** Solo video: % della durata effettivamente riprodotta (unione dei tratti visti), se tracciata. */
+  copertura_percentuale?: number;
 };
 
 export type ProgressoIscrizione = {
@@ -24,6 +27,7 @@ export type ProgressoIscrizione = {
   corso_id: string;
   corso_titolo: string;
   sblocco_sequenziale: boolean;
+  visione_integrale: boolean;
   totale: number;
   completati: number;
   obbligatori_completati: number;
@@ -59,11 +63,11 @@ export async function computeProgressoForIscrizione(
     id: string;
     persona_id: string;
     edizione_id: string;
-    edizione: { id: string; corso_id: string; corso: { id: string; titolo: string; sblocco_sequenziale: boolean } | null } | null;
+    edizione: { id: string; corso_id: string; corso: { id: string; titolo: string; sblocco_sequenziale: boolean; visione_integrale: boolean } | null } | null;
   };
   const { data: iscrizione, error: errIscr } = await supabase
     .from('iscrizione')
-    .select('id, persona_id, edizione_id, edizione:edizione_id ( id, corso_id, corso:corso_id ( id, titolo, sblocco_sequenziale ) )')
+    .select('id, persona_id, edizione_id, edizione:edizione_id ( id, corso_id, corso:corso_id ( id, titolo, sblocco_sequenziale, visione_integrale ) )')
     .eq('id', iscrizioneId)
     .returns<IscrEdCorso[]>()
     .maybeSingle();
@@ -105,25 +109,47 @@ export async function computeProgressoForIscrizione(
   const completionTypes = Array.from(
     new Set(items.map((i) => COMPLETION_EVENT_FOR_RULE[i.regola_completamento.tipo])),
   ).filter(Boolean);
+  // Visione integrale (corso.visione_integrale): oltre a `video.ended` serve la
+  // copertura dei tratti riprodotti, che il player invia come `segmenti_visti`
+  // nei payload di pause/seek/ended. Si leggono quindi anche quegli eventi.
+  const integrale = Boolean(corso.visione_integrale);
+  const hasVideo = items.some((i) => i.lo_type === 'video');
+  const coverageTypes = hasVideo ? ['video.pause', 'video.seek', 'video.ended'] : [];
+  const eventTypes = Array.from(new Set([...completionTypes, ...coverageTypes]));
   type EventoCompletamento = {
     subject_id: string | null;
     event_type: string;
     actor: { persona_id?: string } | null;
+    payload: { segmenti_visti?: unknown; durata_secondi?: unknown } | null;
   };
 
-  const completedLoIds = new Set<string>();
-  if (loIds.length && completionTypes.length) {
+  const completionEventsByLo = new Map<string, Set<string>>();
+  const segmentiByLo = new Map<string, Segmento[]>();
+  const durataByLo = new Map<string, number>();
+  if (loIds.length && eventTypes.length) {
     const { data: events } = await supabase
       .from('evento')
-      .select('subject_id, event_type, actor')
+      .select('subject_id, event_type, actor, payload')
       .eq('actor->>persona_id', iscrizione.persona_id)
-      .in('event_type', completionTypes)
+      .in('event_type', eventTypes)
       .in('subject_id', loIds)
       .returns<EventoCompletamento[]>();
     for (const e of events ?? []) {
       // Controllo difensivo: il filtro SQL è già sull'attore.
-      if (e.actor?.persona_id === iscrizione.persona_id && e.subject_id) {
-        completedLoIds.add(e.subject_id);
+      if (e.actor?.persona_id !== iscrizione.persona_id || !e.subject_id) continue;
+      if (!completionEventsByLo.has(e.subject_id)) completionEventsByLo.set(e.subject_id, new Set());
+      completionEventsByLo.get(e.subject_id)!.add(e.event_type);
+      const seg = e.payload?.segmenti_visti;
+      if (Array.isArray(seg)) {
+        const acc = segmentiByLo.get(e.subject_id) ?? [];
+        for (const s of seg) {
+          if (Array.isArray(s) && s.length === 2 && Number.isFinite(s[0]) && Number.isFinite(s[1])) acc.push([Number(s[0]), Number(s[1])]);
+        }
+        segmentiByLo.set(e.subject_id, acc);
+      }
+      const d = e.payload?.durata_secondi;
+      if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
+        durataByLo.set(e.subject_id, Math.max(durataByLo.get(e.subject_id) ?? 0, d));
       }
     }
   }
@@ -132,10 +158,24 @@ export async function computeProgressoForIscrizione(
   // *obbligatori* sono completati (oppure il corso non ha sblocco sequenziale).
   let allMandatoryPreviousComplete = true;
   const decorated: ProgressoLO[] = items.map((it) => {
-    const completato = completedLoIds.has(it.learning_object_id);
+    const ruleEvent = COMPLETION_EVENT_FOR_RULE[it.regola_completamento.tipo];
+    const seen = completionEventsByLo.get(it.learning_object_id);
+    const haRuleEvent = Boolean(ruleEvent && seen?.has(ruleEvent));
+    let completato = haRuleEvent;
+    let copertura: number | undefined;
+    if (it.lo_type === 'video') {
+      const segmenti = unisciSegmenti(segmentiByLo.get(it.learning_object_id) ?? []);
+      // Durata: quella riportata dal player (reale) se c'è, altrimenti quella dichiarata dall'admin.
+      const cfgDurata = Number((it.lo_config as { durata_secondi?: unknown }).durata_secondi);
+      const durata = durataByLo.get(it.learning_object_id) ?? (Number.isFinite(cfgDurata) ? cfgDurata : 0);
+      if (segmenti.length || durata > 0) copertura = coperturaPercentuale(segmenti, durata);
+      if (integrale && it.regola_completamento.tipo === 'video_ended') {
+        completato = visioneIntegraleCompleta(segmenti, durata, haRuleEvent);
+      }
+    }
     const sbloccato = corso.sblocco_sequenziale ? allMandatoryPreviousComplete : true;
     if (it.obbligatorio && !completato) allMandatoryPreviousComplete = false;
-    return { ...it, completato, sbloccato };
+    return copertura === undefined ? { ...it, completato, sbloccato } : { ...it, completato, sbloccato, copertura_percentuale: copertura };
   });
 
   const totale = decorated.length;
@@ -151,6 +191,7 @@ export async function computeProgressoForIscrizione(
     corso_id: corso.id,
     corso_titolo: corso.titolo,
     sblocco_sequenziale: corso.sblocco_sequenziale,
+    visione_integrale: integrale,
     totale,
     completati,
     obbligatori_completati: obbligatoriCompletati,

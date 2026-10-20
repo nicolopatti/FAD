@@ -11,6 +11,7 @@ export type CorsoCard = {
   categoria: string | null;
   cover_path: string | null;
   sblocco_sequenziale: boolean;
+  visione_integrale: boolean;
   creato_il: string;
   n_oggetti: number;
   n_edizioni: number;
@@ -130,6 +131,7 @@ export function CorsiCatalog({ corsi }: { corsi: CorsoCard[] }) {
                         <span className="metaline"><Icon name="clock" /> {fmtMinuti(c.durata_sec)}</span>
                       )}
                       {c.sblocco_sequenziale && <span className="chip chip--muted">Sblocco sequenziale</span>}
+                      {c.visione_integrale && <span className="chip chip--muted">Visione integrale</span>}
                     </div>
                   </div>
                 </Link>

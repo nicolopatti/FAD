@@ -17,7 +17,7 @@ export default async function CorsiListPage() {
   const [corsiR, strutturaR, edizioniR] = await Promise.all([
     supabase
       .from('corso')
-      .select('id, titolo, descrizione, categoria, cover_path, sblocco_sequenziale, creato_il')
+      .select('id, titolo, descrizione, categoria, cover_path, sblocco_sequenziale, visione_integrale, creato_il')
       .order('creato_il', { ascending: false }),
     supabase
       .from('struttura_corso')
@@ -49,6 +49,7 @@ export default async function CorsiListPage() {
       categoria: c.categoria,
       cover_path: c.cover_path,
       sblocco_sequenziale: c.sblocco_sequenziale,
+      visione_integrale: Boolean(c.visione_integrale),
       creato_il: c.creato_il,
       n_oggetti: los.length,
       n_edizioni: ne,

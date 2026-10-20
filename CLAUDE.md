@@ -94,6 +94,36 @@ dell'edizione: titolo/descrizione non modificabili; i `config` dei LO sì. **Da
 verificare nel browser**: riproduzione (dipende dai domini consentiti su Vimeo per
 quei 6 video) e sblocco sequenziale.
 
+**Visione integrale per corso (2026-10-20, decisione ratificata).** Due casistiche
+dell'utente: corsi **finanziati** → un video non può risultare completato se non è
+stato visto tutto; corsi a **mercato** → fruizione libera (basta `video.ended`, D26
+invariato). Implementato come **spunta per corso** `corso.visione_integrale`
+(default false, **campo strutturale congelato con D22**: `tg_corso_freeze` esteso,
+migration `20261020000001_corso_visione_integrale.sql` applicata sul live; il corso
+di prova a 6 video è stato messo a `true` nella stessa migration, prima di estendere
+il trigger). Meccanica:
+- `VimeoPlayer` registra i tratti riprodotti (`timeupdate`, continuità ≤ 2 s) e li
+  invia come `payload.segmenti_visti` + `durata_secondi` in pause/seek/ended (nessun
+  evento in più). In modalità integrale impedisce i salti in avanti oltre il massimo
+  visto (`setCurrentTime` indietro + avviso) e mostra il % riprodotto.
+- `/api/events/video` valida/ritaglia i segmenti (`normalizzaSegmenti`, `lib/visione.ts`)
+  e aggiunge `copertura_secondi`. Niente PII.
+- `compliance.ts`: legge anche pause/seek/ended, unisce i segmenti per LO
+  (`unisciSegmenti`), espone `copertura_percentuale` per i video; con
+  `visione_integrale` un LO `video_ended` è completato solo se **ended E copertura ≥
+  95%** (`SOGLIA_VISIONE_INTEGRALE`, costante in `lib/visione.ts`). Durata = quella
+  riportata dal player se c'è, altrimenti `config.durata_secondi`. Gli eventi
+  precedenti a questa modifica non hanno segmenti → copertura 0: sul corso di prova la
+  Lezione 01 "completata trascinando" torna **non completata** (voluto).
+- Admin: switch "Visione integrale dei video" in `/admin/corsi/new` e nel Course
+  Builder (sezione Dati, disabilitato a corso congelato); chip nel catalogo; route
+  POST/PATCH corsi accettano `visione_integrale`. Auditor: "(integrale ≥95%) · visto N%".
+  Discente: testo informativo nel player e "Visto N%" nella lista.
+- Test: `tests/unit/visione.test.ts` (6), pgTAP `supabase/tests/corso_visione_integrale.sql` (5).
+Limite noto: la copertura è dichiarata dal client (come `video.ended`); la UI non
+permette scorciatoie, una chiamata API costruita a mano sì. Difesa ulteriore possibile:
+confrontare l'incremento di copertura con il tempo reale trascorso tra gli eventi.
+
 **Autorizzazione di sessione (2026-10-19):** l'utente ha autorizzato
 esplicitamente tutte le modifiche senza chiedere conferma, incluso il push su
 `main` (fatto: `main` = branch `claude/hardening-tappa1`, CI verde). Vale per

@@ -83,6 +83,7 @@ export type CorsoRow = {
   titolo: string;
   descrizione: string | null;
   sblocco_sequenziale: boolean;
+  visione_integrale: boolean; // video completato solo a copertura ≥ 95% + ended (lib/visione.ts)
   categoria: string | null;
   cover_path: string | null;
   creato_il: string;

@@ -7,6 +7,7 @@ type UpdateBody = {
   titolo?: string;
   descrizione?: string | null;
   sblocco_sequenziale?: boolean;
+  visione_integrale?: boolean;
   categoria?: string | null;
   cover_path?: string | null;
 };
@@ -31,6 +32,9 @@ export async function PATCH(
   if (typeof body.sblocco_sequenziale === 'boolean') {
     updates.sblocco_sequenziale = body.sblocco_sequenziale;
   }
+  if (typeof body.visione_integrale === 'boolean') {
+    updates.visione_integrale = body.visione_integrale;
+  }
   if (body.categoria !== undefined) {
     updates.categoria = typeof body.categoria === 'string' ? (body.categoria.trim() || null) : null;
   }
@@ -46,7 +50,7 @@ export async function PATCH(
     .from('corso')
     .update(updates)
     .eq('id', params.id)
-    .select('id, titolo, descrizione, sblocco_sequenziale, categoria, cover_path, creato_il')
+    .select('id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, creato_il')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
@@ -61,7 +65,7 @@ export async function PATCH(
     subjectId: data.id,
     payload: onlyCover
       ? { has_cover: data.cover_path !== null }
-      : { titolo: data.titolo, sblocco_sequenziale: data.sblocco_sequenziale },
+      : { titolo: data.titolo, sblocco_sequenziale: data.sblocco_sequenziale, visione_integrale: data.visione_integrale },
   });
 
   return NextResponse.json({ ok: true, corso: data });
