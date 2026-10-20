@@ -448,7 +448,17 @@ modifica DB: dal container si provano solo letture e validazioni.
   ogni 5 minuti per IP → per 300 VU alzare il limite o `UTENTI` più basso. Il binario
   k6 non è nel repo: nel container si scarica da GitHub releases (v0.54, funziona con
   `HTTPS_PROXY` + `SSL_CERT_FILE=/root/.ccr/ca-bundle.crt`, `NO_PROXY=localhost`).
-  Esito della prova locale: vedi sezione sotto "Prova di carico dal container".
+  **Prova dal container (2026-10-20, build di produzione `next start` con i valori
+  pubblici veri, 10 VU × 10 utenti, proxy del container verso eu-central-1):**
+  `MODO=api` 60 s, 1 evento ogni 5 s → 100/100 eventi ok, 0 errori, latenza media
+  1,13 s, p95 1,89 s (**soglia 1,5 s superata**: ogni evento via app = getUser +
+  3 query di compliance + RPC, ~5 andate e ritorni da ~200 ms ciascuna dal container;
+  su Vercel nella stessa regione il costo di rete è ~10×); `MODO=rpc` 30 s → 97/97 ok,
+  media 243 ms, p95 384 ms (= una sola andata e ritorno). Lato DB
+  (`pg_stat_statements`): `evento_player_registra` **2,4 ms medi, 17 ms max** su 197
+  chiamate; query di compliance 0,6–5,6 ms. Il collo è la rete, non il DB né il lock
+  dello stream. La prova a 300 VU per 10 minuti va fatta da un ambiente vicino al DB
+  (Vercel/staging o un terminale in EU), col limite dei login alzato.
 - **Smoke post-deploy + E2E in CI (Blocco C/E).** `.github/workflows/smoke-deploy.yml`:
   `deployment_status` (ogni deploy Vercel riuscito, anteprima e produzione) + cron
   giornaliero + manuale; curl su login/verifica/pdf-privato, poi `npm run test:e2e` se
