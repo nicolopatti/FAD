@@ -9,7 +9,7 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Fase 5 — test finale e attestato (2026-10-20, branch `claude/affectionate-hawking-03ev7i`, NON ancora su `main`)
+## Fase 5 — test finale e attestato (2026-10-20, branch `claude/affectionate-hawking-03ev7i`, NON ancora su `main`; Task 1–6 fatti, gate M5 da chiudere nel browser)
 
 Richiesta dell'utente: "rilasciare a chi chiude il percorso e supera il test un
 attestato e anche il badge da caricare su LinkedIn". Brief scritto e **ratificato**
@@ -82,12 +82,89 @@ nel browser dell'utente).**
   admin creare un Test nuovo, scrivere domande e importarle da CSV. Senza
   `SUPABASE_SERVICE_ROLE_KEY` nel container le scritture non si provano da qui.
 
-**Task 4–6 da fare** (attestato + badge, vedi brief §5): schema `attestato` write-once +
-`attestato_contatore`, `corso.ore_totali/riferimento_normativo/politica_attestato`,
-`persona.data_nascita/luogo_nascita`, branding tenant, bucket `loghi`/`attestati`, RPC
-`attestato_emetti` (Evento `attestato.emesso` con hash, niente PII), PDF con `pdf-lib`,
-badge PNG con `next/og`, `/verifica/[codice]` pubblica, link LinkedIn "Add to profile",
-UI discente/admin/auditor. **Il merge su `main` richiede autorizzazione esplicita.**
+**Gate M5a chiuso dall'utente nel browser (anteprima Vercel del branch):** video,
+tentativo al 40% non superato, poi 80% superato, catena integra. Rifiniture dopo il
+riscontro: i pulsanti chiamano il test "Vai al test finale" (mai "Lezione N"), icona
+del test nelle liste, e **nelle pagine del discente non compare più "idoneità"**
+("Hai completato …", chip/stato "Completato", "N completati"); auditor, admin e
+report fondi tengono "idoneo" (termine tecnico).
+
+**Task 4–6 fatti (attestato, da provare nel browser → gate M5).**
+- *Schema* (`20261020000008_fase5_attestato.sql`, **applicata sul live**; pgTAP
+  `supabase/tests/fase5_attestato.sql` **19/19** in rollback): `corso.ore_totali`,
+  `riferimento_normativo`, `politica_attestato` (automatica|manuale|nessuna, default
+  automatica) — **freeze D22 esteso con un'eccezione**: ore e riferimento si compilano
+  una volta anche a corso congelato se erano vuoti (per i corsi già in esercizio),
+  politica congelata; `persona.data_nascita/luogo_nascita`; su `tenant` ragione sociale,
+  città, firmatario (nome/ruolo), `logo_path`, `firma_path`, `linkedin_organization_id`
+  (+ policy `tenant_update_admin`). Tabella **`attestato`** (snapshot `contenuto` jsonb
+  CON PII — è il documento —, `numero` `AAAA/000001` progressivo per tenant e anno via
+  `attestato_contatore` con lock di riga, `codice_verifica` 24 hex casuali, `hash`
+  sha256 di `contenuto::text`, `pdf_path` deterministico `{tenant}/{id}.pdf`,
+  `emesso_da` NULL = automatico, `sostituisce`/`sostituito_da`); **write-once** con
+  trigger che ammette un solo UPDATE: `sostituito_da` da NULL a valore. RLS: titolare
+  (persona_id) e staff del tenant. RPC `attestato_emetti(iscrizione, contenuto, attore,
+  emesso_da, sostituisce, motivazione)` SECURITY DEFINER: completa lo snapshot con
+  numero/codice/data/id, calcola l'hash, scrive `attestato.emesso` `{iscrizione_id,
+  attestato_id, numero, hash, automatico, sostituisce}`; con `sostituisce` marca il
+  vecchio e scrive `attestato.sostituito` (motivazione obbligatoria). Un solo attestato
+  valido per iscrizione. `attestato_verifica(codice)` **eseguibile da anon** (solo campi
+  pubblici: nome e cognome, corso, ore, ente, edizione, esito test, numero, date, stato,
+  hash ricalcolato; mai CF/nascita). `persona_aggiorna_nascita(data, luogo)` per il
+  discente. Bucket `loghi` (pubblico, scrittura admin) e `attestati` (privato, nessuna
+  policy: scrive e legge solo il server). Evento `ente.updated` dalla pagina Ente.
+- *Server* (`src/lib/attestati.ts`): `costruisciSnapshot(client, iscrizione)` usa
+  `computeProgressoForIscrizione` + `computeFrequenzaForIscrizione` + `deriveIdoneita`
+  (ora esportata da `report-fondo.ts`): idoneità = completamento FAD e/o frequenza
+  webinar (corsi solo-webinar inclusi); snapshot = ente, discente (con nascita), corso,
+  edizione, percorso (lezioni + date), test (esito/percentuale/tentativi), frequenza,
+  criterio, `completato_il`, testa del registro. `emettiAttestatoSeIdonea` (politica
+  automatica, nessun valido, idoneo) agganciata a `/api/events/video` (ended),
+  `/documento` (completed), `/quiz` (superato) — mai un errore verso il player, la
+  risposta porta `attestato: {numero}` — e alle route presenze (import CSV,
+  risolvi, presenza manuale, correggi: tutti gli iscritti dell'edizione/sessione).
+  `emettiAttestatoManuale` da `POST /api/admin/iscrizioni/[id]/attestato`
+  (riemissione se esiste un valido, con motivazione). La pagina del corso discente
+  emette **pigramente** se idonea+automatica+nessun attestato (percorsi chiusi prima
+  della Fase 5). PDF `src/lib/attestato-pdf.ts` (`pdf-lib`, A4 orizzontale, Helvetica
+  WinAnsi con `pulisci()`, banda blu, logo/firma dal bucket `loghi` se presenti, QR
+  `qrcode` verso `/verifica/<codice>`), servito da `src/lib/attestato-serve.ts`
+  (`GET /api/attestati/[id]/pdf`: scarica dal bucket o genera e carica; senza chiave
+  di servizio genera al volo). Badge `src/lib/attestato-badge.tsx` (`ImageResponse`
+  di `next/og`, 1200×1200 e `?formato=post` 1200×630; **ogni div con più figli deve
+  avere `display:flex`**, altrimenti satori lancia). `src/lib/url.ts`: `appBaseUrl()`
+  da `NEXT_PUBLIC_APP_URL` (fallback `https://fad-wine.vercel.app`) per QR e LinkedIn.
+  Link LinkedIn "Add to profile" precompilato (`linkedInAddToProfileUrl`).
+- *UI*: `/verifica/[codice]` pubblica senza shell (`noindex`), stati autentico /
+  sostituito / non trovato, PDF pubblico `GET /api/verifica/[codice]/pdf`; discente:
+  pannello `.attestato-card` nel corso completato (PDF, Aggiungi a LinkedIn, badge,
+  badge per post, link di verifica) e avviso se manca la data di nascita; `/profilo`
+  con `ProfiloForm` (data/luogo di nascita via RPC, `POST /api/profilo/nascita`) ed
+  elenco attestati; admin: sezione "Attestato" nel builder (ore, riferimento,
+  rilascio) e in `/admin/corsi/new`, colonna Attestato tra gli iscritti con
+  **Emetti / riemetti** (campo motivazione inline), data/luogo di nascita nel form
+  manuale e nel CSV (`addIscritto` accetta `gg/mm/aaaa`), pagine **`/admin/attestati`**
+  (validi/sostituiti, ricerca, PDF, verifica) e **`/admin/ente`** (`EnteForm`: dati +
+  logo e firma caricati nel bucket `loghi`, `PATCH /api/admin/ente`), voci di menu
+  (icone `shield`/`users` aggiunte a `icons.ts`); auditor: etichette `attestato.*`
+  (gruppo "Attestati") e colonna Attestato in `/audit/completamento`.
+- *Fixture sul live*: attestato **n. 2026/000001** (`6c2f917a-…`, codice
+  `d0205717a0b46223e2bbf5ef`) emesso via RPC per l'iscrizione `9da74f31-…` (corso
+  "Prova del test finale" completato dall'utente) con lo snapshot reale costruito con
+  la sessione del discente (`scratchpad/snap.ts`) — l'ente non aveva ancora dati, quindi
+  intestazione "Tenant Demo Fase 1" senza ore: compilare Ente e ore del corso, poi
+  riemettere. Il discente demo ha data/luogo di nascita (1980-05-14, Bergamo) messi dal
+  test Playwright. Eventi 199–200, catena integra.
+- *Verifiche*: typecheck 0, build **35 route**, unit 32/32, fase4 15/15, PDF di prova
+  rasterizzato con `pdftoppm` (presente nel container), Playwright
+  `scratchpad/pw/func6.mjs` **29/29** (pubblico 390, discente 1440/390, auditor,
+  admin). Senza chiave di servizio: emissione automatica e PDF pubblico (503) non si
+  provano da qui.
+- **Da provare nel browser dall'utente (gate M5)**: `/admin/ente` (ragione sociale,
+  firmatario, logo), ore del corso, "riemetti" su Rossi (nuovo numero, vecchio
+  "sostituito" nella verifica pubblica), completare il corso "solo test" → attestato
+  automatico con PDF/badge/LinkedIn, `/verifica/<codice>` dal QR del PDF, pagina
+  Attestati. Dopo il via libera: **merge su `main` solo con autorizzazione esplicita.**
 
 ## UX — revisione, mockup e ondata 1 (2026-10-20, branch `claude/affectionate-hawking-03ev7i`)
 
