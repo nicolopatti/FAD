@@ -2,25 +2,35 @@
 # deploy Vercel: gira su un runner GitHub, che raggiunge sia vercel.app sia
 # Supabase (il container di Claude Code no). Le credenziali sono quelle degli
 # utenti demo del tenant di prova; le operazioni sono reversibili o di prova
-# (vedi scripts/verifica-scritture.mjs). Da lanciare a mano.
+# (vedi scripts/verifica-scritture.mjs). Si lancia a mano oppure parte da sola
+# a ogni push che tocca questo file o lo script (l'integrazione GitHub della
+# sessione Claude non può avviare i workflow: il push è il grilletto).
 name: Verifica scritture admin
 
 on:
+  push:
+    branches: ['claude/**']
+    paths:
+      - .github/workflows/verifica-scritture.yml
+      - scripts/verifica-scritture.mjs
   workflow_dispatch:
     inputs:
       url:
-        description: URL del deploy da provare
-        required: true
+        description: URL del deploy da provare (vuoto = anteprima del branch)
+        required: false
+        default: ''
       share_url:
         description: Link _vercel_share per le anteprime protette (vuoto per la produzione)
         required: false
         default: ''
       admin_password:
-        description: Password dell'admin demo
-        required: true
+        description: Password dell'admin demo (vuota = quella del tenant di prova)
+        required: false
+        default: ''
       auditor_password:
-        description: Password dell'auditor demo
-        required: true
+        description: Password dell'auditor demo (vuota = quella del tenant di prova)
+        required: false
+        default: ''
 
 jobs:
   verifica:
@@ -32,12 +42,14 @@ jobs:
           node-version: 20
       - name: Scritture contro il deploy
         env:
-          URL: ${{ github.event.inputs.url }}
-          SHARE_URL: ${{ github.event.inputs.share_url }}
+          # Senza input (push): l'anteprima del branch e il suo link di accesso temporaneo (scade in 23 ore).
+          URL: ${{ github.event.inputs.url || 'https://fad-5epb388wn-nicolopattis-projects.vercel.app' }}
+          SHARE_URL: ${{ github.event.inputs.share_url || 'https://fad-5epb388wn-nicolopattis-projects.vercel.app/?_vercel_share=RgCp7gXAwVNd5uVCs2ukwx7ml5Lz7Swb' }}
           SUPABASE_URL: https://eqtiyqoxwgnerbmdkqff.supabase.co
           SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdGl5cW94d2duZXJibWRrcWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzOTE1NDksImV4cCI6MjA5NDk2NzU0OX0.fTfbtv9t3InpIcWtoyTgfaG550SALiwj45-_gRpNM_I
           ADMIN_EMAIL: admin@fad.local
-          ADMIN_PASSWORD: ${{ github.event.inputs.admin_password }}
+          # Utenti demo del tenant di prova (le stesse credenziali documentate nel README).
+          ADMIN_PASSWORD: ${{ github.event.inputs.admin_password || secrets.E2E_ADMIN_PASSWORD || 'admin-pass-123' }}
           AUDITOR_EMAIL: auditor@fad.local
-          AUDITOR_PASSWORD: ${{ github.event.inputs.auditor_password }}
+          AUDITOR_PASSWORD: ${{ github.event.inputs.auditor_password || secrets.E2E_AUDITOR_PASSWORD || 'auditor-pass-123' }}
         run: node scripts/verifica-scritture.mjs
