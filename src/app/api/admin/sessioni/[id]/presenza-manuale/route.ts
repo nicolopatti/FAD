@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
+import { emettiPerSessioneSeIdonee } from '@/lib/attestati';
 
 // Inserimento manuale di una presenza mancante (Task 5). Evento, non UPDATE.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as
     | { iscrizione_id?: string; durata?: string; motivazione?: string }
     | null;
@@ -24,5 +25,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     p_motivazione: motivazione,
   });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-  return NextResponse.json({ ok: true, result: data });
+  // Fase 5: la presenza può chiudere il percorso di un corso webinar → attestato automatico.
+  const attestati = await emettiPerSessioneSeIdonee(params.id, session.personaId).catch(() => []);
+  return NextResponse.json({ ok: true, result: data, attestati_emessi: attestati.length });
 }

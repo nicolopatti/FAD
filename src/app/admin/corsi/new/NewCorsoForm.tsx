@@ -17,6 +17,9 @@ export function NewCorsoForm() {
   const [descrizione, setDescrizione] = useState('');
   const [sblocco, setSblocco] = useState(true);
   const [integrale, setIntegrale] = useState(false);
+  const [ore, setOre] = useState('');
+  const [riferimento, setRiferimento] = useState('');
+  const [politica, setPolitica] = useState('automatica');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errTitolo, setErrTitolo] = useState<string | null>(null);
@@ -37,6 +40,9 @@ export function NewCorsoForm() {
           categoria: categoria || null,
           sblocco_sequenziale: sblocco,
           visione_integrale: integrale,
+          ore_totali: ore.trim() ? ore.trim().replace(',', '.') : null,
+          riferimento_normativo: riferimento.trim() || null,
+          politica_attestato: politica,
         }),
       });
       const json = await res.json();
@@ -100,7 +106,23 @@ export function NewCorsoForm() {
               <span className="switch__track" />
             </label>
           </div>
-          <div className="field__hint" style={{ marginBottom: 14 }}>Sblocco e visione integrale si congelano alla prima edizione: scegli adesso con attenzione.</div>
+          <h4 style={{ margin: '4px 0 8px' }}>Attestato</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+            <Field id="nc-ore" label="Ore totali" hint="Compaiono sull’attestato (es. 8 o 2,5).">
+              <input id="nc-ore" className="input" inputMode="decimal" value={ore} onChange={(e) => setOre(e.target.value)} disabled={busy} placeholder="es. 8" />
+            </Field>
+            <Field id="nc-rif" label="Riferimento normativo" hint="Facoltativo.">
+              <input id="nc-rif" className="input" value={riferimento} onChange={(e) => setRiferimento(e.target.value)} disabled={busy} placeholder="es. Accordo Stato-Regioni 21/12/2011" />
+            </Field>
+          </div>
+          <Field id="nc-politica" label="Rilascio dell’attestato" hint={politica === 'automatica' ? 'Si emette da solo appena il percorso è completato (e il test superato).' : politica === 'manuale' ? 'Lo emette l’amministratore dalla sezione Iscritti.' : 'Il corso non rilascia attestati.'}>
+            <select id="nc-politica" className="select" value={politica} onChange={(e) => setPolitica(e.target.value)} disabled={busy}>
+              <option value="automatica">Automatico</option>
+              <option value="manuale">Manuale</option>
+              <option value="nessuna">Nessuno</option>
+            </select>
+          </Field>
+          <div className="field__hint" style={{ marginBottom: 14 }}>Sblocco, visione integrale e rilascio dell&apos;attestato si congelano alla prima edizione: scegli adesso con attenzione. Ore e riferimento normativo si possono compilare anche dopo, se lasciati vuoti.</div>
           <button type="submit" className="btn" disabled={busy}>{busy ? 'Creo…' : 'Crea corso'}</button>
         </div>
       </form>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { appendEvent } from '@/lib/audit';
+import { provaEmissioneAutomatica } from '@/lib/attestati';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
 
 const ALLOWED = new Set(['documento.opened', 'documento.completed']);
@@ -75,5 +76,8 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({ ok: true });
+  // Fase 5: emissione automatica dell'attestato se il percorso è completo.
+  const attestato = eventType === 'documento.completed' ? await provaEmissioneAutomatica(iscrizione.id, persona.id) : null;
+
+  return NextResponse.json({ ok: true, attestato: attestato ? { numero: attestato.numero } : null });
 }

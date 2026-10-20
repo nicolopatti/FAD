@@ -9,6 +9,7 @@ import {
   type EdizioneRow,
   type LearningObjectRow,
   type LearningObjectType,
+  type PoliticaAttestato,
   type StrutturaCorsoConLO,
 } from '@/lib/db-types';
 import { parseDelimited } from '@/lib/csv';
@@ -34,7 +35,15 @@ export type IscrittoRow = {
   azienda: string | null;
   piano_id: string | null;
   piano_titolo: string | null;
+  /** Attestato valido (Fase 5), se emesso. */
+  attestato: { id: string; numero: string; emesso_at: string } | null;
 };
+
+const POLITICHE: [PoliticaAttestato, string, string][] = [
+  ['automatica', 'Automatico', 'Si emette da solo appena il percorso è completato (e il test superato).'],
+  ['manuale', 'Manuale', 'Lo emette l’amministratore dalla sezione Iscritti, dopo i controlli del caso.'],
+  ['nessuna', 'Nessuno', 'Il corso non rilascia attestati.'],
+];
 
 export type PianoMini = { id: string; titolo: string; codice: string | null; fondo: string | null };
 
@@ -172,7 +181,7 @@ export function CorsoEditor({
 
       <SezioneEdizioni corsoId={corso.id} edizioni={edizioni} busy={busy} call={call} onError={setError} onBusy={setBusy} />
 
-      <SezioneIscritti edizioni={edizioni} iscrittiByEdizione={iscrittiByEdizione} piani={piani} busy={busy} call={call} onBusy={setBusy} />
+      <SezioneIscritti edizioni={edizioni} iscrittiByEdizione={iscrittiByEdizione} piani={piani} politicaAttestato={corso.politica_attestato ?? 'automatica'} busy={busy} call={call} onBusy={setBusy} />
     </>
   );
 }
@@ -221,20 +230,31 @@ function SezioneDati({
   const [descrizione, setDescrizione] = useState(corso.descrizione ?? '');
   const [sblocco, setSblocco] = useState(corso.sblocco_sequenziale);
   const [integrale, setIntegrale] = useState(Boolean(corso.visione_integrale));
+  const oreIniziali = corso.ore_totali != null ? String(corso.ore_totali).replace('.', ',') : '';
+  const [ore, setOre] = useState(oreIniziali);
+  const [riferimento, setRiferimento] = useState(corso.riferimento_normativo ?? '');
+  const [politica, setPolitica] = useState<PoliticaAttestato>(corso.politica_attestato ?? 'automatica');
   const [over, setOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // A corso congelato (D22) resta modificabile solo la descrizione (e la
-  // copertina): il trigger DB rifiuta gli altri campi.
+  // A corso congelato (D22) restano modificabili la descrizione, la copertina
+  // e — solo se ancora vuoti — ore totali e riferimento normativo (dati
+  // dell'attestato): il trigger DB rifiuta tutto il resto.
+  const oreEditabile = !frozen || corso.ore_totali == null;
+  const riferimentoEditabile = !frozen || !corso.riferimento_normativo;
   const descrizioneDirty = descrizione.trim() !== (corso.descrizione ?? '');
+  const oreDirty = oreEditabile && ore.trim() !== oreIniziali;
+  const riferimentoDirty = riferimentoEditabile && riferimento.trim() !== (corso.riferimento_normativo ?? '');
   const dirty = frozen
-    ? descrizioneDirty
+    ? descrizioneDirty || oreDirty || riferimentoDirty
     : titolo.trim() !== corso.titolo ||
       (categoria || null) !== (corso.categoria ?? null) ||
       descrizioneDirty ||
       sblocco !== corso.sblocco_sequenziale ||
-      integrale !== Boolean(corso.visione_integrale);
+      integrale !== Boolean(corso.visione_integrale) ||
+      oreDirty || riferimentoDirty ||
+      politica !== (corso.politica_attestato ?? 'automatica');
 
   const catOptions = useMemo(() => {
     const set = [...CATEGORIE];
@@ -247,17 +267,25 @@ function SezioneDati({
     if (!dirty) return;
     if (!frozen && !titolo.trim()) { setErrTitolo('Il titolo è obbligatorio.'); return; }
     setErrTitolo(null);
+    const oreNum = ore.trim() ? Number(ore.trim().replace(',', '.')) : null;
+    if (ore.trim() && (!Number.isFinite(oreNum) || (oreNum as number) <= 0)) { onError('Le ore totali devono essere un numero maggiore di zero (es. 8 o 2,5).'); return; }
+    const attestatoBody = {
+      ...(oreDirty ? { ore_totali: oreNum } : {}),
+      ...(riferimentoDirty ? { riferimento_normativo: riferimento.trim() || null } : {}),
+    };
     const body = frozen
-      ? { descrizione: descrizione.trim() || null }
+      ? { descrizione: descrizione.trim() || null, ...attestatoBody }
       : {
           titolo,
           descrizione: descrizione.trim() || null,
           categoria: categoria || null,
           sblocco_sequenziale: sblocco,
           visione_integrale: integrale,
+          politica_attestato: politica,
+          ...attestatoBody,
         };
     await call('PATCH', `/api/admin/corsi/${corso.id}`, body, {
-      successo: frozen ? 'Descrizione salvata.' : 'Dati del corso salvati.',
+      successo: frozen ? 'Dati salvati.' : 'Dati del corso salvati.',
       busy: setSalvando,
     });
   }
@@ -332,6 +360,21 @@ function SezioneDati({
                 <span className="switch__track" />
               </label>
             </div>
+
+            <h4 style={{ margin: '18px 0 8px' }}>Attestato</h4>
+            <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+              <Field id="corso-ore" label="Ore totali" hint={frozen && !oreEditabile ? 'Congelato con la prima edizione.' : 'Compaiono sull’attestato (es. 8 o 2,5).'}>
+                <input id="corso-ore" className="input" inputMode="decimal" value={ore} onChange={(e) => setOre(e.target.value)} disabled={busy || !oreEditabile} placeholder="es. 8" />
+              </Field>
+              <Field id="corso-rif" label="Riferimento normativo" hint={frozen && !riferimentoEditabile ? 'Congelato con la prima edizione.' : 'Facoltativo, es. Accordo Stato-Regioni 21/12/2011.'}>
+                <input id="corso-rif" className="input" value={riferimento} onChange={(e) => setRiferimento(e.target.value)} disabled={busy || !riferimentoEditabile} placeholder="es. Accordo Stato-Regioni 21/12/2011" />
+              </Field>
+            </div>
+            <Field id="corso-politica" label="Rilascio dell’attestato" hint={frozen ? 'Congelato con la prima edizione.' : POLITICHE.find((p) => p[0] === politica)?.[2]}>
+              <select id="corso-politica" className="select" value={politica} onChange={(e) => setPolitica(e.target.value as PoliticaAttestato)} disabled={busy || frozen}>
+                {POLITICHE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </Field>
           </div>
 
           <div className="field">
@@ -370,7 +413,7 @@ function SezioneDati({
 
         <div style={{ marginTop: 14 }}>
           <button type="submit" className="btn" disabled={busy || !dirty}>
-            {salvando ? 'Salvo…' : frozen ? 'Salva descrizione' : 'Salva dati'}
+            {salvando ? 'Salvo…' : frozen ? 'Salva modifiche' : 'Salva dati'}
           </button>
         </div>
       </div>
@@ -1092,6 +1135,8 @@ type ImportIscrittoRow = {
   email: string;
   codice_fiscale: string;
   azienda: string;
+  data_nascita: string;
+  luogo_nascita: string;
   esito: 'nuovo' | 'duplicato' | 'errore';
   motivo?: string;
 };
@@ -1102,6 +1147,7 @@ function SezioneIscritti({
   edizioni,
   iscrittiByEdizione,
   piani,
+  politicaAttestato,
   busy,
   call,
   onBusy,
@@ -1109,6 +1155,7 @@ function SezioneIscritti({
   edizioni: EdizioneRow[];
   iscrittiByEdizione: Record<string, IscrittoRow[]>;
   piani: PianoMini[];
+  politicaAttestato: PoliticaAttestato;
   busy: boolean;
   call: CallFn;
   onBusy: BusyFn;
@@ -1147,6 +1194,23 @@ function SezioneIscritti({
     await call('PATCH', `/api/admin/iscrizioni/${i.iscrizione_id}`, { piano_id: pianoId || null }, {
       successo: piano ? `${i.cognome} ${i.nome}: piano "${piano.titolo}" assegnato.` : `${i.cognome} ${i.nome}: nessun piano finanziato.`,
     });
+  }
+
+  // Emissione (o riemissione con motivazione) dell'attestato: il server
+  // ricalcola l'idoneità; a percorso incompleto risponde con un errore chiaro.
+  const [riemetti, setRiemetti] = useState<{ iscrizione_id: string; motivazione: string } | null>(null);
+  async function emettiAttestato(i: IscrittoRow) {
+    if (i.attestato) { setRiemetti({ iscrizione_id: i.iscrizione_id, motivazione: '' }); return; }
+    if (!(await confirm({ titolo: `Emettere l'attestato a ${i.cognome} ${i.nome}?`, messaggio: 'Viene emesso solo se il percorso risulta completato adesso. Il documento è numerato e non si modifica: un errore si corregge con una riemissione.', conferma: 'Emetti' }))) return;
+    await call('POST', `/api/admin/iscrizioni/${i.iscrizione_id}/attestato`, {}, { successo: `Attestato emesso a ${i.cognome} ${i.nome}.` });
+  }
+  async function confermaRiemissione() {
+    if (!riemetti) return;
+    const mot = riemetti.motivazione.trim();
+    if (!mot) return;
+    const i = iscritti.find((x) => x.iscrizione_id === riemetti.iscrizione_id);
+    await call('POST', `/api/admin/iscrizioni/${riemetti.iscrizione_id}/attestato`, { motivazione: mot }, { successo: `Nuovo attestato emesso${i ? ` a ${i.cognome} ${i.nome}` : ''}; il precedente risulta sostituito.` });
+    setRiemetti(null);
   }
 
   if (edizioni.length === 0) {
@@ -1204,7 +1268,7 @@ function SezioneIscritti({
               </div>
             )}
             <div className="tbl-wrap"><table className="tbl tbl--zebra">
-              <thead><tr><th>Cognome e nome</th><th>Email</th><th>Codice fiscale</th><th>Azienda</th><th>Piano finanziato</th><th></th></tr></thead>
+              <thead><tr><th>Cognome e nome</th><th>Email</th><th>Codice fiscale</th><th>Azienda</th><th>Piano finanziato</th><th>Attestato</th><th></th></tr></thead>
               <tbody>
                 {visibili.map((i) => (
                   <tr key={i.iscrizione_id}>
@@ -1223,6 +1287,16 @@ function SezioneIscritti({
                       )}
                     </td>
                     <td>
+                      {politicaAttestato === 'nessuna' ? <span className="muted">—</span> : i.attestato ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                          <a className="mono" href={`/api/attestati/${i.attestato.id}/pdf`} target="_blank" rel="noreferrer" title="Apri il PDF">n. {i.attestato.numero}</a>
+                          <span className="muted" style={{ fontSize: 11 }}>{fmtData(i.attestato.emesso_at)} · <button type="button" className="link-btn" disabled={busy} onClick={() => emettiAttestato(i)}>riemetti</button></span>
+                        </div>
+                      ) : (
+                        <button type="button" className="btn btn--ghost btn--xs" disabled={busy} onClick={() => emettiAttestato(i)}>Emetti</button>
+                      )}
+                    </td>
+                    <td>
                       <button type="button" className="icon-btn" title="Rimuovi iscritto" aria-label={`Rimuovi ${i.cognome} ${i.nome}`} disabled={busy} onClick={async () => { if (await confirm({ titolo: `Rimuovere ${i.cognome} ${i.nome} dall'edizione?`, messaggio: 'La persona resta in anagrafica; viene tolta solo l\'iscrizione a questa edizione.', conferma: 'Rimuovi', pericolosa: true })) call('DELETE', `/api/admin/iscrizioni/${i.iscrizione_id}`, undefined, { successo: `${i.cognome} ${i.nome} rimosso dall'edizione.` }); }}>
                         <Icon name="trash" />
                       </button>
@@ -1230,10 +1304,21 @@ function SezioneIscritti({
                   </tr>
                 ))}
                 {visibili.length === 0 && (
-                  <tr><td colSpan={6} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
+                  <tr><td colSpan={7} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
                 )}
               </tbody>
             </table></div>
+            {riemetti && (
+              <form className="edit-form" style={{ margin: '10px 0 14px' }} onSubmit={(e) => { e.preventDefault(); confermaRiemissione(); }}>
+                <Field id="riem-mot" label="Motivazione della riemissione" required hint="Finisce nel registro insieme al numero del nuovo attestato; il precedente resta consultabile come sostituito.">
+                  <input id="riem-mot" className="input" value={riemetti.motivazione} onChange={(e) => setRiemetti({ ...riemetti, motivazione: e.target.value })} disabled={busy} placeholder="es. cognome errato in anagrafica, ora corretto" autoFocus />
+                </Field>
+                <div className="row">
+                  <button type="submit" className="btn btn--sm" disabled={busy || !riemetti.motivazione.trim()}>Emetti il nuovo attestato</button>
+                  <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setRiemetti(null)}>Annulla</button>
+                </div>
+              </form>
+            )}
             <Pager page={paginaCorrente} pages={pagine} total={filtrati.length} perPage={ISCRITTI_PER_PAGINA} onChange={setPagina} cosa="iscritti" />
             <div style={{ marginBottom: 16 }} />
           </>
@@ -1281,6 +1366,8 @@ function IscrittoManuale({
   const [cf, setCf] = useState('');
   const [azienda, setAzienda] = useState('');
   const [pianoId, setPianoId] = useState('');
+  const [dataNascita, setDataNascita] = useState('');
+  const [luogoNascita, setLuogoNascita] = useState('');
   const [errs, setErrs] = useState<Errori>({});
   const [aggiungendo, setAggiungendo] = useState(false);
 
@@ -1304,8 +1391,9 @@ function IscrittoManuale({
         cognome: cognome.trim(), nome: nome.trim(), email: email.trim(),
         codice_fiscale: cf.trim().toUpperCase() || null, azienda: azienda.trim() || null,
         piano_id: pianoId || null,
+        data_nascita: dataNascita || null, luogo_nascita: luogoNascita.trim() || null,
       }, { successo: `${cognome.trim()} ${nome.trim()} iscritto all'edizione.`, busy: setAggiungendo });
-      setCognome(''); setNome(''); setEmail(''); setCf(''); setAzienda('');
+      setCognome(''); setNome(''); setEmail(''); setCf(''); setAzienda(''); setDataNascita(''); setLuogoNascita('');
     } catch { /* mostrato da call */ }
   }
 
@@ -1336,6 +1424,14 @@ function IscrittoManuale({
             <option value="">— nessuno —</option>
             {piani.map((p) => <option key={p.id} value={p.id}>{p.titolo}{p.fondo ? ` (${p.fondo})` : ''}</option>)}
           </select>
+        </Field>
+      </div>
+      <div className="grid-3">
+        <Field id="isc-dn" label="Data di nascita" hint="Compare sull’attestato. Il discente può completarla dal profilo.">
+          <input id="isc-dn" className="input" type="date" value={dataNascita} onChange={(e) => setDataNascita(e.target.value)} disabled={busy} />
+        </Field>
+        <Field id="isc-ln" label="Luogo di nascita">
+          <input id="isc-ln" className="input" value={luogoNascita} onChange={(e) => setLuogoNascita(e.target.value)} disabled={busy} placeholder="es. Bergamo" autoComplete="off" />
         </Field>
       </div>
       <button type="submit" className="btn" disabled={busy}><Icon name="plus" /> {aggiungendo ? 'Aggiungo…' : 'Aggiungi iscritto'}</button>
@@ -1373,6 +1469,8 @@ function IscrittiCsv({
         email: matchCol(headers, ['email', 'e-mail', 'indirizzo email']),
         cf: matchCol(headers, ['codice fiscale', 'cf', 'codice_fiscale', 'fiscal code']),
         azienda: matchCol(headers, ['azienda', 'ragione sociale', 'company', 'datore']),
+        dn: matchCol(headers, ['data di nascita', 'data nascita', 'nato il', 'birth date', 'data_nascita']),
+        ln: matchCol(headers, ['luogo di nascita', 'luogo nascita', 'nato a', 'birth place', 'luogo_nascita']),
       };
       const seenEmail = new Set<string>();
       const seenCf = new Set<string>();
@@ -1382,13 +1480,15 @@ function IscrittiCsv({
         const email = (ci.email >= 0 ? r[ci.email] : '')?.trim() ?? '';
         const cf = (ci.cf >= 0 ? r[ci.cf] : '')?.trim() ?? '';
         const azienda = (ci.azienda >= 0 ? r[ci.azienda] : '')?.trim() ?? '';
+        const data_nascita = (ci.dn >= 0 ? r[ci.dn] : '')?.trim() ?? '';
+        const luogo_nascita = (ci.ln >= 0 ? r[ci.ln] : '')?.trim() ?? '';
         let esito: ImportIscrittoRow['esito'] = 'nuovo';
         let motivo: string | undefined;
         const ek = email.toLowerCase(); const ck = cf.toLowerCase();
         if (!cognome || !nome || !email) { esito = 'errore'; motivo = 'cognome/nome/email mancanti'; }
         else if (emails.has(ek) || (ck && cfs.has(ck)) || seenEmail.has(ek) || (ck && seenCf.has(ck))) { esito = 'duplicato'; motivo = 'già iscritto'; }
         if (esito === 'nuovo') { seenEmail.add(ek); if (ck) seenCf.add(ck); }
-        return { riga: idx + 1, cognome, nome, email, codice_fiscale: cf, azienda, esito, motivo };
+        return { riga: idx + 1, cognome, nome, email, codice_fiscale: cf, azienda, data_nascita, luogo_nascita, esito, motivo };
       });
       setRows(out);
     } catch (e) {
@@ -1406,6 +1506,7 @@ function IscrittiCsv({
         rows: importabili.map((r) => ({
           cognome: r.cognome, nome: r.nome, email: r.email,
           codice_fiscale: r.codice_fiscale || null, azienda: r.azienda || null,
+          data_nascita: r.data_nascita || null, luogo_nascita: r.luogo_nascita || null,
         })),
       }, { successo: `${importabili.length} iscritt${importabili.length === 1 ? 'o importato' : 'i importati'}.` });
       setRows([]);
@@ -1423,7 +1524,7 @@ function IscrittiCsv({
       >
         <Icon name="upload" className="dropzone__icon" />
         <div className="dropzone__t">Trascina qui un file .csv</div>
-        <div className="dropzone__s">colonne: Cognome, Nome, Email, Codice fiscale, Azienda · da Excel: salva come CSV</div>
+        <div className="dropzone__s">colonne: Cognome, Nome, Email, Codice fiscale, Azienda, Data di nascita (gg/mm/aaaa), Luogo di nascita · da Excel: salva come CSV</div>
       </div>
       <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(parse); e.target.value = ''; }} />
 

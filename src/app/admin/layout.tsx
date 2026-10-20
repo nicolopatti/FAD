@@ -9,16 +9,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const supabase = createSupabaseServerClient();
 
   // Conteggi per le voci di sidebar (head: solo count, niente righe).
-  const [corsi, contenuti, sessioni] = await Promise.all([
+  const [corsi, contenuti, sessioni, attestati] = await Promise.all([
     supabase.from('corso').select('id', { count: 'exact', head: true }),
     supabase.from('learning_object').select('id', { count: 'exact', head: true }).is('archiviato_at', null),
     supabase.from('sessione').select('id', { count: 'exact', head: true }),
+    supabase.from('attestato').select('id', { count: 'exact', head: true }).is('sostituito_da', null),
   ]);
 
   const counts: Record<string, number> = {
     corsi: corsi.count ?? 0,
     contenuti: contenuti.count ?? 0,
     sessioni: sessioni.count ?? 0,
+    attestati: attestati.count ?? 0,
   };
 
   return (

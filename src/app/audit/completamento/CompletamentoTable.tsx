@@ -33,6 +33,7 @@ export type RigaCompletamento = {
   idonea: boolean;
   frequenza: { percentuale: number; soglia: number; ore: number; ore_pianificate: number; idoneo: boolean; non_parsate: number } | null;
   presenze: number;
+  attestato: { id: string; numero: string; emesso_at: string; automatico: boolean } | null;
   items: LoRiga[];
 };
 
@@ -146,6 +147,7 @@ export function CompletamentoTable({ righe }: { righe: RigaCompletamento[] }) {
                     <th>Lezioni</th>
                     <th>Idoneità</th>
                     <th>Frequenza</th>
+                    <th>Attestato</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -200,6 +202,14 @@ function RigaView({ r, open, pct, onToggle }: { r: RigaCompletamento; open: bool
               <div className="muted log-sub">soglia {r.frequenza.soglia}% · {r.frequenza.ore} h su {r.frequenza.ore_pianificate} h{r.frequenza.non_parsate > 0 ? ` · ${r.frequenza.non_parsate} durate non lette` : ''}</div>
             </>
           ) : r.presenze > 0 ? <span className="muted">{r.presenze} presenze</span> : <span className="muted">—</span>}
+        </td>
+        <td>
+          {r.attestato ? (
+            <>
+              <a className="mono" href={`/api/attestati/${r.attestato.id}/pdf`} target="_blank" rel="noreferrer" title="Apri il PDF">n. {r.attestato.numero}</a>
+              <div className="muted log-sub">del {fmtDataOra(r.attestato.emesso_at)} · {r.attestato.automatico ? 'automatico' : 'manuale'}</div>
+            </>
+          ) : <span className="muted">—</span>}
         </td>
       </tr>
       {open && (

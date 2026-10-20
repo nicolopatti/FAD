@@ -105,7 +105,7 @@ type SessioneFondoRow = {
   incarico: { persona: { nome: string; cognome: string } | null } | null;
 };
 
-function deriveIdoneita(
+export function deriveIdoneita(
   obbligatoriTotale: number,
   fadIdonea: boolean,
   soglia: number | null,

@@ -27,7 +27,7 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
 
   const { data: corso } = await supabase
     .from('corso')
-    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, creato_il')
+    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, creato_il')
     .eq('id', params.id)
     .maybeSingle<CorsoRow>();
   if (!corso) notFound();
@@ -84,6 +84,14 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
       `)
       .in('edizione_id', edizioneIds)
       .returns<IscrizioneJoin[]>(), 'gli iscritti');
+    // Attestati validi degli iscritti (Fase 5).
+    const { data: attestati } = await supabase
+      .from('attestato')
+      .select('id, iscrizione_id, numero, emesso_at')
+      .in('edizione_id', edizioneIds)
+      .is('sostituito_da', null)
+      .returns<{ id: string; iscrizione_id: string; numero: string; emesso_at: string }[]>();
+    const attestatoDi = new Map((attestati ?? []).map((a) => [a.iscrizione_id, a]));
     iscrittiByEdizione = iscrizioni.reduce<Record<string, IscrittoRow[]>>((acc, r) => {
       const arr = acc[r.edizione_id] ?? (acc[r.edizione_id] = []);
       arr.push({
@@ -95,6 +103,7 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
         azienda: r.azienda?.ragione_sociale ?? null,
         piano_id: r.piano_id,
         piano_titolo: r.piano?.titolo ?? null,
+        attestato: (() => { const a = attestatoDi.get(r.id); return a ? { id: a.id, numero: a.numero, emesso_at: a.emesso_at } : null; })(),
       });
       return acc;
     }, {});

@@ -52,6 +52,48 @@ export type EventoRow = {
   hash: string | null;
 };
 
+export type PoliticaAttestato = 'automatica' | 'manuale' | 'nessuna';
+
+export const POLITICA_ATTESTATO_LABEL: Record<PoliticaAttestato, string> = {
+  automatica: 'Automatico al completamento',
+  manuale: 'Emesso dall’amministratore',
+  nessuna: 'Nessun attestato',
+};
+
+/** Riga di `attestato` (snapshot write-once, Fase 5). */
+export type AttestatoRow = {
+  id: string;
+  tenant_id: string;
+  iscrizione_id: string;
+  persona_id: string;
+  corso_id: string;
+  edizione_id: string;
+  anno: number;
+  progressivo: number;
+  numero: string;
+  codice_verifica: string;
+  contenuto: Record<string, unknown>;
+  hash: string;
+  pdf_path: string;
+  emesso_at: string;
+  emesso_da: string | null;
+  sostituisce: string | null;
+  sostituito_da: string | null;
+};
+
+/** Dati dell'ente emittente su `tenant` (Fase 5). */
+export type EnteRow = {
+  id: string;
+  nome: string;
+  ragione_sociale: string | null;
+  logo_path: string | null;
+  firmatario_nome: string | null;
+  firmatario_ruolo: string | null;
+  firma_path: string | null;
+  citta: string | null;
+  linkedin_organization_id: string | null;
+};
+
 export type LearningObjectType = 'video' | 'documento' | 'quiz';
 
 export const LO_TYPE_LABEL: Record<LearningObjectType, string> = { video: 'Video', documento: 'Documento', quiz: 'Test' };
@@ -113,6 +155,10 @@ export type CorsoRow = {
   visione_integrale: boolean; // video completato solo a copertura ≥ 95% + ended (lib/visione.ts)
   categoria: string | null;
   cover_path: string | null;
+  // Fase 5 — dati dell'attestato (congelati con D22; ore e riferimento compilabili da vuoto)
+  ore_totali?: number | string | null;
+  riferimento_normativo?: string | null;
+  politica_attestato?: PoliticaAttestato;
   creato_il: string;
 };
 

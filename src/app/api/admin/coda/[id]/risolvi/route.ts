@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
+import { emettiAttestatoSeIdonea } from '@/lib/attestati';
 
 // Risoluzione manuale di un match (ambiguo/assente): scrive
 // presenza_webinar_registrata + match_risolto_manualmente via RPC (mai UPDATE).
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as
     | { iscrizione_id?: string; motivazione?: string }
     | null;
@@ -24,5 +25,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     p_motivazione: motivazione,
   });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-  return NextResponse.json({ ok: true, result: data });
+  // Fase 5: la presenza riconciliata può completare il percorso → attestato automatico.
+  const attestato = await emettiAttestatoSeIdonea(body.iscrizione_id, session.personaId).catch(() => null);
+  return NextResponse.json({ ok: true, result: data, attestato: attestato ? { numero: attestato.numero } : null });
 }

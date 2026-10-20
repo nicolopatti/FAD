@@ -4,7 +4,10 @@ import { requireSession } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { AppShell, Ico } from '@/components/AppShell';
-import { fmtDataOra } from '@/components/admin/Atlante';
+import { fmtDataOra, fmtData } from '@/components/admin/Atlante';
+import { linkedInAddToProfileUrl, provaEmissioneAutomatica } from '@/lib/attestati';
+import { appBaseUrl, urlVerifica } from '@/lib/url';
+import type { AttestatoRow, PoliticaAttestato } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,16 +26,32 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
 
   const { data: iscrizione } = await supabase
     .from('iscrizione')
-    .select('id, edizione:edizione_id ( codice, corso:corso_id ( descrizione ) )')
+    .select('id, edizione:edizione_id ( codice, corso:corso_id ( descrizione, politica_attestato ) )')
     .eq('persona_id', session.personaId)
     .eq('edizione_id', params.edizioneId)
-    .maybeSingle<{ id: string; edizione: { codice: string; corso: { descrizione: string | null } | null } | null }>();
+    .maybeSingle<{ id: string; edizione: { codice: string; corso: { descrizione: string | null; politica_attestato: PoliticaAttestato | null } | null } | null }>();
   if (!iscrizione) notFound();
 
   const prog = await computeProgressoForIscrizione(supabase, iscrizione.id);
   if (!prog) notFound();
 
   const descrizione = iscrizione.edizione?.corso?.descrizione ?? null;
+  const politica: PoliticaAttestato = iscrizione.edizione?.corso?.politica_attestato ?? 'automatica';
+
+  // Attestato valido di questa iscrizione (RLS: solo il titolare). Se il corso
+  // è completato, la politica è automatica e non c'è ancora (percorsi chiusi
+  // prima della Fase 5), si emette adesso.
+  const caricaAttestato = () => supabase
+    .from('attestato')
+    .select('*')
+    .eq('iscrizione_id', iscrizione.id)
+    .is('sostituito_da', null)
+    .maybeSingle<AttestatoRow>();
+  let { data: attestato } = await caricaAttestato();
+  if (!attestato && prog.idonea && politica === 'automatica') {
+    const emesso = await provaEmissioneAutomatica(iscrizione.id, session.personaId);
+    if (emesso) attestato = (await caricaAttestato()).data;
+  }
   const pct = prog.totale > 0 ? Math.round((prog.completati / prog.totale) * 100) : 0;
   const currentId = prog.items.find((i) => i.sbloccato && !i.completato)?.learning_object_id;
   const next = prog.items.find((i) => i.sbloccato && !i.completato) ?? prog.items.find((i) => i.sbloccato);
@@ -92,21 +111,53 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
 
       <div className="detail-layout">
         <section>
+          {prog.idonea && attestato && (
+            <section className="attestato-card" aria-labelledby="attestato">
+              <div className="attestato-card__head">
+                <div className="attestato-card__icon"><Ico name="cap" size={22} /></div>
+                <div>
+                  <h2 id="attestato" style={{ margin: 0 }}>Il tuo attestato</h2>
+                  <div className="page-lead">n. {attestato.numero} · emesso il {fmtData(attestato.emesso_at)}</div>
+                </div>
+              </div>
+              <p className="page-lead" style={{ margin: 0, lineHeight: 1.55 }}>
+                È un documento registrato e verificabile da chiunque abbia il codice stampato sopra: puoi scaricarlo, aggiungerlo al tuo profilo LinkedIn o condividere il badge.
+              </p>
+              <div className="attestato-card__actions">
+                <a className="btn" href={`/api/attestati/${attestato.id}/pdf`} target="_blank" rel="noreferrer"><Ico name="doc2" size={16} /> Scarica il PDF</a>
+                <a className="btn btn--secondary" href={linkedInAddToProfileUrl(attestato, appBaseUrl())} target="_blank" rel="noreferrer">Aggiungi a LinkedIn</a>
+                <a className="btn btn--ghost" href={`/api/attestati/${attestato.id}/badge`} target="_blank" rel="noreferrer">Badge da condividere</a>
+                <a className="btn btn--ghost" href={`/api/attestati/${attestato.id}/badge?formato=post`} target="_blank" rel="noreferrer">Badge per un post</a>
+              </div>
+              <div className="attestato-card__verify">
+                Pagina di verifica: <a href={urlVerifica(attestato.codice_verifica)} target="_blank" rel="noreferrer">{urlVerifica(attestato.codice_verifica).replace(/^https?:\/\//, '')}</a>
+              </div>
+            </section>
+          )}
+
           {prog.idonea && (
             <div style={{ marginBottom: 28 }}>
               <h2 style={{ marginBottom: 12 }}>E adesso?</h2>
               <div className="next-steps">
+                {!attestato && politica !== 'nessuna' && (
+                  <div className="next-step">
+                    <div className="next-step__icon"><Ico name="doc2" size={18} /></div>
+                    <div><strong>{politica === 'manuale' ? 'L’attestato lo rilascia il tuo ente' : 'L’attestato è in preparazione'}</strong><p>{politica === 'manuale' ? 'Il referente della formazione lo emette dopo i controlli del caso: lo troverai qui e nel tuo profilo.' : 'Ricarica questa pagina tra poco: appena pronto compare qui, con il PDF e il badge.'}</p></div>
+                  </div>
+                )}
+                {attestato && !(attestato.contenuto as { discente?: { data_nascita?: string | null } }).discente?.data_nascita && (
+                  <div className="next-step">
+                    <div className="next-step__icon"><Ico name="user" size={18} /></div>
+                    <div><strong>Manca la tua data di nascita sull&apos;attestato</strong><p>Completa data e luogo di nascita nel <Link href="/profilo">profilo</Link> e chiedi al tuo ente di riemettere l&apos;attestato, se ti serve con quei dati.</p></div>
+                  </div>
+                )}
                 <div className="next-step">
-                  <div className="next-step__icon"><Ico name="doc2" size={18} /></div>
-                  <div><strong>L&apos;attestato arriva dal tuo ente</strong><p>Il referente della formazione riceve l&apos;esito e lo trasmette a chi deve riceverlo. Non devi fare altro.</p></div>
-                </div>
-                <div className="next-step">
-                  <div className="next-step__icon next-step__icon--ok"><Ico name="cap" size={18} /></div>
+                  <div className="next-step__icon next-step__icon--ok"><Ico name="check" size={18} /></div>
                   <div><strong>Puoi rivedere le lezioni quando vuoi</strong><p>Il completamento resta valido: rivederle non cambia nulla nel registro.</p></div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-                <Link className="btn" href="/corsi">Vai ai tuoi corsi <Ico name="arrowR" size={14} /></Link>
+                <Link className="btn btn--ghost" href="/corsi">Vai ai tuoi corsi <Ico name="arrowR" size={14} /></Link>
               </div>
             </div>
           )}

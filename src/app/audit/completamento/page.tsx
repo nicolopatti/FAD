@@ -22,6 +22,14 @@ export default async function CompletamentoPage() {
     `)
     .returns<IscrizioneAuditRow[]>(), 'le iscrizioni');
 
+  // Attestati validi (uno per iscrizione): l'auditor li legge via RLS.
+  const { data: attestati } = await supabase
+    .from('attestato')
+    .select('id, iscrizione_id, numero, emesso_at, emesso_da')
+    .is('sostituito_da', null)
+    .returns<{ id: string; iscrizione_id: string; numero: string; emesso_at: string; emesso_da: string | null }[]>();
+  const attestatoDi = new Map((attestati ?? []).map((a) => [a.iscrizione_id, a]));
+
   // Ricalcolo dagli Eventi per ogni iscrizione (D8): la verità è il registro,
   // non le colonne-cache. (Blocco B #2: da portare in una funzione SQL.)
   const righe: RigaCompletamento[] = await Promise.all(
@@ -45,6 +53,7 @@ export default async function CompletamentoPage() {
           ? { percentuale: freq.frequenza_percentuale, soglia: freq.soglia, ore: freq.ore_frequentate, ore_pianificate: round1(freq.minuti_pianificati / 60), idoneo: freq.idoneo_frequenza, non_parsate: freq.durate_non_parsate }
           : null,
         presenze: freq?.presenze ?? 0,
+        attestato: (() => { const a = attestatoDi.get(i.id); return a ? { id: a.id, numero: a.numero, emesso_at: a.emesso_at, automatico: a.emesso_da == null } : null; })(),
         items: (prog?.items ?? []).map((it) => ({
           struttura_id: it.struttura_id,
           ordine: it.ordine,

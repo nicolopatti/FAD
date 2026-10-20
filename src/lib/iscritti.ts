@@ -8,7 +8,18 @@ export type IscrittoInput = {
   codice_fiscale?: string | null;
   azienda?: string | null;
   piano_id?: string | null;
+  data_nascita?: string | null;   // YYYY-MM-DD (per l'attestato)
+  luogo_nascita?: string | null;
 };
+
+function dataIso(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/); // formato italiano gg/mm/aaaa
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return null;
+}
 
 export type AddIscrittoResult =
   | { status: 'created'; iscrizione_id: string; persona_creata: boolean }
@@ -35,9 +46,14 @@ export async function addIscritto(
   const cf = (input.codice_fiscale ?? '')?.trim() || null;
   const azienda = (input.azienda ?? '')?.trim() || null;
   const pianoId = (input.piano_id ?? '')?.trim() || null;
+  const dataNascita = dataIso(input.data_nascita);
+  const luogoNascita = (input.luogo_nascita ?? '')?.trim().slice(0, 120) || null;
 
   if (!cognome || !nome || !email) {
     return { status: 'error', error: 'cognome, nome ed email sono obbligatori' };
+  }
+  if ((input.data_nascita ?? '').trim() && !dataNascita) {
+    return { status: 'error', error: 'data di nascita non valida (usa gg/mm/aaaa)' };
   }
 
   // 1) Azienda (opzionale) — find-or-create per ragione sociale nel tenant.
@@ -68,21 +84,25 @@ export async function addIscritto(
   let personaCreata = false;
   const { data: persona } = await supabase
     .from('persona')
-    .select('id, codice_fiscale')
+    .select('id, codice_fiscale, data_nascita, luogo_nascita')
     .eq('tenant_id', ctx.tenantId)
     .eq('email', email)
     .limit(1)
     .maybeSingle();
   if (persona) {
     personaId = persona.id as string;
-    // completa il CF se mancante (utile per la rendicontazione fondo)
-    if (cf && !persona.codice_fiscale) {
-      await supabase.from('persona').update({ codice_fiscale: cf }).eq('id', personaId);
+    // completa CF e dati di nascita se mancanti (rendicontazione e attestato)
+    const completa: Record<string, string> = {};
+    if (cf && !persona.codice_fiscale) completa.codice_fiscale = cf;
+    if (dataNascita && !persona.data_nascita) completa.data_nascita = dataNascita;
+    if (luogoNascita && !persona.luogo_nascita) completa.luogo_nascita = luogoNascita;
+    if (Object.keys(completa).length) {
+      await supabase.from('persona').update(completa).eq('id', personaId);
     }
   } else {
     const { data: created, error } = await supabase
       .from('persona')
-      .insert({ tenant_id: ctx.tenantId, nome, cognome, email, codice_fiscale: cf })
+      .insert({ tenant_id: ctx.tenantId, nome, cognome, email, codice_fiscale: cf, data_nascita: dataNascita, luogo_nascita: luogoNascita })
       .select('id')
       .single();
     if (error) return { status: 'error', error: `persona: ${error.message}` };

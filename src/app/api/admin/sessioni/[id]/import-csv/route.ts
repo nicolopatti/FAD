@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { csvToNormalizedRows, CsvAdapterError, type ColumnMapping } from '@/lib/csv';
 import { ingestGrezzo } from '@/lib/pipeline';
+import { emettiPerSessioneSeIdonee } from '@/lib/attestati';
 
 type ImportBody = { csv?: string; mapping?: ColumnMapping };
 
@@ -47,8 +48,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
       contenuto: normalized.rows,
       importatoDa: session.personaId,
     });
+    // Fase 5: l'import riconcilia le presenze in automatico → attestati per chi
+    // raggiunge la soglia (politica `automatica`).
+    const attestati = await emettiPerSessioneSeIdonee(params.id, session.personaId).catch(() => []);
     return NextResponse.json({
       ok: true,
+      attestati_emessi: attestati.length,
       result,
       headers: normalized.headers,
       annullata: Boolean(sessione.annullato_at),

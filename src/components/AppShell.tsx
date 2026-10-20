@@ -51,6 +51,8 @@ const NAV_BY_ROLE: Record<Role, { section: string; items: NavItem[] }> = {
       { key: 'contenuti', label: 'Contenuti', href: '/admin/learning-objects', ico: 'libreria' },
       { key: 'sessioni', label: 'Sessioni', href: '/admin/sessioni', ico: 'sessioni' },
       { key: 'report', label: 'Report fondi', href: '/admin/report-fondo', ico: 'report' },
+      { key: 'attestati', label: 'Attestati', href: '/admin/attestati', ico: 'shield' },
+      { key: 'ente', label: 'Ente', href: '/admin/ente', ico: 'users' },
     ],
   },
 };

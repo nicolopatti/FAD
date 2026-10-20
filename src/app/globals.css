@@ -1397,6 +1397,37 @@ h2 { font-weight: 700; letter-spacing: -.015em; }
 @media (max-width: 640px) { .quiz-ed__head { grid-template-columns: 30px minmax(0, 1fr); } .quiz-ed__tools { grid-column: 2; } .quiz-ed__risposte { padding-left: 0; } .quiz-ed .btn--xs { margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .quiz-result__ring, .quiz-result__ring svg path, .quiz-result__title, .quiz-result__sub, .quiz-result__actions { animation: none; opacity: 1; transform: none; stroke-dashoffset: 0; } }
 
+.link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-decoration: underline; }
+.link-btn:disabled { opacity: .5; cursor: default; }
+
+/* attestato — discente */
+.attestato-card { display: flex; flex-direction: column; gap: 14px; padding: 22px 24px; background: var(--surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-2); margin-bottom: 28px; animation: rise var(--dur-3) .2s var(--ease-out) both; }
+.attestato-card__head { display: flex; align-items: center; gap: 14px; }
+.attestato-card__icon { flex: none; width: 46px; height: 46px; border-radius: 50%; background: var(--deep); color: var(--mint); display: grid; place-items: center; }
+.attestato-card__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.attestato-card__verify { font-size: 13px; color: var(--muted); word-break: break-all; }
+.attestati-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.attestati-list__item { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; background: var(--bg); border-radius: var(--radius-lg); }
+.attestati-list__icon { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--deep); color: var(--mint); display: grid; place-items: center; }
+
+/* verifica pubblica */
+.verifica { min-height: 100dvh; display: flex; align-items: flex-start; justify-content: center; padding: clamp(20px, 5vw, 56px) 16px; background: var(--bg); }
+.verifica__card { width: 100%; max-width: 640px; background: var(--surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-2); padding: clamp(22px, 4vw, 36px); display: flex; flex-direction: column; gap: 16px; }
+.verifica__brand { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--muted); font-size: 14px; }
+.verifica__brand .brand__mark { width: 28px; height: 28px; border-radius: 8px; background: var(--deep); color: #fff; display: grid; place-items: center; }
+.verifica__stato { font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 3vw, 28px); line-height: 1.15; padding: 14px 18px; border-radius: var(--radius-lg); }
+.verifica__stato--ok { background: var(--ok-soft); color: var(--ok); }
+.verifica__stato--warn { background: var(--warn-soft); color: var(--warn); }
+.verifica__stato--no { background: var(--bad-soft); color: var(--bad); }
+.verifica__dati { margin: 0; display: grid; grid-template-columns: 1fr; gap: 10px; }
+.verifica__dati > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: baseline; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.verifica__dati dt { font-size: 13px; color: var(--muted); }
+.verifica__dati dd { margin: 0; font-size: 15px; color: var(--ink); }
+.verifica__nome { font-family: var(--font-display); font-weight: 700; font-size: 22px; }
+.verifica__hash { font-size: 12px; word-break: break-all; }
+.verifica__nota { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
+@media (max-width: 520px) { .verifica__dati > div { grid-template-columns: 1fr; gap: 2px; } }
+
 /* completamento */
 .compl-prog { display: flex; flex-direction: column; gap: 4px; }
 .compl-prog__n { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }

@@ -10,7 +10,12 @@ type UpdateBody = {
   visione_integrale?: boolean;
   categoria?: string | null;
   cover_path?: string | null;
+  ore_totali?: number | string | null;
+  riferimento_normativo?: string | null;
+  politica_attestato?: string;
 };
+
+const POLITICHE = new Set(['automatica', 'manuale', 'nessuna']);
 
 export async function PATCH(
   request: Request,
@@ -41,6 +46,22 @@ export async function PATCH(
   if (body.cover_path !== undefined) {
     updates.cover_path = typeof body.cover_path === 'string' ? (body.cover_path.trim() || null) : null;
   }
+  // Dati dell'attestato (Fase 5). A corso congelato il DB accetta solo il
+  // passaggio da vuoto a valore (D22 esteso): il trigger risponde con errore.
+  if (body.ore_totali !== undefined) {
+    const ore = body.ore_totali == null || body.ore_totali === '' ? null : Number(String(body.ore_totali).replace(',', '.'));
+    if (ore != null && (!Number.isFinite(ore) || ore <= 0 || ore > 9999)) {
+      return NextResponse.json({ ok: false, error: 'ore totali non valide' }, { status: 400 });
+    }
+    updates.ore_totali = ore;
+  }
+  if (body.riferimento_normativo !== undefined) {
+    updates.riferimento_normativo = typeof body.riferimento_normativo === 'string' ? (body.riferimento_normativo.trim() || null) : null;
+  }
+  if (body.politica_attestato !== undefined) {
+    if (!POLITICHE.has(body.politica_attestato)) return NextResponse.json({ ok: false, error: 'politica attestato non valida' }, { status: 400 });
+    updates.politica_attestato = body.politica_attestato;
+  }
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ ok: false, error: 'nessun campo da aggiornare' }, { status: 400 });
   }
@@ -50,9 +71,12 @@ export async function PATCH(
     .from('corso')
     .update(updates)
     .eq('id', params.id)
-    .select('id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, creato_il')
+    .select('id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, creato_il')
     .single();
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  if (error) {
+    const msg = error.message.includes('congelato') ? 'Corso congelato: ore e riferimento normativo si compilano una volta sola se erano vuoti; gli altri campi strutturali non si cambiano.' : error.message;
+    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+  }
 
   // Se l'unico cambiamento è la copertina, è un evento dedicato (avviene anche
   // a corso congelato: la copertina non è un campo strutturale).

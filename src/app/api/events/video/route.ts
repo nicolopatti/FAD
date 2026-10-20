@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { appendEvent } from '@/lib/audit';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { coperturaSecondi, normalizzaSegmenti } from '@/lib/visione';
+import { provaEmissioneAutomatica } from '@/lib/attestati';
 
 const ALLOWED = new Set(['video.play', 'video.pause', 'video.seek', 'video.ended', 'video.progress']);
 
@@ -98,5 +99,9 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({ ok: true });
+  // Fase 5: se questo era l'ultimo passo, l'attestato si emette da solo
+  // (politica `automatica`). Mai un errore verso il player.
+  const attestato = eventType === 'video.ended' ? await provaEmissioneAutomatica(iscrizione.id, persona.id) : null;
+
+  return NextResponse.json({ ok: true, attestato: attestato ? { numero: attestato.numero } : null });
 }

@@ -10,7 +10,8 @@ export type GruppoEvento =
   | 'catalogo'
   | 'edizioni'
   | 'presenze'
-  | 'fondi';
+  | 'fondi'
+  | 'attestati';
 
 export const GRUPPI: { id: GruppoEvento; etichetta: string }[] = [
   { id: 'accesso', etichetta: 'Accessi' },
@@ -21,6 +22,7 @@ export const GRUPPI: { id: GruppoEvento; etichetta: string }[] = [
   { id: 'edizioni', etichetta: 'Edizioni e iscrizioni' },
   { id: 'presenze', etichetta: 'Sessioni e presenze' },
   { id: 'fondi', etichetta: 'Report fondi' },
+  { id: 'attestati', etichetta: 'Attestati' },
 ];
 
 export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[] = [
@@ -66,6 +68,9 @@ export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[]
   { tipo: 'presenza_inserita_manualmente', etichetta: 'Presenza inserita a mano', gruppo: 'presenze' },
   { tipo: 'presenza_corretta_manualmente', etichetta: 'Presenza corretta a mano', gruppo: 'presenze' },
   { tipo: 'report_fondo_depositato', etichetta: 'Report fondo depositato', gruppo: 'fondi' },
+  { tipo: 'attestato.emesso', etichetta: 'Attestato emesso', gruppo: 'attestati' },
+  { tipo: 'attestato.sostituito', etichetta: 'Attestato sostituito', gruppo: 'attestati' },
+  { tipo: 'ente.updated', etichetta: 'Dati dell’ente aggiornati', gruppo: 'catalogo' },
 ];
 
 const BY_TIPO = new Map(EVENTI.map((e) => [e.tipo, e]));
@@ -148,6 +153,12 @@ export function riassuntoEvento(tipo: string, payload: Record<string, unknown> |
       return str('durata') ? `durata ${str('durata')}` : num('durata_minuti') != null ? `${num('durata_minuti')} min` : '';
     case 'report_fondo_depositato':
       return str('formato') ? `formato ${str('formato')}` : '';
+    case 'attestato.emesso':
+      return [str('numero') ? `n. ${str('numero')}` : null, p.automatico === true ? 'automatico' : 'manuale', str('sostituisce') ? 'riemissione' : null].filter(Boolean).join(' · ');
+    case 'attestato.sostituito':
+      return [str('numero_nuovo') ? `sostituito dal n. ${str('numero_nuovo')}` : null, str('motivazione')].filter(Boolean).join(' · ');
+    case 'ente.updated':
+      return Array.isArray(p.campi) ? (p.campi as string[]).join(', ') : '';
     default:
       return '';
   }

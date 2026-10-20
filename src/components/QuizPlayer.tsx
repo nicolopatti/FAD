@@ -10,7 +10,7 @@ import { fmtDataOra } from '@/components/admin/Atlante';
 import { useFeedback } from '@/components/ui/Feedback';
 
 type Correzione = { domanda_id: string; corretta: boolean; giuste?: number[] };
-type Risultato = { tentativo: number; punteggio: number; totale: number; percentuale: number; soglia: number; superato: boolean; correzione: Correzione[]; tentativi_max: number | null };
+type Risultato = { tentativo: number; punteggio: number; totale: number; percentuale: number; soglia: number; superato: boolean; correzione: Correzione[]; tentativi_max: number | null; attestato?: { numero: string } | null };
 
 type Props = {
   iscrizioneId: string;
@@ -141,6 +141,9 @@ export function QuizPlayer({ iscrizioneId, learningObjectId, domande, soglia, te
             {risultato ? `${risultato.punteggio} risposte giuste su ${risultato.totale} · ${perc}%` : `${perc}%`} · soglia {soglia}% · tentativo {tentativo}
             {!risultato && esito.superato_il ? ` · registrato il ${fmtDataOra(esito.superato_il)}` : ''}
           </div>
+          {risultato?.attestato && (
+            <div className="quiz-result__sub" style={{ color: 'var(--mint)' }}>Percorso completato: il tuo attestato n. {risultato.attestato.numero} è pronto nella pagina del corso.</div>
+          )}
           <div className="quiz-result__actions">
             {sup && nextHref && <Link className="btn btn--light" href={nextHref as Route}>{nextLabel ?? 'Lezione successiva'}</Link>}
             {sup && <Link className="btn btn--glass" href={corsoHref as Route}>Torna al corso</Link>}

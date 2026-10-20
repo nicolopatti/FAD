@@ -5,6 +5,7 @@ import { appendEvent } from '@/lib/audit';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { configQuizDa, correggi, type RisposteDate } from '@/lib/quiz';
 import type { QuizDomandaRow } from '@/lib/db-types';
+import { provaEmissioneAutomatica } from '@/lib/attestati';
 
 // Test finale (Fase 5). Due eventi:
 //  - quiz.started   → apertura di un tentativo (payload: tentativo)
@@ -107,8 +108,13 @@ export async function POST(request: Request) {
     },
   });
 
+  // Fase 5: con il test superato il percorso può essere completo → attestato
+  // automatico (politica `automatica`). Mai un errore verso il player.
+  const attestato = esito.superato ? await provaEmissioneAutomatica(iscrizione.id, persona.id) : null;
+
   return NextResponse.json({
     ok: true,
+    attestato: attestato ? { numero: attestato.numero } : null,
     tentativo,
     punteggio: esito.punteggio,
     totale: esito.totale,

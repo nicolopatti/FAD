@@ -9,7 +9,12 @@ type CreateBody = {
   sblocco_sequenziale?: boolean;
   visione_integrale?: boolean;
   categoria?: string | null;
+  ore_totali?: number | string | null;
+  riferimento_normativo?: string | null;
+  politica_attestato?: string;
 };
+
+const POLITICHE = new Set(['automatica', 'manuale', 'nessuna']);
 
 export async function POST(request: Request) {
   const session = await requireAdmin();
@@ -20,6 +25,12 @@ export async function POST(request: Request) {
   if (!titolo) {
     return NextResponse.json({ ok: false, error: 'titolo mancante' }, { status: 400 });
   }
+  const ore = body.ore_totali == null || body.ore_totali === '' ? null : Number(String(body.ore_totali).replace(',', '.'));
+  if (ore != null && (!Number.isFinite(ore) || ore <= 0 || ore > 9999)) {
+    return NextResponse.json({ ok: false, error: 'ore totali non valide' }, { status: 400 });
+  }
+  const politica = body.politica_attestato ?? 'automatica';
+  if (!POLITICHE.has(politica)) return NextResponse.json({ ok: false, error: 'politica attestato non valida' }, { status: 400 });
 
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
@@ -27,12 +38,15 @@ export async function POST(request: Request) {
     .insert({
       tenant_id: session.tenantId,
       titolo,
+      ore_totali: ore,
+      riferimento_normativo: body.riferimento_normativo?.trim() || null,
+      politica_attestato: politica,
       descrizione: body.descrizione?.trim() || null,
       sblocco_sequenziale: body.sblocco_sequenziale ?? true,
       visione_integrale: body.visione_integrale === true,
       categoria: body.categoria?.trim() || null,
     })
-    .select('id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, creato_il')
+    .select('id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, creato_il')
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
