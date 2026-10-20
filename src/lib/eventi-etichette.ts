@@ -28,6 +28,9 @@ export const GRUPPI: { id: GruppoEvento; etichetta: string }[] = [
 export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[] = [
   { tipo: 'auth.login', etichetta: 'Accesso', gruppo: 'accesso' },
   { tipo: 'auth.logout', etichetta: 'Uscita', gruppo: 'accesso' },
+  { tipo: 'auth.password_aggiornata', etichetta: 'Password aggiornata', gruppo: 'accesso' },
+  { tipo: 'informativa.accettata', etichetta: 'Informativa accettata', gruppo: 'accesso' },
+  { tipo: 'persona.invitata', etichetta: 'Invito inviato', gruppo: 'edizioni' },
   { tipo: 'video.play', etichetta: 'Video avviato', gruppo: 'video' },
   { tipo: 'video.pause', etichetta: 'Video in pausa', gruppo: 'video' },
   { tipo: 'video.seek', etichetta: 'Salto nel video', gruppo: 'video' },

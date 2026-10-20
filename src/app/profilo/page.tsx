@@ -8,6 +8,7 @@ import { linkedInAddToProfileUrl } from '@/lib/attestati';
 import { appBaseUrl } from '@/lib/url';
 import type { AttestatoRow } from '@/lib/db-types';
 import { ProfiloForm } from './ProfiloForm';
+import { PasswordForm } from './PasswordForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,8 +36,9 @@ export default async function ProfiloPage() {
             <div style={{ fontSize: 16, color: 'var(--ink)' }}>{session.email}</div>
           </div>
           <p className="page-lead" style={{ margin: 0 }}>
-            Per cambiare nome, email o password rivolgiti al referente della formazione della tua azienda.
+            Per cambiare nome o email rivolgiti al referente della formazione della tua azienda.
           </p>
+          <PasswordForm />
           <div><LogoutButton /></div>
         </div>
 

@@ -338,6 +338,69 @@ lanciare con `NODE_USE_ENV_PROXY=1` (Chromium non passa dal proxy). Richiede
 `playwright` (devDependency) e un browser: in CI `npx playwright install
 chromium` prima di lanciarlo, con un deploy di anteprima come `E2E_BASE_URL`.
 
+### Test di carico (k6)
+
+`tests/carico/player.js` simula N discenti che guardano un video e mandano gli
+eventi del player (play, poi un avanzamento ogni `INTERVALLO` secondi). Scrive
+eventi veri: va lanciato contro uno **staging** o un'anteprima, sul tenant di
+carico creato da `supabase/seed/carico_tenant.sql` (300 utenti
+`carico-001@fad.local`…, password `carico-pass-123`, stream del registro
+separato). Serve [k6](https://k6.io) installato.
+
+```bash
+SUPABASE_URL=https://<ref>.supabase.co SUPABASE_ANON_KEY=<anon> \
+BASE_URL=https://<anteprima>.vercel.app VUS=300 DURATA=10m npm run test:carico
+# MODO=rpc misura il solo DB (chiamata diretta alla RPC evento_player_registra)
+```
+
+Soglie: errori < 1 %, p95 < `P95_MS` (1500 ms). Supabase Auth limita i login per
+IP (30 ogni 5 minuti): per 300 utenti alzare il limite in Auth → Rate limits o
+usare `UTENTI` più basso. Dopo il test, sul DB, `pg_stat_statements` dà il tempo
+medio della RPC (query in testa allo script).
+
+### Smoke dopo il deploy e controllo giornaliero
+
+`.github/workflows/smoke-deploy.yml` gira a ogni deploy Vercel riuscito
+(anteprima e produzione, evento `deployment_status`), ogni mattina sulla
+produzione e a richiesta: controlla le pagine pubbliche con `curl` e, se nei
+Secrets del repo ci sono `E2E_DISCENTE_PASSWORD`, `E2E_AUDITOR_PASSWORD`,
+`E2E_ADMIN_PASSWORD` (più le email, opzionali), esegue anche la suite E2E dei tre
+ruoli contro quell'URL. Un fallimento arriva come email di GitHub Actions: è il
+monitoraggio minimo senza servizi aggiuntivi.
+
+### Inviti, password dimenticata, cambio password
+
+- Le Persone importate come iscritti nascono **senza utente**: dal Course Builder,
+  sezione Iscritti, colonna **Accesso** → "Invita" (o "Invita tutti"). L'admin
+  crea l'utente Supabase Auth e manda l'email con il link; il discente atterra su
+  `/auth/reimposta`, sceglie la password e al primo accesso accetta l'informativa
+  (Evento `informativa.accettata`). Eventi `persona.invitata` senza PII.
+- `/password-dimenticata` → email di Supabase → `/auth/reimposta`. Cambio password
+  dal profilo (`/profilo`), Evento `auth.password_aggiornata`.
+- **Email**: senza SMTP proprio Supabase usa il suo mailer con limiti molto bassi
+  (adatto solo ai test). Per l'uso reale: Supabase → Auth → SMTP Settings (es.
+  Resend, Postmark, Brevo), poi Auth → Email Templates per testi in italiano. I link
+  dei modelli predefiniti portano la sessione nel frammento `#…` e li gestisce la
+  pagina nel browser; con modelli personalizzati si può usare
+  `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery` (o
+  `invite`), gestito lato server da `/auth/callback`.
+
+### Staging separato (runbook)
+
+Oggi le anteprime Vercel usano il DB di produzione. Per uno staging serve un
+secondo progetto Supabase: con il piano Free l'organizzazione può avere **due
+progetti attivi** e sono già occupati (`acli-gestionale`, `fad-fase-1`), quindi
+serve il piano Pro o la pausa di un progetto. Passi, una volta disponibile:
+1. creare il progetto (stessa regione), applicare le migration in ordine
+   (`supabase db push --linked` o `apply_migration` via MCP), `npm run bootstrap`
+   con la service role del nuovo progetto;
+2. su Vercel impostare per l'ambiente **Preview** `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` del nuovo progetto
+   e `NEXT_PUBLIC_APP_URL` dell'anteprima;
+3. nel nuovo progetto Auth → URL Configuration: redirect `https://fad-*-nicolopattis-projects.vercel.app/**`;
+4. i secrets `E2E_*` di GitHub puntano alle utenze demo dello staging: da lì in poi
+   il workflow di smoke prova le anteprime su dati finti, mai sulla produzione.
+
 ## Architettura — i 5 invarianti
 
 1. **Tenant-ready dal giorno 1 (D2).**

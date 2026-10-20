@@ -11,6 +11,8 @@ const browser = await apriBrowser();
   const { ctx, page } = await nuovaPagina(browser, { width: 390, height: 844 });
   await paginaOk(page, '/login', 'pubblico: login (390)', /Bentornato|Entra|Accedi/);
   await paginaOk(page, '/verifica/000000000000000000000000', 'pubblico: verifica con codice inesistente', 'Nessun attestato');
+  await paginaOk(page, '/password-dimenticata', 'pubblico: password dimenticata', 'Password dimenticata');
+  await paginaOk(page, '/auth/reimposta', 'pubblico: reimposta senza link → messaggio di link non valido', /Link non valido|verificando/);
   const r = await page.request.get(`${BASE}/api/attestati/00000000-0000-0000-0000-000000000000/pdf`);
   check('pubblico: PDF privato senza accesso → 401', r.status() === 401, String(r.status()));
   await ctx.close();

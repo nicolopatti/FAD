@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Ico } from '@/components/AppShell';
+import { LoginBrand, LoginPreview } from './LoginPreview';
 
 // Traduzione dei messaggi di Supabase Auth: all'utente arriva una frase in
 // italiano che dice anche cosa fare, mai il testo grezzo in inglese.
@@ -18,13 +20,26 @@ function messaggioErrore(raw: string): string {
   return `Accesso non riuscito: ${raw}`;
 }
 
+const AVVISI: Record<string, string> = {
+  link: 'Il link non è più valido o è già stato usato: richiedi un nuovo link con "Password dimenticata".',
+  password: 'Password aggiornata: entra con quella nuova.',
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mostra, setMostra] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avviso, setAvviso] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    // Letto dal browser per non richiedere un confine Suspense su useSearchParams.
+    const p = new URLSearchParams(window.location.search);
+    const a = p.get('errore') ?? p.get('info');
+    if (a && AVVISI[a]) setAvviso(AVVISI[a]);
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -50,12 +65,7 @@ export default function LoginPage() {
   return (
     <div className="login">
       <section className="login__form">
-        <span className="topbar__brand">
-          <span className="topbar__mark" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M6 4l14 8-14 8z" /></svg>
-          </span>
-          FAD
-        </span>
+        <LoginBrand />
 
         <form onSubmit={handleLogin}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -65,6 +75,12 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {avviso && !error && (
+            <div className="login__error" role="status" style={{ background: 'var(--surface-2, var(--bg))', color: 'var(--ink)' }}>
+              <Ico name="info" size={18} />
+              <div>{avviso}</div>
+            </div>
+          )}
           {error && (
             <div className="login__error" role="alert">
               <Ico name="info" size={18} />
@@ -88,9 +104,9 @@ export default function LoginPage() {
           <div className="login__field">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <label htmlFor="password">Password</label>
-              <span className="page-lead" style={{ fontSize: 13 }} title="Chiedila al referente della formazione">
-                Password dimenticata? Chiedi al tuo referente.
-              </span>
+              <Link href="/password-dimenticata" className="page-lead" style={{ fontSize: 13 }}>
+                Password dimenticata?
+              </Link>
             </div>
             <div className="login__pw">
               <input
@@ -124,26 +140,7 @@ export default function LoginPage() {
         </p>
       </section>
 
-      {/* Anteprima: racconta che è una piattaforma video e cosa succede dentro */}
-      <section className="login__preview" aria-hidden="true">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 460 }}>
-          <h2>Video, ritmo tuo, risultato certo.</h2>
-          <p>Le lezioni si sbloccano una dopo l&apos;altra e ogni completamento resta registrato: a fine corso il risultato è già registrato.</p>
-        </div>
-        <div className="login__player">
-          <span className="login__play">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5l12 7-12 7z" /></svg>
-          </span>
-          <div className="login__bar">
-            <div className="login__bar-meta"><span>Lezione 3 · Il sistema dei finanziamenti privati</span><span>5:31 / 8:39</span></div>
-            <div className="login__bar-track"><div className="login__bar-fill" /></div>
-          </div>
-        </div>
-        <div className="login__card">
-          <span className="ok"><Ico name="check" size={13} /></span>
-          <span><strong>Lezione 2 completata</strong> · registrata alle 09:31</span>
-        </div>
-      </section>
+      <LoginPreview />
     </div>
   );
 }

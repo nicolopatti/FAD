@@ -17,7 +17,7 @@ type IscrizioneJoin = {
   id: string;
   edizione_id: string;
   piano_id: string | null;
-  persona: { id: string; nome: string; cognome: string; email: string; codice_fiscale: string | null } | null;
+  persona: { id: string; nome: string; cognome: string; email: string; codice_fiscale: string | null; auth_user_id: string | null } | null;
   azienda: { ragione_sociale: string } | null;
   piano: { titolo: string } | null;
 };
@@ -92,7 +92,7 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
       .from('iscrizione')
       .select(`
         id, edizione_id, piano_id,
-        persona:persona_id ( id, nome, cognome, email, codice_fiscale ),
+        persona:persona_id ( id, nome, cognome, email, codice_fiscale, auth_user_id ),
         azienda:azienda_id ( ragione_sociale ),
         piano:piano_id ( titolo )
       `)
@@ -110,6 +110,8 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
       const arr = acc[r.edizione_id] ?? (acc[r.edizione_id] = []);
       arr.push({
         iscrizione_id: r.id,
+        persona_id: r.persona?.id ?? '',
+        accesso: Boolean(r.persona?.auth_user_id),
         nome: r.persona?.nome ?? '',
         cognome: r.persona?.cognome ?? '',
         email: r.persona?.email ?? '',

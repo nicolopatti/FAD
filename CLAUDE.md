@@ -433,6 +433,50 @@ scratchpad `pw/` (da portare in repo con i test E2E del Blocco E). Senza
 `SUPABASE_SERVICE_ROLE_KEY` nell'ambiente le route di scrittura falliscono dopo la
 modifica DB: dal container si provano solo letture e validazioni.
 
+## Resto del piano: carico, smoke in CI, inviti/password, staging (2026-10-20, "fai quello che manca")
+
+- **Test di carico (Blocco B/E).** `tests/carico/player.js` (k6, `npm run test:carico`):
+  login degli utenti in `setup()`, cookie di sessione nel formato `@supabase/ssr` 0.5
+  (`base64-` + base64url del JSON di sessione, pezzi da 3180), poi per VU un `video.play`
+  e un `video.progress` ogni `INTERVALLO` s; `MODO=rpc` colpisce direttamente
+  `evento_player_registra` via PostgREST. Soglie: errori < 1 %, p95 < 1500 ms. Tenant
+  dedicato **`cccc0000-0000-4000-8000-0000000000c0` "Tenant carico (test)"** creato sul
+  live da `supabase/seed/carico_tenant.sql` (300 discenti `carico-NNN@fad.local` /
+  `carico-pass-123`, admin `carico-admin@fad.local`, corso a 1 video, edizione
+  `ED-CARICO-01`, utenti Auth inseriti in SQL con bcrypt + `auth.identities`; stream
+  del registro proprio, 305 eventi, catena integra). Limite: Supabase Auth 30 login
+  ogni 5 minuti per IP → per 300 VU alzare il limite o `UTENTI` più basso. Il binario
+  k6 non è nel repo: nel container si scarica da GitHub releases (v0.54, funziona con
+  `HTTPS_PROXY` + `SSL_CERT_FILE=/root/.ccr/ca-bundle.crt`, `NO_PROXY=localhost`).
+  Esito della prova locale: vedi sezione sotto "Prova di carico dal container".
+- **Smoke post-deploy + E2E in CI (Blocco C/E).** `.github/workflows/smoke-deploy.yml`:
+  `deployment_status` (ogni deploy Vercel riuscito, anteprima e produzione) + cron
+  giornaliero + manuale; curl su login/verifica/pdf-privato, poi `npm run test:e2e` se
+  ci sono i secrets `E2E_*_PASSWORD`. Alert = email di workflow fallito. **Deve stare su
+  `main`** per il cron; l'evento `deployment_status` arriva sul ref del deploy.
+- **Inviti, reset e cambio password, informativa (Blocco C/D).** `/password-dimenticata`
+  (`resetPasswordForEmail` → `/auth/reimposta`), `/auth/reimposta` (client: il browser
+  client di Supabase riconosce da solo la sessione dal frammento `#…` o da `?code=`;
+  al primo accesso — nessun Evento `informativa.accettata` — chiede l'accettazione),
+  `/auth/callback` (route server per `?code=`/`?token_hash=` dei modelli email
+  personalizzati), `POST /api/profilo/password` (updateUser + Evento
+  `auth.password_aggiornata`), `POST /api/profilo/informativa` (Evento con `versione`),
+  `PasswordForm` in `/profilo`. Admin: colonna **Accesso** fra gli iscritti (chip
+  "attivo" o "Invita"; "Invita tutti" per edizione) → `src/lib/inviti.ts`
+  `invitaPersona` (`auth.admin.inviteUserByEmail` con redirect a `/auth/reimposta`,
+  ricollega un utente Auth già esistente, aggiorna `persona.auth_user_id`, Evento
+  `persona.invitata`), route `POST /api/admin/persone/[id]/invita` e
+  `POST /api/admin/edizioni/[id]/invita`. Middleware: fail-fast anche su
+  `/api/profilo/password|informativa`. **Email**: senza SMTP proprio Supabase manda
+  pochissime email l'ora → runbook nel README (SMTP + template). Le pagine si sono
+  verificate nel browser headless; l'invio reale delle email e il link di atterraggio
+  **vanno provati dall'utente** nell'anteprima (serve la chiave di servizio).
+- **Staging**: NON creato. L'organizzazione Supabase ha già 2 progetti attivi sul piano
+  Free (`acli-gestionale`, `fad-fase-1`) e il Free ne ammette due: serve Pro o mettere
+  in pausa uno dei due. Runbook completo nel README ("Staging separato").
+- **Blocco D (tracciati ufficiali fondi, Teams)**: restano runbook esterni, servono
+  materiali/accessi dell'utente.
+
 ## Blocco B #2/#8 — report per edizione + onboarding di un ente (2026-10-20)
 
 **Il Blocco B è chiuso** (restano solo i test di carico k6, Blocco E).
@@ -1467,6 +1511,15 @@ PG_URL='postgres://postgres:testpass@127.0.0.1:5432/fad_test' npm run test:m1a
     confronta i campi dell'utente rotto con quelli di un utente buono
     (`select confirmation_token, recovery_token, … from auth.users where
     email in (…)`) — i NULL saltano fuori subito.
+13. **`next start` dopo una build con `NEXT_PUBLIC_*` segnaposto non funziona nel
+    browser**: le variabili `NEXT_PUBLIC_*` vengono incorporate nel bundle client al
+    momento della `build` (`placeholder.supabase.co` resta nel JS anche se a runtime
+    passi i valori veri; il login fallisce con "Non riusciamo a raggiungere il
+    servizio"). Per provare la build di produzione in locale (E2E, k6) compilare con
+    l'URL e la anon key veri; la build di sola verifica (CI) può restare col segnaposto.
+    E `pkill -f "next star[t]"` va lanciato in un comando **separato**: se nella stessa
+    riga di shell compare poi `npx next start …`, il pattern combacia con la shell
+    stessa e la uccide (exit 144).
 12. **Container senza `node_modules` all'avvio**: la sessione Claude Code on
     the web parte con la repo clonata ma le dipendenze NON installate. Eseguire
     **`npm ci`** prima di `npm run typecheck`/`build`/`test:fase4`, altrimenti

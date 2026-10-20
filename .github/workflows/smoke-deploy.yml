@@ -1,0 +1,65 @@
+# Smoke test dopo ogni deploy Vercel (anteprima e produzione) + controllo
+# giornaliero della produzione. Senza nuovi servizi: se fallisce, GitHub manda
+# l'email di workflow fallito (Blocco C "monitoraggio/alert", Blocco E "E2E in
+# CI con deploy di anteprima").
+#
+# 1) pagine pubbliche con curl (sempre);
+# 2) E2E read-only dei tre ruoli (tests/e2e) SOLO se nei Secrets del repo ci
+#    sono E2E_DISCENTE_PASSWORD, E2E_AUDITOR_PASSWORD, E2E_ADMIN_PASSWORD
+#    (le email hanno i default demo; vedi tests/e2e/lib.mjs).
+name: Smoke dopo il deploy
+
+on:
+  deployment_status:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL da provare
+        default: https://fad-wine.vercel.app
+        required: true
+
+jobs:
+  smoke:
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    env:
+      URL: ${{ github.event.deployment_status.environment_url || github.event.inputs.url || 'https://fad-wine.vercel.app' }}
+      HA_SECRETS: ${{ secrets.E2E_DISCENTE_PASSWORD != '' && secrets.E2E_AUDITOR_PASSWORD != '' && secrets.E2E_ADMIN_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: pagine pubbliche (${{ env.URL }})
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -L -o /tmp/login.html -w '%{http_code}' "$URL/login")
+          test "$code" = "200" || { echo "login: HTTP $code"; exit 1; }
+          grep -q "Bentornato" /tmp/login.html || { echo "login: testo atteso non trovato"; exit 1; }
+          code=$(curl -sS -L -o /dev/null -w '%{http_code}' "$URL/verifica/000000000000000000000000")
+          test "$code" = "200" || { echo "verifica: HTTP $code"; exit 1; }
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "$URL/api/attestati/00000000-0000-0000-0000-000000000000/pdf")
+          test "$code" = "401" || { echo "pdf privato: HTTP $code (atteso 401)"; exit 1; }
+          echo "ok: login, verifica pubblica, pdf privato protetto"
+
+      - uses: actions/setup-node@v4
+        if: env.HA_SECRETS == 'true'
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: dipendenze + Chromium
+        if: env.HA_SECRETS == 'true'
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: E2E dei tre ruoli (sola lettura)
+        if: env.HA_SECRETS == 'true'
+        env:
+          E2E_BASE_URL: ${{ env.URL }}
+          E2E_DISCENTE_EMAIL: ${{ secrets.E2E_DISCENTE_EMAIL }}
+          E2E_DISCENTE_PASSWORD: ${{ secrets.E2E_DISCENTE_PASSWORD }}
+          E2E_AUDITOR_EMAIL: ${{ secrets.E2E_AUDITOR_EMAIL }}
+          E2E_AUDITOR_PASSWORD: ${{ secrets.E2E_AUDITOR_PASSWORD }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: npm run test:e2e

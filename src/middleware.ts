@@ -6,7 +6,7 @@ import { updateSession } from '@/lib/supabase/middleware';
 // la chiave manca, meglio rifiutare subito (503) che lasciare righe senza
 // Evento nel registro. Gli eventi del player video/documento e il profilo
 // passano per RPC con il client dell'utente e non ne hanno bisogno.
-const SCRITTURA = /^\/api\/(admin\/|events\/quiz$)/;
+const SCRITTURA = /^\/api\/(admin\/|events\/quiz$|profilo\/(password|informativa)$)/;
 // POST di sola lettura (nessuna scrittura, nessun Evento): passano comunque.
 const SOLO_LETTURA = /^\/api\/admin\/attestati\/anteprima$/;
 const MUTANTI = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);

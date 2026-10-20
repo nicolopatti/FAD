@@ -30,6 +30,9 @@ import { isEmail, isCodiceFiscale, parseMmSs, dataDopo, type Errori } from '@/li
 
 export type IscrittoRow = {
   iscrizione_id: string;
+  persona_id: string;
+  /** Ha un utente Auth collegato (può entrare); altrimenti va invitato. */
+  accesso: boolean;
   nome: string;
   cognome: string;
   email: string;
@@ -1174,7 +1177,7 @@ function SezioneIscritti({
   call: CallFn;
   onBusy: BusyFn;
 }) {
-  const { confirm } = useFeedback();
+  const { confirm, toast } = useFeedback();
   // Di default si lavora sulle edizioni attive; le concluse/annullate si mostrano a richiesta.
   const attiveSolo = edizioni.filter((e) => edizioneStato(e) === 'attiva');
   const [tutteLeEdizioni, setTutteLeEdizioni] = useState(attiveSolo.length === 0);
@@ -1281,13 +1284,42 @@ function SezioneIscritti({
                 </div>
               </div>
             )}
+            {sel && iscritti.some((i) => !i.accesso) && (
+              <div className="row between" style={{ marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
+                <span className="muted" style={{ fontSize: 13 }}>
+                  {iscritti.filter((i) => !i.accesso).length} iscritt{iscritti.filter((i) => !i.accesso).length === 1 ? 'o' : 'i'} senza accesso alla piattaforma: ricevono l&apos;email con il link per scegliere la password.
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  disabled={busy}
+                  onClick={async () => {
+                    const n = iscritti.filter((i) => !i.accesso).length;
+                    if (!(await confirm({ titolo: `Inviare l'invito a ${n} iscritt${n === 1 ? 'o' : 'i'}?`, messaggio: 'Ognuno riceve un\'email con il link per scegliere la password. Chi ha già un accesso non viene toccato.', conferma: 'Invia gli inviti' }))) return;
+                    const r = (await call('POST', `/api/admin/edizioni/${sel.id}/invita`)) as { inviati?: number; errori?: { email: string; errore: string }[] } | undefined;
+                    if (!r) return;
+                    if (r.errori?.length) toast(`${r.inviati ?? 0} inviti inviati, ${r.errori.length} non riusciti: ${r.errori[0].email} (${r.errori[0].errore})`, 'errore');
+                    else toast(`${r.inviati ?? 0} invit${(r.inviati ?? 0) === 1 ? 'o inviato' : 'i inviati'}.`);
+                  }}
+                >
+                  Invita tutti
+                </button>
+              </div>
+            )}
             <div className="tbl-wrap"><table className="tbl tbl--zebra">
-              <thead><tr><th>Cognome e nome</th><th>Email</th><th>Codice fiscale</th><th>Azienda</th><th>Piano finanziato</th><th>Attestato</th><th></th></tr></thead>
+              <thead><tr><th>Cognome e nome</th><th>Email</th><th>Accesso</th><th>Codice fiscale</th><th>Azienda</th><th>Piano finanziato</th><th>Attestato</th><th></th></tr></thead>
               <tbody>
                 {visibili.map((i) => (
                   <tr key={i.iscrizione_id}>
                     <td className="t-title">{i.cognome} {i.nome}</td>
                     <td className="muted">{i.email}</td>
+                    <td>
+                      {i.accesso ? (
+                        <span className="chip chip--ok" title="Ha un utente attivo sulla piattaforma">attivo</span>
+                      ) : (
+                        <button type="button" className="btn btn--ghost btn--xs" disabled={busy} title="Manda l'email con il link per scegliere la password" onClick={() => call('POST', `/api/admin/persone/${i.persona_id}/invita`, undefined, { successo: `Invito inviato a ${i.email}.` })}>Invita</button>
+                      )}
+                    </td>
                     <td className="mono">{i.codice_fiscale ?? <span className="chip chip--err">assente</span>}</td>
                     <td>{i.azienda ?? <span className="muted">—</span>}</td>
                     <td>
@@ -1319,7 +1351,7 @@ function SezioneIscritti({
                   </tr>
                 ))}
                 {visibili.length === 0 && (
-                  <tr><td colSpan={7} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
+                  <tr><td colSpan={8} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
                 )}
               </tbody>
             </table></div>

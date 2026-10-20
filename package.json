@@ -14,7 +14,8 @@
     "test:m1a": "vitest run tests/m1a",
     "test:fase4": "vitest run tests/fase4",
     "test:unit": "vitest run tests/unit",
-    "test:e2e": "node tests/e2e/smoke.mjs"
+    "test:e2e": "node tests/e2e/smoke.mjs",
+    "test:carico": "k6 run tests/carico/player.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
