@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { vimeoEmbedUrl } from '@/lib/vimeo';
 
 declare global {
   interface Window {
@@ -15,13 +16,14 @@ type VimeoPlayerInstance = {
 
 type Props = {
   vimeoId: string;
+  vimeoHash?: string;
   iscrizioneId: string;
   learningObjectId: string;
 };
 
 const VIMEO_SDK = 'https://player.vimeo.com/api/player.js';
 
-export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) {
+export function VimeoPlayer({ vimeoId, vimeoHash, iscrizioneId, learningObjectId }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) 
         document.head.appendChild(s);
       }
     }
-  }, [vimeoId, iscrizioneId, learningObjectId]);
+  }, [vimeoId, vimeoHash, iscrizioneId, learningObjectId]);
 
   return (
     <div>
@@ -88,7 +90,7 @@ export function VimeoPlayer({ vimeoId, iscrizioneId, learningObjectId }: Props) 
       >
         <iframe
           ref={iframeRef}
-          src={`https://player.vimeo.com/video/${vimeoId}?dnt=1`}
+          src={vimeoEmbedUrl(vimeoId, vimeoHash)}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen

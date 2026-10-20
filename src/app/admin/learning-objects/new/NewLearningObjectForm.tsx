@@ -89,8 +89,8 @@ export function NewLearningObjectForm({ tenantId }: { tenantId: string }) {
         {type === 'video' ? (
           <div className="grid-2">
             <div className="field">
-              <label>Vimeo ID</label>
-              <input className="input" value={vimeoId} onChange={(e) => setVimeoId(e.target.value)} disabled={busy} placeholder="es. 1084894652" required />
+              <label>ID o link Vimeo</label>
+              <input className="input" value={vimeoId} onChange={(e) => setVimeoId(e.target.value)} disabled={busy} placeholder="es. 1084894652 oppure https://vimeo.com/1084894652/abc123" required />
             </div>
             <div className="field">
               <label>Durata (secondi)</label>

@@ -90,6 +90,7 @@ export default async function LearningObjectPage({
               {item.lo_type === 'video' ? (
                 <VimeoPlayer
                   vimeoId={String((item.lo_config as { vimeo_id?: string }).vimeo_id ?? '')}
+                  vimeoHash={(item.lo_config as { vimeo_hash?: string }).vimeo_hash}
                   iscrizioneId={iscrizione.id}
                   learningObjectId={item.learning_object_id}
                 />

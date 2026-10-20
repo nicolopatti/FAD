@@ -70,6 +70,24 @@ stream). Restano del Blocco B: #2 report auditor in una funzione SQL (oggi
 `Promise.all` con ~10 query per iscrizione), #4 politica eventi del player, #5 RPC
 unica per gli eventi video, #7 policy multiple, #8 tenant da env.
 
+**Riferimenti Vimeo (2026-10-20).** Problema segnalato dall'utente: i video non si
+vedono. Cause trovate: (a) il LO "Le caratteristiche della squadra" aveva come
+`vimeo_id` un intero link `vimeo.com/reviews/…/videos/1071424134` → iframe rotto;
+corretto sul live a `1071424134` (+ Evento `learning_object.updated`); (b) il video
+demo `1084894652` potrebbe non esistere più sull'account Vimeo del cliente (non
+verificabile da qui: **`vimeo.com` non è raggiungibile dal container**). Fix
+strutturale: `src/lib/vimeo.ts` `parseVimeoRef` accetta ID numerico o qualsiasi
+link Vimeo (pubblico, non in elenco con hash, player, manage, channels, reviews) e
+salva sempre `config.vimeo_id` numerico + `config.vimeo_hash` opzionale (video
+"non in elenco": il player passa `h=`). Usato dalla route di creazione LO, dalla
+import CSV della struttura e dal `VimeoPlayer` (`vimeoEmbedUrl`). Un link di
+**cartella** (`…/folders/<n>`) non è un video → rifiutato. Test `tests/unit/vimeo.test.ts`
+(`npm run test:unit`, 6). **Corso di prova a 6 video**: template
+`supabase/seed/corso_prova_video.sql` (DO block, idempotente sul codice edizione,
+Eventi via `audit_append`): compilare `v_video` con titolo/ID/hash/durata e lanciarlo
+via MCP `execute_sql`. Serve che l'utente fornisca gli ID numerici (o i link dei
+singoli video) e le durate: la cartella Vimeo condivisa non è leggibile da qui.
+
 **Autorizzazione di sessione (2026-10-19):** l'utente ha autorizzato
 esplicitamente tutte le modifiche senza chiedere conferma, incluso il push su
 `main` (fatto: `main` = branch `claude/hardening-tappa1`, CI verde). Vale per

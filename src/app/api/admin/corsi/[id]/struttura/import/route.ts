@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
+import { parseVimeoRef } from '@/lib/vimeo';
 import type { LearningObjectType, RegolaCompletamento } from '@/lib/db-types';
 
 type ImportRow = {
@@ -64,12 +65,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
     } else {
       // Creazione al volo: solo video (il documento richiede l'upload del PDF).
       if (r.tipo !== 'video') { saltati.push({ titolo, motivo: 'documento nuovo: caricalo prima in libreria' }); continue; }
-      const vimeo = (r.riferimento ?? '').trim();
+      const vimeo = parseVimeoRef(r.riferimento);
       const durata = r.durata_secondi;
-      if (!vimeo || typeof durata !== 'number' || durata <= 0) { saltati.push({ titolo, motivo: 'video: ID Vimeo/durata mancanti' }); continue; }
+      if (!vimeo || typeof durata !== 'number' || durata <= 0) { saltati.push({ titolo, motivo: 'video: ID/link Vimeo o durata mancanti' }); continue; }
+      const videoConfig: Record<string, unknown> = { vimeo_id: vimeo.vimeo_id, durata_secondi: Math.round(durata) };
+      if (vimeo.vimeo_hash) videoConfig.vimeo_hash = vimeo.vimeo_hash;
       const { data: createdLo, error: loErr } = await supabase
         .from('learning_object')
-        .insert({ tenant_id: session.tenantId, type: 'video', titolo, config: { vimeo_id: vimeo, durata_secondi: Math.round(durata) } })
+        .insert({ tenant_id: session.tenantId, type: 'video', titolo, config: videoConfig })
         .select('id, type, titolo')
         .single();
       if (loErr || !createdLo) { saltati.push({ titolo, motivo: loErr?.message ?? 'creazione LO fallita' }); continue; }

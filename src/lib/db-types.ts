@@ -65,7 +65,8 @@ export type LearningObjectRow = {
 };
 
 export type VideoConfig = {
-  vimeo_id: string;
+  vimeo_id: string; // sempre l'ID numerico (mai il link): vedi lib/vimeo.ts
+  vimeo_hash?: string; // hash di privacy dei video "non in elenco" (parametro h)
   durata_secondi: number;
 };
 

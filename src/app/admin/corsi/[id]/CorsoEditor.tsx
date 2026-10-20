@@ -583,8 +583,8 @@ function AggiungiManuale({
           {newType === 'video' ? (
             <div className="grid-2">
               <div className="field">
-                <label>ID Vimeo</label>
-                <input className="input" value={vimeo} onChange={(e) => setVimeo(e.target.value)} disabled={busy} placeholder="es. 824601551" />
+                <label>ID o link Vimeo</label>
+                <input className="input" value={vimeo} onChange={(e) => setVimeo(e.target.value)} disabled={busy} placeholder="es. 824601551 oppure https://vimeo.com/824601551/abc123" />
               </div>
               <div className="field">
                 <label>Durata (mm:ss)</label>

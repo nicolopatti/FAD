@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 import type { DocumentoConfig, LearningObjectType, VideoConfig } from '@/lib/db-types';
+import { parseVimeoRef } from '@/lib/vimeo';
 
 type CreateBody = {
   id?: string;
@@ -12,15 +13,19 @@ type CreateBody = {
 };
 
 function validateVideoConfig(c: Record<string, unknown>): VideoConfig | string {
-  const vimeoId = c.vimeo_id;
   const durata = c.durata_secondi;
-  if (typeof vimeoId !== 'string' || vimeoId.trim() === '') {
-    return 'config.vimeo_id mancante';
+  // Si accetta l'ID numerico o un link Vimeo; si salva sempre l'ID (+ hash).
+  const ref = parseVimeoRef(c.vimeo_id);
+  if (!ref) {
+    return 'config.vimeo_id non valido: serve l\'ID numerico o il link del video Vimeo (non di una cartella)';
   }
   if (typeof durata !== 'number' || !Number.isFinite(durata) || durata <= 0) {
     return 'config.durata_secondi non valido';
   }
-  return { vimeo_id: vimeoId.trim(), durata_secondi: Math.round(durata) };
+  const out: VideoConfig = { vimeo_id: ref.vimeo_id, durata_secondi: Math.round(durata) };
+  const hash = ref.vimeo_hash ?? (typeof c.vimeo_hash === 'string' ? c.vimeo_hash.trim() : '');
+  if (hash) out.vimeo_hash = hash;
+  return out;
 }
 
 function validateDocumentoConfig(
