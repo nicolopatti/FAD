@@ -394,7 +394,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-
   list-style: none; padding: 0; margin: 0;
 }
 .outline-row {
-  display: grid; grid-template-columns: 28px 1fr auto; gap: 12px;
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px;
   align-items: center;
   padding: 12px 14px;
   border-radius: 10px;
@@ -411,8 +411,9 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-
 }
 .outline-row.is-current .outline-row__num { color: var(--primary); }
 .outline-row__title {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
+.outline-row > * { min-width: 0; }
 .outline-row__icon { width: 16px; height: 16px; color: var(--muted); }
 .outline-row.is-current .outline-row__icon { color: var(--primary); }
 .outline-row.is-ok .outline-row__icon { color: var(--primary); }
@@ -986,4 +987,12 @@ input[type='text'], input[type='search'] {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; animation-iteration-count: 1 !important; }
   .corso-card:hover, .course-card:hover { transform: none; }
+}
+
+/* Contenimento: i figli di griglia non devono allargare la pagina (tabelle, JSON, iframe) */
+.app > main, .content, .player-layout > *, .detail-layout > *, .card, .card__body { min-width: 0; }
+.btn { white-space: nowrap; }
+@media (max-width: 860px) {
+  /* in colonna il flex-basis 380px della testata diventava un'altezza: 350px di vuoto */
+  .page-head__lead { flex: 0 0 auto; max-width: none; }
 }
