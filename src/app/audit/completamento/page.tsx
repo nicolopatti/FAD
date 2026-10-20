@@ -42,7 +42,7 @@ export default async function CompletamentoPage() {
         facoltativi contano nell'avanzamento ma non bloccano l'idoneità (D35).
       </p>
       <div className="card">
-        <table>
+        <div className="tbl-wrap"><table className="tbl">
           <thead>
             <tr>
               <th>Discente</th>
@@ -150,7 +150,7 @@ export default async function CompletamentoPage() {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </>
   );

@@ -99,7 +99,7 @@ export default async function ReportFondoPage({
           {combos.length === 0 ? (
             <div className="card__body"><div className="muted">Nessuna iscrizione con piano finanziato.</div></div>
           ) : (
-            <table className="tbl tbl--zebra">
+            <div className="tbl-wrap"><table className="tbl tbl--zebra">
               <thead>
                 <tr><th>Corso / Edizione</th><th>Piano</th><th>Fondo</th><th>CUP</th><th style={{ width: 120 }}></th></tr>
               </thead>
@@ -124,7 +124,7 @@ export default async function ReportFondoPage({
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
       </div>
@@ -177,7 +177,7 @@ export default async function ReportFondoPage({
               <span className="chip chip--muted">{dataset.iscritti.length}</span>
             </div>
             <div className="card__body card__body--flush">
-              <table className="tbl tbl--zebra">
+              <div className="tbl-wrap"><table className="tbl tbl--zebra">
                 <thead>
                   <tr><th>Cognome Nome</th><th>Codice fiscale</th><th>Azienda</th><th>Frequenza</th><th>FAD</th><th>Idoneità</th></tr>
                 </thead>
@@ -202,7 +202,7 @@ export default async function ReportFondoPage({
                     <tr><td colSpan={6} className="muted" style={{ padding: 18 }}>Nessun iscritto per questa coppia.</td></tr>
                   )}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           </div>
 
@@ -210,7 +210,7 @@ export default async function ReportFondoPage({
             <div className="card">
               <div className="card__head"><h3>Sessioni</h3><span className="chip chip--muted">{dataset.sessioni.length}</span></div>
               <div className="card__body card__body--flush">
-                <table className="tbl tbl--zebra">
+                <div className="tbl-wrap"><table className="tbl tbl--zebra">
                   <thead><tr><th>Titolo</th><th>Quando</th><th>Durata</th><th>Modalità</th><th>Docente</th></tr></thead>
                   <tbody>
                     {dataset.sessioni.map((s) => (
@@ -223,7 +223,7 @@ export default async function ReportFondoPage({
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </div>
           )}

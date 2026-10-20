@@ -116,7 +116,7 @@ export function DepositaPanel({
         {snapshots.length === 0 ? (
           <div className="muted">Nessuno snapshot ancora depositato per questa coppia.</div>
         ) : (
-          <table className="tbl tbl--zebra">
+          <div className="tbl-wrap"><table className="tbl tbl--zebra">
             <thead>
               <tr><th>Quando</th><th>Formato</th><th>Hash (Evento)</th><th>Integrità</th><th></th></tr>
             </thead>
@@ -137,7 +137,7 @@ export function DepositaPanel({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
     </div>

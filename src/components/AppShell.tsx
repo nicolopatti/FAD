@@ -3,23 +3,7 @@ import type { Route } from 'next';
 import { LogoutButton } from './LogoutButton';
 import { SidebarNav, type NavItem } from './SidebarNav';
 
-// ============================================================================
-// Icone — set minimale portato dal mockup (path SVG semplici).
-// ============================================================================
-
-const ICON_PATHS: Record<string, string> = {
-  home: 'M3 10.5 12 3l9 7.5V21H3z',
-  courses: 'M4 5h16M4 12h16M4 19h10',
-  play: 'M6 4l14 8L6 20z',
-  audit: 'M4 4h16v4H4zM4 12h16v8H4z',
-  log: 'M4 6h16M4 12h16M4 18h10',
-  check: 'M5 12.5l4 4 10-11',
-  lock: 'M8 11V7a4 4 0 0 1 8 0v4M6 11h12v10H6z',
-  chevR: 'M9 6l6 6-6 6',
-  chevL: 'M15 6l-6 6 6 6',
-  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
-  report: 'M4 4h16v4H4zM4 12h16v8H4z',
-};
+import { ICON_PATHS } from './icons';
 
 export function Ico({ name, size = 18 }: { name: string; size?: number }) {
   return (
@@ -154,27 +138,6 @@ export function Crumb({ items }: { items: CrumbItem[] }) {
         </span>
       ))}
     </nav>
-  );
-}
-
-// ============================================================================
-// Cover — solo gradiente + iniziale (niente immagini: non sono nel modello dati).
-// ============================================================================
-
-export function Cover({
-  gradient = 1,
-  initial = 'F',
-  tag,
-}: {
-  gradient?: number;
-  initial?: string;
-  tag?: string;
-}) {
-  return (
-    <div className={`course-card__cover cover-grad-${gradient}`}>
-      {tag && <span className="course-card__cover-tag">{tag}</span>}
-      <div className="course-card__cover-fallback">{initial}</div>
-    </div>
   );
 }
 

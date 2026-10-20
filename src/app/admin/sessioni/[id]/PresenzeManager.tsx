@@ -81,7 +81,7 @@ export function PresenzeManager({
         {presenze.length === 0 ? (
           <div className="muted">Nessuna presenza registrata per questa sessione.</div>
         ) : (
-          <table className="tbl tbl--zebra">
+          <div className="tbl-wrap"><table className="tbl tbl--zebra">
             <thead>
               <tr><th>Iscritto</th><th style={{ width: 120 }}>Durata</th><th style={{ width: 160 }}>Origine</th><th style={{ width: 110 }}></th></tr>
             </thead>
@@ -106,7 +106,7 @@ export function PresenzeManager({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
 
         {correggiId && (

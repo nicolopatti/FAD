@@ -436,7 +436,7 @@ function SezioneStruttura({
             return (
               <div
                 key={s.id}
-                className={`lo-row ${frozen ? 'is-readonly' : ''} ${drag === s.id ? 'is-dragging' : ''} ${target === s.id ? 'is-drop-target' : ''}`}
+                className={`struct-row ${frozen ? 'is-readonly' : ''} ${drag === s.id ? 'is-dragging' : ''} ${target === s.id ? 'is-drop-target' : ''}`}
                 draggable={!frozen && !busy}
                 onDragStart={() => !frozen && setDrag(s.id)}
                 onDragEnd={() => { setDrag(null); setTarget(null); }}
@@ -752,7 +752,7 @@ function AggiungiCsv({
 
       {rows.length > 0 && (
         <div className="import-preview">
-          <table className="tbl">
+          <div className="tbl-wrap"><table className="tbl">
             <thead><tr><th>#</th><th>Titolo</th><th>Tipo</th><th>Esito</th></tr></thead>
             <tbody>
               {rows.map((r) => (
@@ -768,7 +768,7 @@ function AggiungiCsv({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
@@ -836,7 +836,7 @@ function SezioneEdizioni({
         {edizioni.length === 0 ? (
           <div className="muted" style={{ marginBottom: 14, fontSize: 13 }}>Nessuna edizione ancora creata.</div>
         ) : (
-          <table className="tbl" style={{ marginBottom: 16 }}>
+          <div className="tbl-wrap"><table className="tbl" style={{ marginBottom: 16 }}>
             <thead><tr><th>Codice</th><th>Stato</th><th>Date operative</th><th>Finestra FAD</th><th></th></tr></thead>
             <tbody>
               {edizioni.map((e) => {
@@ -861,7 +861,7 @@ function SezioneEdizioni({
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
 
         <form onSubmit={create} style={{ borderTop: '1px dashed var(--line)', paddingTop: 14 }}>
@@ -960,7 +960,7 @@ function SezioneIscritti({
         {iscritti.length === 0 ? (
           <div className="muted" style={{ marginBottom: 16, fontSize: 13 }}>Nessun iscritto su questa edizione.</div>
         ) : (
-          <table className="tbl tbl--zebra" style={{ marginBottom: 16 }}>
+          <div className="tbl-wrap"><table className="tbl tbl--zebra" style={{ marginBottom: 16 }}>
             <thead><tr><th>Cognome e nome</th><th>Email</th><th>Codice fiscale</th><th>Azienda</th><th></th></tr></thead>
             <tbody>
               {iscritti.map((i) => (
@@ -977,7 +977,7 @@ function SezioneIscritti({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
 
         <div className="between row" style={{ borderTop: '1px dashed var(--line)', paddingTop: 14, marginBottom: 12 }}>
@@ -1130,7 +1130,7 @@ function IscrittiCsv({
 
       {rows.length > 0 && (
         <div className="import-preview">
-          <table className="tbl">
+          <div className="tbl-wrap"><table className="tbl">
             <thead><tr><th>#</th><th>Cognome e nome</th><th>Email</th><th>Esito</th></tr></thead>
             <tbody>
               {rows.map((r) => (
@@ -1146,7 +1146,7 @@ function IscrittiCsv({
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 

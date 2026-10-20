@@ -5,7 +5,13 @@
  * manca / non è leggibile via RLS).
  */
 
-export type CorsoMini = { id: string; titolo: string; descrizione?: string | null };
+export type CorsoMini = {
+  id: string;
+  titolo: string;
+  descrizione?: string | null;
+  categoria?: string | null;
+  cover_path?: string | null;
+};
 
 export type EdizioneConCorso = {
   id: string;

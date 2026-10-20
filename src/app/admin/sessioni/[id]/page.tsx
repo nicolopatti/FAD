@@ -151,7 +151,7 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
       <div className="card">
         <div className="card__head"><h3>Dettagli</h3></div>
         <div className="card__body">
-          <table className="tbl">
+          <div className="tbl-wrap"><table className="tbl">
             <tbody>
               <tr><th style={{ width: 200 }}>Modalità</th><td>{sessione.modalita === 'vcs' ? `Webinar · ${sessione.vcs_piattaforma ?? '?'}` : 'Aula'}</td></tr>
               <tr><th>Quando</th><td>{fmtDataOra(sessione.data_ora)}{sessione.durata_minuti != null && ` · ${sessione.durata_minuti} min`}</td></tr>
@@ -159,7 +159,7 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
                 <tr><th>ID riunione</th><td className="mono">{sessione.vcs_meeting_id ?? '—'}</td></tr>
               )}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
 
@@ -179,7 +179,7 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
           {grezzi.length === 0 ? (
             <div className="card__body"><div className="muted">Nessun report importato per questa sessione.</div></div>
           ) : (
-            <table className="tbl tbl--zebra">
+            <div className="tbl-wrap"><table className="tbl tbl--zebra">
               <thead>
                 <tr><th>Importato il</th><th>Fonte</th><th>Righe</th><th>Importato da</th></tr>
               </thead>
@@ -193,7 +193,7 @@ export default async function SessioneDetailPage({ params }: { params: { id: str
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
       </div>

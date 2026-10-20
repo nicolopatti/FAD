@@ -1,4 +1,4 @@
-# Stato del progetto FAD — Fase 4 chiusa (M4 verde a livello DB) + hardening Tappa 1 in corso (handoff session-to-session)
+# Stato del progetto FAD — Fase 1–4 chiuse, hardening Tappa 1 fatto, **lavoro UX in corso** (handoff session-to-session)
 
 > Questo file è il primo da leggere all'inizio di ogni nuova sessione.
 > Riassume cosa è stato fatto, cosa resta, e come riprendere senza dover
@@ -7,6 +7,74 @@
 > (Fase 3, chiusa fino a M3a) e `docs/brief-fase-4.md` (Fase 4, **corrente** — è il
 > mandato) — e in caso di conflitto `piattaforma-elearning-stato-progetto-v8.md`
 > (non in repo) con le decisioni D1–D37.
+
+## UX — revisione, mockup e ondata 1 (2026-10-20, branch `claude/affectionate-hawking-03ev7i`)
+
+Richiesta dell'utente: il portale è "grezzo" e "uguale ai portali generati con
+Claude"; vuole facilità d'uso **e** un'estetica curata, moderna, con poche
+animazioni ben fatte. Metodo deciso: revisione → mockup → ondate di lavoro.
+
+**Revisione pubblicata** (artifact `RcVPuux3m7GgW4H9N2AwK3`, "Valutazione UX FAD"):
+lettura integrale del codice + crawl Playwright di 40 pagine con i 3 utenti demo
+(desktop 1440 / telefono 390). Numeri chiave prima dell'ondata 1: 0 toast,
+0 `loading/error/not-found`, 6 `confirm/alert` nativi, 0 `@keyframes`, 187 stili
+inline, 108 colori esadecimali, 3 blocchi `:root`, 20 pagine su 40 con scorrimento
+orizzontale su telefono. **Mockup** (artifact Design `1nJhmcS81SvtpnMfBWSWuV`,
+"Mockup UX FAD", 5 artboard): login nuovo per il discente, fine lezione con
+conferma del server + "Lezione successiva", corso completato con idoneità
+"sigillata", mobile opzione A (barra + menu a scomparsa, consigliata) e B (barra
+in basso). Decisioni dell'utente: mockup prima del codice; ondate nell'ordine
+proposto (1 fondamenta → 2 discente → 3 admin → 4 auditor); movimento "pochi
+momenti ben fatti".
+
+**Ondata 1 fatta (3 commit):**
+- *1a bug*: crea edizione passa per `call()` (prima mancava `router.refresh()`
+  → doppioni); `DocumentoPlayer` fa `router.refresh()`; `VimeoPlayer` dice
+  "Lezione completata" solo se `video.ended` è stato accettato dal server
+  (stato `registrazione` ok/errore + "Riprova ora"); `ChainVerifyButton` con
+  try/catch e esito negativo in rosso; `LogoutButton` con try/catch; testo
+  `un'immagine`; doppio H1 in `/admin/corsi/new`; `<a>` interni → `<Link>`.
+- *1b riscontro*: `src/components/ui/Feedback.tsx` (`FeedbackProvider` nel layout
+  radice; `useFeedback()` → `toast(testo, kind)` e `confirm({titolo, messaggio,
+  conferma, pericolosa}) → Promise<boolean>` su `<dialog>` nativo). Niente più
+  `confirm()/alert()` nel codice. Conferma del congelamento D22 alla prima
+  edizione; conferme con conseguenze per togliere lezioni, concludere/annullare
+  edizioni, rimuovere iscritti, archiviare contenuti, "Ignora" in coda, deposito
+  write-once. `call()` del builder accetta `{ successo, busy }` (toast + busy per
+  pulsante). `src/components/ui/PageStates.tsx` (`PageSkeleton`, `ErrorState`,
+  `NotFoundState`) + `loading/error/not-found.tsx` a radice e in `corsi/`,
+  `admin/`, `audit/`. `src/lib/db-result.ts` `unwrap(res, cosa)`: gli errori
+  delle query non sono più mascherati da `data ?? []`.
+- *1c CSS*: `globals.css` da 1149 a ~990 righe: **un solo `:root`** (token +
+  alias, scala tipo `--text-xs…3xl` con `clamp` sui titoli, `--space-1…8`,
+  `--r-ctrl/--r-pill`, `--dur-*/--ease-out`), stato separato dalla marca
+  (`--ok`/`--warn` non sono più teal/ocra), via tema vecchio e ~25 regole morte
+  (appbar, event-stream, table.modern, cover-grad-*, player-video, topbar…).
+  **I componenti Atlante sono globali** (niente più prefisso `.admin-scope .`;
+  la classe `.admin-scope` resta solo come densità 14px). Riga struttura del
+  builder rinominata `.struct-row` (collideva con `.lo-row` del discente).
+  Card corso discente → `.corso-card` fluida con la **Cover vera** di Atlante
+  (immagine caricata dall'admin o tratteggio + glifo categoria; `CorsoMini` ha
+  `categoria/cover_path`). Hero del dettaglio corso in classi `.course-hero*`
+  (prima 52px/44px inline). Tabelle dentro `.tbl-wrap` (overflow-x) ovunque,
+  quelle auditor con `.tbl`. Focus visibile anche su select/textarea/switch/seg,
+  `.btn:hover:not(:disabled)`, `prefers-reduced-motion`, media query 860/640.
+  `ICON_PATHS` unico in `src/components/icons.ts` (AppShell + SidebarNav);
+  tolto il font Plus Jakarta. "Tutti i corsi" non va più a capo; etichetta
+  copertina nascosta nelle miniature (era "FORMAZI").
+
+Verifiche: `typecheck` 0 errori, `test:unit` 20/20, `test:fase4` 15/15, crawler
+Playwright rieseguito (schermate prima/dopo in scratchpad). **Il player video
+va riprovato nel browser dall'utente** (il container non raggiunge vimeo.com).
+
+**Prossime ondate** (vedi artifact revisione, sezione "Piano per ondate"):
+2 discente (login nuovo, fine lezione/corso, nav mobile A, testi senza gergo,
+movimento) → 3 admin → 4 auditor + tema scuro. Per far girare l'app in
+locale/crawler: ambiente con `*.supabase.co` consentito (fatto), `npx next dev
+-p 3100` con `NODE_USE_ENV_PROXY=1` e le env pubbliche; Chromium non passa dal
+proxy → nel crawler le richieste a supabase.co sono inoltrate via `route()` +
+`fetch` di Node (script in scratchpad `pw/crawl.mjs`, da portare in repo con i
+test E2E del Blocco E).
 
 ## Hardening Tappa 1 — grant, guardia audit_append, service role (2026-10-19)
 
@@ -709,6 +777,10 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
+> **Aggiornamento 2026-10-20 sera: è in corso il lavoro UX (sezione "UX — revisione,
+> mockup e ondata 1" in testa al file): riprendere da lì, ondata 2. Il resto di
+> questa nota resta valido per i temi non-UX.**
+>
 > **Aggiornamento 2026-10-20 (leggere PRIMA del resto di questa sezione, che è
 > storica).** Stato: Fase 1–4 chiuse; hardening Tappa 1 fatto (sicurezza log, indici,
 > login pulita); Vimeo robusto; corso di prova a 6 video verificato end-to-end nel

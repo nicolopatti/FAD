@@ -100,7 +100,7 @@ export default async function AuditLogPage({
       <section className="card">
         <h2>Cronologia leggibile</h2>
         {paginatore}
-        <table>
+        <div className="tbl-wrap"><table className="tbl">
           <thead>
             <tr>
               <th>#</th>
@@ -146,7 +146,7 @@ export default async function AuditLogPage({
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       </section>
 
       <section className="card">
@@ -155,7 +155,7 @@ export default async function AuditLogPage({
           {streamId && <ChainVerifyButton streamId={streamId} />}
         </div>
         {paginatore}
-        <table>
+        <div className="tbl-wrap"><table className="tbl">
           <thead>
             <tr>
               <th>seq</th>
@@ -184,7 +184,7 @@ export default async function AuditLogPage({
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </section>
     </>
   );

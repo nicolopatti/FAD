@@ -3,7 +3,8 @@ import { requireSession } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
-import { AppShell, Cover, StatusChip, Ico } from '@/components/AppShell';
+import { AppShell, StatusChip, Ico } from '@/components/AppShell';
+import { Cover, coverUrl } from '@/components/admin/Atlante';
 import type { IscrizioneListaRow } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export default async function MieiCorsiPage() {
   const iscrizioni = unwrap(await supabase
     .from('iscrizione')
     .select(
-      'id, edizione_id, edizione:edizione_id ( id, codice, corso:corso_id ( id, titolo, descrizione ) )',
+      'id, edizione_id, edizione:edizione_id ( id, codice, corso:corso_id ( id, titolo, descrizione, categoria, cover_path ) )',
     )
     .eq('persona_id', session.personaId)
     .returns<IscrizioneListaRow[]>(), 'i tuoi corsi');
@@ -81,7 +82,7 @@ export default async function MieiCorsiPage() {
       )}
 
       <div className="stack">
-        {rows.map(({ iscrizione, prog }, idx) => {
+        {rows.map(({ iscrizione, prog }) => {
           const corsoTitolo = iscrizione.edizione?.corso?.titolo ?? '— corso non disponibile —';
           const descrizione = iscrizione.edizione?.corso?.descrizione ?? null;
           const codice = iscrizione.edizione?.codice ?? '—';
@@ -93,34 +94,30 @@ export default async function MieiCorsiPage() {
           return (
             <Link
               key={iscrizione.id}
-              className="course-card"
+              className="corso-card"
               href={`/corsi/${iscrizione.edizione_id}`}
             >
-              <Cover gradient={(idx % 4) + 1} initial={corsoTitolo.slice(0, 1).toUpperCase()} />
-              <div className="course-card__body">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="eyebrow">Ed. {codice}</span>
-                  <span style={{ marginLeft: 'auto' }}>
-                    <StatusChip idonea={idonea} completati={completati} />
-                  </span>
+              <Cover categoria={iscrizione.edizione?.corso?.categoria} src={coverUrl(iscrizione.edizione?.corso?.cover_path)} />
+              <div className="corso-card__body">
+                <div className="corso-card__head">
+                  <span className="eyebrow">Edizione {codice}</span>
+                  <StatusChip idonea={idonea} completati={completati} />
                 </div>
-                <h2 className="course-card__title">{corsoTitolo}</h2>
+                <h2 className="corso-card__title">{corsoTitolo}</h2>
                 {descrizione && (
-                  <p className="meta" style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14 }}>
-                    {descrizione}
-                  </p>
+                  <p className="corso-card__desc">{descrizione}</p>
                 )}
 
                 {prog && (
-                  <div className="course-card__progress">
-                    <div className="course-card__progressRow">
-                      <span className="course-card__progressLabel">
+                  <div className="corso-card__progress">
+                    <div className="corso-card__progressRow">
+                      <span className="corso-card__progressLabel">
                         {completati}/{totale} oggetti · obbligatori{' '}
                         <strong style={{ color: 'var(--ink-2)' }}>
                           {prog.obbligatori_completati}/{prog.obbligatori_totale}
                         </strong>
                       </span>
-                      <span className="course-card__progressValue">{pct}%</span>
+                      <span className="corso-card__progressValue">{pct}%</span>
                     </div>
                     <div className="progress progress--lg">
                       <div
@@ -131,7 +128,7 @@ export default async function MieiCorsiPage() {
                   </div>
                 )}
 
-                <div className="row" style={{ marginTop: 4 }}>
+                <div className="corso-card__cta">
                   <span className="btn btn--secondary btn--sm">
                     {completati === 0 ? 'Inizia il corso' : idonea ? 'Rivedi materiali' : 'Riprendi'}
                     <Ico name="chevR" size={14} />

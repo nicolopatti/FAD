@@ -58,7 +58,7 @@ export default async function SessioniListPage() {
               <div className="muted">Nessuna sessione ancora pianificata.</div>
             </div>
           ) : (
-            <table className="tbl tbl--zebra">
+            <div className="tbl-wrap"><table className="tbl tbl--zebra">
               <thead>
                 <tr>
                   <th>Titolo</th>
@@ -94,7 +94,7 @@ export default async function SessioniListPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
       </div>

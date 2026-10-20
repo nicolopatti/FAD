@@ -47,39 +47,18 @@ export default async function DettaglioCorsoPage({
         items={[{ label: 'I miei corsi', href: '/corsi' }, { label: prog.corso_titolo }]}
       />
 
-      {/* Hero (gradiente, niente immagine: non è nel modello dati) */}
-      <section
-        style={{
-          position: 'relative',
-          borderRadius: 'var(--radius-xl)',
-          overflow: 'hidden',
-          marginBottom: 32,
-          boxShadow: 'var(--shadow-2)',
-          background: 'var(--hero-grad-1)',
-        }}
-      >
-        <div style={{ position: 'relative', padding: '48px 52px 44px', color: '#fff', maxWidth: 740 }}>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-            <span className="chip" style={{ background: 'rgba(255,255,255,.18)', color: '#fff', borderColor: 'transparent' }}>
-              Ed. {codice}
-            </span>
-            <span className="chip" style={{ background: 'rgba(255,255,255,.18)', color: '#fff', borderColor: 'transparent' }}>
-              {prog.totale} ogget{prog.totale === 1 ? 'to' : 'ti'} didattici
-            </span>
-            <span className="chip" style={{ background: 'rgba(255,255,255,.18)', color: '#fff', borderColor: 'transparent' }}>
-              {prog.idonea ? 'Idoneità ottenuta' : `${prog.completati} completati`}
-            </span>
+      {/* Hero del corso: classi CSS (prima era tutto inline e non reggeva su telefono) */}
+      <section className="course-hero">
+        <div className="course-hero__inner">
+          <div className="course-hero__chips">
+            <span className="chip chip--onDark">Edizione {codice}</span>
+            <span className="chip chip--onDark">{prog.totale} lezion{prog.totale === 1 ? 'e' : 'i'}</span>
+            <span className="chip chip--onDark">{prog.idonea ? 'Idoneità ottenuta' : `${prog.completati} completat${prog.completati === 1 ? 'a' : 'e'}`}</span>
           </div>
-          <h1 style={{ color: '#fff', fontSize: 44, lineHeight: 1.05, marginBottom: 16, maxWidth: 660 }}>
-            {prog.corso_titolo}
-          </h1>
-          {descrizione && (
-            <p style={{ fontSize: 16, lineHeight: 1.55, color: 'rgba(255,255,255,.82)', maxWidth: 580, marginBottom: 26 }}>
-              {descrizione}
-            </p>
-          )}
+          <h1 className="course-hero__title">{prog.corso_titolo}</h1>
+          {descrizione && <p className="course-hero__desc">{descrizione}</p>}
           {next && (
-            <div className="row" style={{ gap: 12 }}>
+            <div className="course-hero__actions">
               <Link
                 className="btn btn--accent btn--lg"
                 href={`/corsi/${params.edizioneId}/lo/${next.learning_object_id}`}
@@ -146,12 +125,11 @@ export default async function DettaglioCorsoPage({
                       )}
                     </div>
                   </div>
-                  <div>
+                  <div className="lo-row__action">
                     {it.sbloccato ? (
                       <Link
                         className="btn btn--ghost btn--sm"
                         href={`/corsi/${params.edizioneId}/lo/${it.learning_object_id}`}
-                        style={{ padding: '6px 10px' }}
                       >
                         {it.completato ? 'Rivedi' : 'Apri'}
                         <Ico name="chevR" size={14} />

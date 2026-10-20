@@ -1,14 +1,8 @@
 import './globals.css';
-import { Plus_Jakarta_Sans, Bricolage_Grotesque, IBM_Plex_Mono } from 'next/font/google';
+import { Bricolage_Grotesque, IBM_Plex_Mono } from 'next/font/google';
 import { GeistSans } from 'geist/font/sans';
 import { FeedbackProvider } from '@/components/ui/Feedback';
 
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-jakarta',
-  display: 'swap',
-});
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -31,7 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="it"
-      className={`${GeistSans.variable} ${jakarta.variable} ${bricolage.variable} ${plexMono.variable}`}
+      className={`${GeistSans.variable} ${bricolage.variable} ${plexMono.variable}`}
     >
       <body>
         <FeedbackProvider>{children}</FeedbackProvider>
