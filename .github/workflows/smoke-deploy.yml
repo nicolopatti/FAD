@@ -41,15 +41,17 @@ jobs:
           set -euo pipefail
           H=()
           if [ -n "$BYPASS" ]; then H=(-H "x-vercel-protection-bypass: $BYPASS"); fi
-          code=$(curl -sS -L "${H[@]}" -o /tmp/login.html -w '%{http_code}' "$URL/login")
-          if grep -qi "vercel.com/sso-api\|Authentication Required\|_vercel_sso" /tmp/login.html; then
-            if [ "$ANTEPRIMA" = "true" ]; then
-              echo "anteprima protetta da Vercel: aggiungi il secret VERCEL_AUTOMATION_BYPASS_SECRET per provarla (salto)"; echo "SALTA=1" >> "$GITHUB_ENV"; exit 0
+          code=$(curl -sS -L "${H[@]}" -D /tmp/intestazioni.txt -o /tmp/login.html -w '%{http_code}' "$URL/login")
+          if [ "$code" != "200" ] || ! grep -q "Bentornato" /tmp/login.html; then
+            echo "login: HTTP $code, pagina dell'app non riconosciuta"
+            echo "--- intestazioni:"; grep -i "^HTTP\|^x-vercel\|^set-cookie\|^location" /tmp/intestazioni.txt | cut -c1-160 || true
+            echo "--- inizio pagina:"; head -c 400 /tmp/login.html | tr -d '\n'; echo
+            if [ "$ANTEPRIMA" = "true" ] && [ -z "$BYPASS" ]; then
+              echo "anteprima senza bypass: Vercel protegge le anteprime, aggiungi il secret VERCEL_AUTOMATION_BYPASS_SECRET per provarle (salto)"
+              echo "SALTA=1" >> "$GITHUB_ENV"; exit 0
             fi
-            echo "la produzione risponde con la pagina di protezione di Vercel"; exit 1
+            exit 1
           fi
-          test "$code" = "200" || { echo "login: HTTP $code"; exit 1; }
-          grep -q "Bentornato" /tmp/login.html || { echo "login: testo atteso non trovato"; exit 1; }
           code=$(curl -sS -L "${H[@]}" -o /dev/null -w '%{http_code}' "$URL/verifica/000000000000000000000000")
           test "$code" = "200" || { echo "verifica: HTTP $code"; exit 1; }
           code=$(curl -sS "${H[@]}" -o /dev/null -w '%{http_code}' "$URL/api/attestati/00000000-0000-0000-0000-000000000000/pdf")
