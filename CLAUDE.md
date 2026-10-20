@@ -9,7 +9,7 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Fase 5 — test finale e attestato (2026-10-20, branch `claude/affectionate-hawking-03ev7i`, NON ancora su `main`; Task 1–6 fatti, gate M5 da chiudere nel browser)
+## Fase 5 — test finale e attestato (2026-10-20, branch `claude/affectionate-hawking-03ev7i`, **su `main` dalla sera del 2026-10-20** con autorizzazione esplicita dell'utente "riporta su main"; Task 1–6 fatti, gate M5a chiuso, gate M5 da chiudere nel browser)
 
 Richiesta dell'utente: "rilasciare a chi chiude il percorso e supera il test un
 attestato e anche il badge da caricare su LinkedIn". Brief scritto e **ratificato**
@@ -1281,6 +1281,34 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
+> **Aggiornamento 2026-10-20 sera (leggere per primo).** Tutto il branch
+> `claude/affectionate-hawking-03ev7i` è su `main` (fast-forward autorizzato
+> dall'utente): Fase 5 completa (test finale, attestato, editor del modello), Blocco B
+> chiuso (#2 #5 #7 #8 + prova di carico), smoke post-deploy, inviti/reset/cambio
+> password con informativa, onboarding ente, revisione del codice con 10 correzioni.
+> Migration applicate sul live fino alla `20261020000012`. CI verde (anche sui push
+> dei branch `claude/**`). In produzione il deploy di `main` porta quindi anche le
+> route che richiedono `SUPABASE_SERVICE_ROLE_KEY` (già su Vercel).
+> **Prossimi passi, in ordine:**
+> 1. **Prove nel browser dell'utente in produzione** (gate M5 + flussi nuovi):
+>    `/admin/ente` con logo/firma e modello; sezione 6 "Attestato" di un corso; ore del
+>    corso; "Riemetti"; corso "solo test" fino all'attestato automatico (PDF, badge,
+>    LinkedIn, verifica pubblica); "Invita" un iscritto (email di Supabase, link →
+>    scelta password + informativa); "Password dimenticata"; cambio password dal profilo;
+>    `/audit/completamento` con l'ambito per edizione. Segnalare le rifiniture: si fanno
+>    in un'unica passata.
+> 2. **Configurazioni lato utente**: SMTP in Supabase (Auth → SMTP) e modelli email in
+>    italiano, altrimenti gli inviti sono limitati a poche email l'ora; secret GitHub
+>    `VERCEL_AUTOMATION_BYPASS_SECRET` (+ `E2E_*_PASSWORD`) per smoke ed E2E sulle
+>    anteprime; togliere `NEXT_PUBLIC_TENANT_ID` da Vercel (inutilizzata); backup DB,
+>    "leaked password protection", piani Pro (Supabase e Vercel) — con Pro anche lo
+>    staging (runbook nel README).
+> 3. **Test di carico vero** (300 VU, 10 min) da un ambiente in Europa con
+>    `npm run test:carico` contro un'anteprima/staging (limite login alzato).
+> 4. **Blocco D**: tracciati ufficiali Fondimpresa/FonCoop (servono i documenti), Teams
+>    (serve Azure). **Debito minore**: `datiEnteDa` unico (dati dell'ente ricostruiti
+>    in 4 punti). Niente altro di aperto nel piano eseguibile da qui.
+>
 > **Aggiornamento 2026-10-20 notte: le 4 ondate UX sono finite e mergiate su
 > `main`** (fast-forward del branch `claude/affectionate-hawking-03ev7i`, 9 commit,
 > autorizzato dall'utente: "Va procedi"). Deploy Vercel Production aggiornato.
