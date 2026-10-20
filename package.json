@@ -12,7 +12,8 @@
     "bootstrap": "tsx scripts/bootstrap.ts",
     "test:m1a": "vitest run tests/m1a",
     "test:fase4": "vitest run tests/fase4",
-    "test:unit": "vitest run tests/unit"
+    "test:unit": "vitest run tests/unit",
+    "test:e2e": "node tests/e2e/smoke.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -33,6 +34,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.15",
     "pg": "^8.21.0",
+    "playwright": "^1.56.1",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
     "vitest": "^2.1.2"

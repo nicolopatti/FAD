@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { computeProgressoForIscrizione, computeFrequenzaForIscrizione } from './compliance';
+import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni } from './compliance';
 
 // ===========================================================================
 // Fase 4 — Task 2: motore di aggregazione del report fondo (format-agnostic).
@@ -162,12 +162,15 @@ export async function computeReportFondoDataset(
     .returns<IscrizioneFondoRow[]>();
 
   const iscritti: ReportFondoIscritto[] = [];
+  // Ricalcolo dagli Eventi (D8): completamento FAD + frequenza webinar, in blocco.
+  const ids = (iscrizioni ?? []).map((i) => i.id);
+  const [progressi, frequenze] = await Promise.all([
+    computeProgressoPerIscrizioni(supabase, ids),
+    computeFrequenzaPerIscrizioni(supabase, ids),
+  ]);
   for (const i of iscrizioni ?? []) {
-    // Ricalcolo dagli Eventi (D8): completamento FAD + frequenza webinar.
-    const [prog, freq] = await Promise.all([
-      computeProgressoForIscrizione(supabase, i.id),
-      computeFrequenzaForIscrizione(supabase, i.id),
-    ]);
+    const prog = progressi.get(i.id) ?? null;
+    const freq = frequenze.get(i.id) ?? null;
     const obbligatoriTot = prog?.obbligatori_totale ?? 0;
     const obbligatoriDone = prog?.obbligatori_completati ?? 0;
     const soglia = freq?.soglia ?? null;

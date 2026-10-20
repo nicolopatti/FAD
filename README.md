@@ -302,11 +302,28 @@ a ogni apertura (D8); le colonne-cache sull'Iscrizione non vengono lette.
 
 `.github/workflows/ci.yml` esegue su ogni PR:
 - `npm run typecheck`
+- `npm run test:unit` (librerie pure: Vimeo, visione integrale, test finale,
+  attestato e modello PDF) e `npm run test:fase4` (validazioni e formati del
+  report fondo)
 - `npm run build` (con env placeholder per evitare la dipendenza dalle chiavi
   reali in build).
 
 I test M1a contro un vero progetto Supabase si attivano solo se i secrets
 `SUPABASE_*` sono presenti nel repository (consigliato per il branch `main`).
+
+### Test E2E (Playwright, sola lettura)
+
+`npm run test:e2e` percorre le pagine dei tre ruoli (pubblico, discente,
+auditor, admin) a 1440 e 390 px contro un'app in esecuzione: controlla risposta,
+assenza di scorrimento orizzontale ed errori JS, e le API di sola lettura
+(export CSV, verifica catena, anteprima PDF dell'attestato). **Non scrive nulla
+sul DB.** Variabili: `E2E_BASE_URL` (default `http://localhost:3100`),
+`E2E_<RUOLO>_EMAIL/PASSWORD` (default utenti demo), `PLAYWRIGHT_CHROMIUM`
+(percorso di un Chromium già installato), `E2E_DEV=1` se l'app gira con `next
+dev`. Nel container Claude Code on the web aggiungere `E2E_PROXY_SUPABASE=1` e
+lanciare con `NODE_USE_ENV_PROXY=1` (Chromium non passa dal proxy). Richiede
+`playwright` (devDependency) e un browser: in CI `npx playwright install
+chromium` prima di lanciarlo, con un deploy di anteprima come `E2E_BASE_URL`.
 
 ## Architettura — i 5 invarianti
 

@@ -17,6 +17,10 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run typecheck
+      - name: test unitari (lib pure: vimeo, visione, quiz, attestato)
+        run: npm run test:unit
+      - name: test fase 4 (validazioni e formati del report fondo)
+        run: npm run test:fase4
       - name: next build (placeholder env)
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co

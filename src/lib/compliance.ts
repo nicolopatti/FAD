@@ -77,39 +77,29 @@ export type EsitoQuiz = {
   superato_il: string | null;
 };
 
-export async function computeProgressoForIscrizione(
-  supabase: SupabaseClient,
-  iscrizioneId: string,
-): Promise<ProgressoIscrizione | null> {
-  // Iscrizione → Edizione → Corso in UNA query (prima erano 3 round trip).
-  type IscrEdCorso = {
-    id: string;
-    persona_id: string;
-    edizione_id: string;
-    edizione: { id: string; corso_id: string; corso: { id: string; titolo: string; sblocco_sequenziale: boolean; visione_integrale: boolean } | null } | null;
-  };
-  const { data: iscrizione, error: errIscr } = await supabase
-    .from('iscrizione')
-    .select('id, persona_id, edizione_id, edizione:edizione_id ( id, corso_id, corso:corso_id ( id, titolo, sblocco_sequenziale, visione_integrale ) )')
-    .eq('id', iscrizioneId)
-    .returns<IscrEdCorso[]>()
-    .maybeSingle();
-  if (errIscr || !iscrizione) return null;
-  const corso = iscrizione.edizione?.corso ?? null;
-  if (!corso) return null;
+type IscrEdCorso = {
+  id: string;
+  persona_id: string;
+  edizione_id: string;
+  edizione: { id: string; corso_id: string; corso: { id: string; titolo: string; sblocco_sequenziale: boolean; visione_integrale: boolean } | null } | null;
+};
 
-  const { data: struttura, error: errStr } = await supabase
-    .from('struttura_corso')
-    .select(`
-      id, ordine, obbligatorio, regola_completamento, learning_object_id,
+type EventoCompletamento = {
+  subject_id: string | null;
+  event_type: string;
+  occurred_at: string;
+  actor: { persona_id?: string } | null;
+  payload: Record<string, unknown> | null;
+};
+
+const SELECT_ISCRIZIONE = 'id, persona_id, edizione_id, edizione:edizione_id ( id, corso_id, corso:corso_id ( id, titolo, sblocco_sequenziale, visione_integrale ) )';
+const SELECT_STRUTTURA = `
+      id, corso_id, ordine, obbligatorio, regola_completamento, learning_object_id,
       learning_object:learning_object_id ( titolo, type, config )
-    `)
-    .eq('corso_id', corso.id)
-    .order('ordine', { ascending: true })
-    .returns<StrutturaRow[]>();
-  if (errStr || !struttura) return null;
+    `;
 
-  const items: StrutturaItem[] = struttura
+function itemsDaStruttura(rows: (StrutturaRow & { corso_id?: string })[]): StrutturaItem[] {
+  return rows
     .filter((row) => row.learning_object !== null)
     .map((row) => ({
       struttura_id: row.id,
@@ -121,82 +111,67 @@ export async function computeProgressoForIscrizione(
       lo_type: row.learning_object!.type,
       lo_config: row.learning_object!.config,
     }));
+}
 
-  const loIds = items.map((i) => i.learning_object_id);
+/** Tipi di Evento da leggere per una struttura (completamento + copertura video). */
+function tipiEventoPer(items: StrutturaItem[]): string[] {
+  const completionTypes = Array.from(new Set(items.map((i) => COMPLETION_EVENT_FOR_RULE[i.regola_completamento.tipo]))).filter(Boolean);
+  const coverageTypes = items.some((i) => i.lo_type === 'video') ? ['video.play', 'video.pause', 'video.seek', 'video.ended', 'video.progress'] : [];
+  return Array.from(new Set([...completionTypes, ...coverageTypes]));
+}
 
-  // Eventi di completamento di QUESTA iscrizione sugli LO di questo corso.
-  // Il filtro sull'attore è in SQL (indice evento_actor_persona_idx, migration
-  // 20261019000004): prima si leggevano gli eventi di tutti i discenti del corso
-  // e si filtrava in JavaScript — costo proporzionale agli iscritti a ogni
-  // richiesta del player. Il filtro sull'iscrizione (payload.iscrizione_id, indice
-  // evento_payload_iscrizione_idx) evita che un contenuto della libreria riusato
-  // in due corsi porti il credito da un corso all'altro: ogni iscrizione ha la
-  // propria evidenza (tutti gli eventi del player lo portano dalla Fase 1).
-  const completionTypes = Array.from(
-    new Set(items.map((i) => COMPLETION_EVENT_FOR_RULE[i.regola_completamento.tipo])),
-  ).filter(Boolean);
+/**
+ * Nucleo puro del ricalcolo (D8): dati già caricati → progresso. Gli Eventi
+ * devono essere SOLO quelli di questa iscrizione (attore = persona,
+ * payload.iscrizione_id = iscrizione), in ordine di `seq`.
+ */
+export function calcolaProgresso(
+  iscrizione: { id: string; persona_id: string; edizione_id: string },
+  corso: { id: string; titolo: string; sblocco_sequenziale: boolean; visione_integrale: boolean },
+  items: StrutturaItem[],
+  events: EventoCompletamento[],
+): ProgressoIscrizione {
+  const loIds = new Set(items.map((i) => i.learning_object_id));
   // Visione integrale (corso.visione_integrale): oltre a `video.ended` serve la
   // copertura dei tratti riprodotti. La copertura si RICOSTRUISCE dai timestamp
   // server degli eventi play/pause/seek/ended (tempo reale, lib/visione.ts):
   // i `segmenti_visti` dichiarati dal client restano nel log solo a titolo
   // informativo (un player a 2x o una chiamata forgiata non contano).
   const integrale = Boolean(corso.visione_integrale);
-  const hasVideo = items.some((i) => i.lo_type === 'video');
-  const coverageTypes = hasVideo ? ['video.play', 'video.pause', 'video.seek', 'video.ended', 'video.progress'] : [];
-  const eventTypes = Array.from(new Set([...completionTypes, ...coverageTypes]));
-  type EventoCompletamento = {
-    subject_id: string | null;
-    event_type: string;
-    occurred_at: string;
-    actor: { persona_id?: string } | null;
-    payload: Record<string, unknown> | null;
-  };
-
   const completionEventsByLo = new Map<string, Set<string>>();
   const completionAtByLo = new Map<string, string>();
   const videoEventsByLo = new Map<string, EventoVideo[]>();
   const durataByLo = new Map<string, number>();
   const quizByLo = new Map<string, EsitoQuiz>();
-  if (loIds.length && eventTypes.length) {
-    const { data: events } = await supabase
-      .from('evento')
-      .select('subject_id, event_type, occurred_at, actor, payload')
-      .eq('actor->>persona_id', iscrizione.persona_id)
-      .eq('payload->>iscrizione_id', iscrizione.id)
-      .in('event_type', eventTypes)
-      .in('subject_id', loIds)
-      .order('seq', { ascending: true })
-      .returns<EventoCompletamento[]>();
-    for (const e of events ?? []) {
-      // Controllo difensivo: il filtro SQL è già sull'attore.
-      if (e.actor?.persona_id !== iscrizione.persona_id || !e.subject_id) continue;
-      if (e.event_type === 'quiz.submitted') {
-        // Il test conta solo se superato (correzione del server nel payload).
-        const perc = typeof e.payload?.percentuale === 'number' ? (e.payload.percentuale as number) : null;
-        const superato = e.payload?.superato === true;
-        const q = quizByLo.get(e.subject_id) ?? { tentativi: 0, superato: false, ultima_percentuale: null, migliore_percentuale: null, superato_il: null };
-        q.tentativi += 1;
-        q.ultima_percentuale = perc;
-        if (perc != null && (q.migliore_percentuale == null || perc > q.migliore_percentuale)) q.migliore_percentuale = perc;
-        if (superato && !q.superato) { q.superato = true; q.superato_il = e.occurred_at; }
-        quizByLo.set(e.subject_id, q);
-        if (!superato) continue;
-      }
-      if (!completionEventsByLo.has(e.subject_id)) completionEventsByLo.set(e.subject_id, new Set());
-      completionEventsByLo.get(e.subject_id)!.add(e.event_type);
-      if (!e.event_type.startsWith('video.') || e.event_type === 'video.ended') {
-        // primo evento di completamento: resta quello (append-only, ordine per seq)
-        if (!completionAtByLo.has(e.subject_id)) completionAtByLo.set(e.subject_id, e.occurred_at);
-      }
-      if (e.event_type.startsWith('video.')) {
-        const acc = videoEventsByLo.get(e.subject_id) ?? [];
-        acc.push({ event_type: e.event_type, occurred_at: e.occurred_at, payload: e.payload });
-        videoEventsByLo.set(e.subject_id, acc);
-      }
-      const d = e.payload?.durata_secondi;
-      if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
-        durataByLo.set(e.subject_id, Math.max(durataByLo.get(e.subject_id) ?? 0, d));
-      }
+  for (const e of events) {
+    // Controllo difensivo: il filtro SQL è già sull'attore e sull'iscrizione.
+    if (e.actor?.persona_id !== iscrizione.persona_id || !e.subject_id || !loIds.has(e.subject_id)) continue;
+    if (e.event_type === 'quiz.submitted') {
+      // Il test conta solo se superato (correzione del server nel payload).
+      const perc = typeof e.payload?.percentuale === 'number' ? (e.payload.percentuale as number) : null;
+      const superato = e.payload?.superato === true;
+      const q = quizByLo.get(e.subject_id) ?? { tentativi: 0, superato: false, ultima_percentuale: null, migliore_percentuale: null, superato_il: null };
+      q.tentativi += 1;
+      q.ultima_percentuale = perc;
+      if (perc != null && (q.migliore_percentuale == null || perc > q.migliore_percentuale)) q.migliore_percentuale = perc;
+      if (superato && !q.superato) { q.superato = true; q.superato_il = e.occurred_at; }
+      quizByLo.set(e.subject_id, q);
+      if (!superato) continue;
+    }
+    if (!completionEventsByLo.has(e.subject_id)) completionEventsByLo.set(e.subject_id, new Set());
+    completionEventsByLo.get(e.subject_id)!.add(e.event_type);
+    if (!e.event_type.startsWith('video.') || e.event_type === 'video.ended') {
+      // primo evento di completamento: resta quello (append-only, ordine per seq)
+      if (!completionAtByLo.has(e.subject_id)) completionAtByLo.set(e.subject_id, e.occurred_at);
+    }
+    if (e.event_type.startsWith('video.')) {
+      const acc = videoEventsByLo.get(e.subject_id) ?? [];
+      acc.push({ event_type: e.event_type, occurred_at: e.occurred_at, payload: e.payload });
+      videoEventsByLo.set(e.subject_id, acc);
+    }
+    const d = e.payload?.durata_secondi;
+    if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
+      durataByLo.set(e.subject_id, Math.max(durataByLo.get(e.subject_id) ?? 0, d));
     }
   }
 
@@ -254,6 +229,113 @@ export async function computeProgressoForIscrizione(
   };
 }
 
+export async function computeProgressoForIscrizione(
+  supabase: SupabaseClient,
+  iscrizioneId: string,
+): Promise<ProgressoIscrizione | null> {
+  // Iscrizione → Edizione → Corso in UNA query (prima erano 3 round trip).
+  const { data: iscrizione, error: errIscr } = await supabase
+    .from('iscrizione')
+    .select(SELECT_ISCRIZIONE)
+    .eq('id', iscrizioneId)
+    .returns<IscrEdCorso[]>()
+    .maybeSingle();
+  if (errIscr || !iscrizione) return null;
+  const corso = iscrizione.edizione?.corso ?? null;
+  if (!corso) return null;
+
+  const { data: struttura, error: errStr } = await supabase
+    .from('struttura_corso')
+    .select(SELECT_STRUTTURA)
+    .eq('corso_id', corso.id)
+    .order('ordine', { ascending: true })
+    .returns<StrutturaRow[]>();
+  if (errStr || !struttura) return null;
+  const items = itemsDaStruttura(struttura);
+  const loIds = items.map((i) => i.learning_object_id);
+
+  // Eventi di completamento di QUESTA iscrizione sugli LO di questo corso.
+  // Il filtro sull'attore è in SQL (indice evento_actor_persona_idx, migration
+  // 20261019000004): prima si leggevano gli eventi di tutti i discenti del corso
+  // e si filtrava in JavaScript — costo proporzionale agli iscritti a ogni
+  // richiesta del player. Il filtro sull'iscrizione (payload.iscrizione_id, indice
+  // evento_payload_iscrizione_idx) evita che un contenuto della libreria riusato
+  // in due corsi porti il credito da un corso all'altro: ogni iscrizione ha la
+  // propria evidenza (tutti gli eventi del player lo portano dalla Fase 1).
+  const eventTypes = tipiEventoPer(items);
+  let events: EventoCompletamento[] = [];
+  if (loIds.length && eventTypes.length) {
+    const { data } = await supabase
+      .from('evento')
+      .select('subject_id, event_type, occurred_at, actor, payload')
+      .eq('actor->>persona_id', iscrizione.persona_id)
+      .eq('payload->>iscrizione_id', iscrizione.id)
+      .in('event_type', eventTypes)
+      .in('subject_id', loIds)
+      .order('seq', { ascending: true })
+      .returns<EventoCompletamento[]>();
+    events = data ?? [];
+  }
+  return calcolaProgresso(iscrizione, corso, items, events);
+}
+
+/**
+ * Versione in blocco (Blocco B #2): il progresso di MOLTE iscrizioni con un
+ * numero fisso di query (iscrizioni, strutture, eventi) invece di 3 per
+ * iscrizione. Stesso nucleo `calcolaProgresso`, stesso risultato. Usata dalle
+ * viste dell'auditor e dal report fondo. Le iscrizioni non trovate mancano
+ * dalla mappa.
+ */
+export async function computeProgressoPerIscrizioni(
+  supabase: SupabaseClient,
+  iscrizioneIds: string[],
+): Promise<Map<string, ProgressoIscrizione>> {
+  const out = new Map<string, ProgressoIscrizione>();
+  const ids = Array.from(new Set(iscrizioneIds));
+  if (!ids.length) return out;
+  const { data: iscrizioni } = await supabase.from('iscrizione').select(SELECT_ISCRIZIONE).in('id', ids).returns<IscrEdCorso[]>();
+  const valide = (iscrizioni ?? []).filter((i) => i.edizione?.corso);
+  const corsoIds = Array.from(new Set(valide.map((i) => i.edizione!.corso!.id)));
+  if (!corsoIds.length) return out;
+  const { data: struttura } = await supabase
+    .from('struttura_corso')
+    .select(SELECT_STRUTTURA)
+    .in('corso_id', corsoIds)
+    .order('ordine', { ascending: true })
+    .returns<(StrutturaRow & { corso_id: string })[]>();
+  const itemsPerCorso = new Map<string, StrutturaItem[]>();
+  for (const c of corsoIds) itemsPerCorso.set(c, itemsDaStruttura((struttura ?? []).filter((s) => s.corso_id === c)));
+  const eventTypes = Array.from(new Set(corsoIds.flatMap((c) => tipiEventoPer(itemsPerCorso.get(c) ?? []))));
+
+  // Eventi di tutte le iscrizioni in una query (indice evento_payload_iscrizione_idx),
+  // poi distribuiti per iscrizione; il nucleo scarta quelli di LO non in struttura.
+  const eventiPer = new Map<string, EventoCompletamento[]>();
+  if (eventTypes.length) {
+    const PASSO = 200;
+    for (let i = 0; i < valide.length; i += PASSO) {
+      const lotto = valide.slice(i, i + PASSO).map((x) => x.id);
+      const { data } = await supabase
+        .from('evento')
+        .select('subject_id, event_type, occurred_at, actor, payload')
+        .in('payload->>iscrizione_id', lotto)
+        .in('event_type', eventTypes)
+        .order('seq', { ascending: true })
+        .returns<(EventoCompletamento & { payload: { iscrizione_id?: string } | null })[]>();
+      for (const e of data ?? []) {
+        const k = e.payload?.iscrizione_id;
+        if (!k) continue;
+        if (!eventiPer.has(k)) eventiPer.set(k, []);
+        eventiPer.get(k)!.push(e);
+      }
+    }
+  }
+  for (const i of valide) {
+    const corso = i.edizione!.corso!;
+    out.set(i.id, calcolaProgresso(i, corso, itemsPerCorso.get(corso.id) ?? [], eventiPer.get(i.id) ?? []));
+  }
+  return out;
+}
+
 export async function isLoSbloccato(
   supabase: SupabaseClient,
   iscrizioneId: string,
@@ -309,63 +391,40 @@ export type FrequenzaIscrizione = {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export async function computeFrequenzaForIscrizione(
-  supabase: SupabaseClient,
-  iscrizioneId: string,
-): Promise<FrequenzaIscrizione | null> {
-  // Iscrizione → Edizione → Corso in UNA query (prima erano 3 round trip).
-  type IscrEdSoglia = {
-    id: string;
-    edizione_id: string;
-    edizione: { id: string; corso: { id: string; soglia_frequenza_percentuale: number | string | null } | null } | null;
-  };
-  const { data: iscrizione } = await supabase
-    .from('iscrizione')
-    .select('id, edizione_id, edizione:edizione_id ( id, corso:corso_id ( id, soglia_frequenza_percentuale ) )')
-    .eq('id', iscrizioneId)
-    .returns<IscrEdSoglia[]>()
-    .maybeSingle();
-  if (!iscrizione) return null;
-  const corso = iscrizione.edizione?.corso ?? null;
+type IscrEdSoglia = {
+  id: string;
+  edizione_id: string;
+  edizione: { id: string; corso: { id: string; soglia_frequenza_percentuale: number | string | null } | null } | null;
+};
+type SessioneMini = { id: string; edizione_id: string; durata_minuti: number | null; annullato_at: string | null };
+type PresEvt = {
+  id: string;
+  subject_id: string | null;
+  payload: { durata?: string | null; corregge_evento_id?: string | null; iscrizione_id?: string | null } | null;
+};
+const TIPI_PRESENZA = ['presenza_webinar_registrata', 'presenza_inserita_manualmente', 'presenza_corretta_manualmente'];
 
+/** Nucleo puro: frequenza di UNA iscrizione da sessioni dell'edizione ed Eventi di presenza (solo suoi, in ordine di seq). */
+export function calcolaFrequenza(
+  iscrizione: { id: string; edizione_id: string },
+  soglia: number | null,
+  sessioni: SessioneMini[],
+  eventi: PresEvt[],
+): FrequenzaIscrizione {
   // Sessioni (non annullate) dell'Edizione → minuti pianificati per sessione.
-  const { data: sessioni } = await supabase
-    .from('sessione')
-    .select('id, durata_minuti, annullato_at')
-    .eq('edizione_id', iscrizione.edizione_id)
-    .returns<{ id: string; durata_minuti: number | null; annullato_at: string | null }[]>();
-
   const plannedBySessione = new Map<string, number>();
   let minutiPianificati = 0;
-  for (const s of sessioni ?? []) {
+  for (const s of sessioni) {
     if (s.annullato_at) continue;
     const p = s.durata_minuti ?? 0;
     plannedBySessione.set(s.id, p);
     minutiPianificati += p;
   }
 
-  // Eventi di presenza per questa Iscrizione (auto + manuali). subject_id = sessione.
-  type PresEvt = {
-    id: string;
-    subject_id: string | null;
-    payload: { durata?: string | null; corregge_evento_id?: string | null } | null;
-  };
-  const { data: eventi } = await supabase
-    .from('evento')
-    .select('id, subject_id, payload')
-    .in('event_type', [
-      'presenza_webinar_registrata',
-      'presenza_inserita_manualmente',
-      'presenza_corretta_manualmente',
-    ])
-    .eq('payload->>iscrizione_id', iscrizioneId) // indice evento_payload_iscrizione_idx
-    .order('seq', { ascending: true })
-    .returns<PresEvt[]>();
-
   // Correzioni manuali (D7/M3a#7): un Evento di correzione SUPERA quello
   // referenziato — la ricostruzione dello stato dal log esclude il superato.
   const superseded = new Set<string>();
-  for (const e of eventi ?? []) {
+  for (const e of eventi) {
     const ref = e.payload?.corregge_evento_id;
     if (ref) superseded.add(ref);
   }
@@ -374,7 +433,7 @@ export async function computeFrequenzaForIscrizione(
   // limitata al pianificato (no doppio conteggio tra più report/rientri).
   const attendedBySessione = new Map<string, number>();
   let durateNonParsate = 0;
-  for (const e of eventi ?? []) {
+  for (const e of eventi) {
     if (!e.subject_id || superseded.has(e.id)) continue;
     const min = parseDurataMinuti(e.payload?.durata ?? null);
     if (min == null) { durateNonParsate += 1; continue; }
@@ -389,7 +448,6 @@ export async function computeFrequenzaForIscrizione(
     minutiFrequentati += planned != null ? Math.min(attended, planned) : attended;
   }
 
-  const soglia = corso?.soglia_frequenza_percentuale ?? null;
   const frequenza = minutiPianificati > 0 ? round2((minutiFrequentati / minutiPianificati) * 100) : 0;
   const idoneo = soglia != null && frequenza >= Number(soglia);
 
@@ -402,8 +460,71 @@ export async function computeFrequenzaForIscrizione(
     minuti_frequentati: round2(minutiFrequentati),
     ore_frequentate: round2(minutiFrequentati / 60),
     frequenza_percentuale: frequenza,
-    presenze: eventi?.length ?? 0,
+    presenze: eventi.length,
     durate_non_parsate: durateNonParsate,
     idoneo_frequenza: idoneo,
   };
+}
+
+/**
+ * Frequenza di MOLTE iscrizioni con un numero fisso di query (iscrizioni,
+ * sessioni delle loro edizioni, Eventi di presenza per iscrizione —
+ * indice evento_payload_iscrizione_idx). Le iscrizioni non trovate mancano.
+ */
+export async function computeFrequenzaPerIscrizioni(
+  supabase: SupabaseClient,
+  iscrizioneIds: string[],
+): Promise<Map<string, FrequenzaIscrizione>> {
+  const out = new Map<string, FrequenzaIscrizione>();
+  const ids = Array.from(new Set(iscrizioneIds));
+  if (!ids.length) return out;
+  const { data: iscrizioni } = await supabase
+    .from('iscrizione')
+    .select('id, edizione_id, edizione:edizione_id ( id, corso:corso_id ( id, soglia_frequenza_percentuale ) )')
+    .in('id', ids)
+    .returns<IscrEdSoglia[]>();
+  const lista = iscrizioni ?? [];
+  if (!lista.length) return out;
+  const edizioneIds = Array.from(new Set(lista.map((i) => i.edizione_id)));
+  const { data: sessioni } = await supabase
+    .from('sessione')
+    .select('id, edizione_id, durata_minuti, annullato_at')
+    .in('edizione_id', edizioneIds)
+    .returns<SessioneMini[]>();
+  const sessioniPer = new Map<string, SessioneMini[]>();
+  for (const s of sessioni ?? []) {
+    if (!sessioniPer.has(s.edizione_id)) sessioniPer.set(s.edizione_id, []);
+    sessioniPer.get(s.edizione_id)!.push(s);
+  }
+  const eventiPer = new Map<string, PresEvt[]>();
+  const PASSO = 200;
+  for (let i = 0; i < lista.length; i += PASSO) {
+    const lotto = lista.slice(i, i + PASSO).map((x) => x.id);
+    const { data } = await supabase
+      .from('evento')
+      .select('id, subject_id, payload')
+      .in('event_type', TIPI_PRESENZA)
+      .in('payload->>iscrizione_id', lotto)
+      .order('seq', { ascending: true })
+      .returns<PresEvt[]>();
+    for (const e of data ?? []) {
+      const k = e.payload?.iscrizione_id;
+      if (!k) continue;
+      if (!eventiPer.has(k)) eventiPer.set(k, []);
+      eventiPer.get(k)!.push(e);
+    }
+  }
+  for (const i of lista) {
+    const soglia = i.edizione?.corso?.soglia_frequenza_percentuale ?? null;
+    out.set(i.id, calcolaFrequenza(i, soglia != null ? Number(soglia) : null, sessioniPer.get(i.edizione_id) ?? [], eventiPer.get(i.id) ?? []));
+  }
+  return out;
+}
+
+export async function computeFrequenzaForIscrizione(
+  supabase: SupabaseClient,
+  iscrizioneId: string,
+): Promise<FrequenzaIscrizione | null> {
+  const m = await computeFrequenzaPerIscrizioni(supabase, [iscrizioneId]);
+  return m.get(iscrizioneId) ?? null;
 }

@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { requireAuditor } from '@/lib/auth-context';
-import { computeProgressoForIscrizione, computeFrequenzaForIscrizione, regolaLabel } from '@/lib/compliance';
+import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni, regolaLabel } from '@/lib/compliance';
 import type { IscrizioneAuditRow } from '@/lib/db-types';
 import { CompletamentoTable, type RigaCompletamento } from './CompletamentoTable';
 
@@ -31,13 +31,16 @@ export default async function CompletamentoPage() {
   const attestatoDi = new Map((attestati ?? []).map((a) => [a.iscrizione_id, a]));
 
   // Ricalcolo dagli Eventi per ogni iscrizione (D8): la verità è il registro,
-  // non le colonne-cache. (Blocco B #2: da portare in una funzione SQL.)
-  const righe: RigaCompletamento[] = await Promise.all(
-    iscrizioni.map(async (i) => {
-      const [prog, freq] = await Promise.all([
-        computeProgressoForIscrizione(supabase, i.id),
-        computeFrequenzaForIscrizione(supabase, i.id),
-      ]);
+  // non le colonne-cache. In blocco (Blocco B #2): un numero fisso di query per
+  // tutte le iscrizioni invece di ~6 per ciascuna.
+  const ids = iscrizioni.map((i) => i.id);
+  const [progressi, frequenze] = await Promise.all([
+    computeProgressoPerIscrizioni(supabase, ids),
+    computeFrequenzaPerIscrizioni(supabase, ids),
+  ]);
+  const righe: RigaCompletamento[] = iscrizioni.map((i) => {
+      const prog = progressi.get(i.id) ?? null;
+      const freq = frequenze.get(i.id) ?? null;
       return {
         iscrizione_id: i.id,
         persona: i.persona,
@@ -68,8 +71,7 @@ export default async function CompletamentoPage() {
           quiz: it.quiz ? { tentativi: it.quiz.tentativi, migliore: it.quiz.migliore_percentuale, ultima: it.quiz.ultima_percentuale, superato: it.quiz.superato } : null,
         })),
       };
-    }),
-  );
+    });
   righe.sort((a, b) => `${a.persona?.cognome ?? ''} ${a.persona?.nome ?? ''}`.localeCompare(`${b.persona?.cognome ?? ''} ${b.persona?.nome ?? ''}`, 'it') || (a.corso ?? '').localeCompare(b.corso ?? '', 'it'));
 
   return (
