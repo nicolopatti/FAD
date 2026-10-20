@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-// Le route che scrivono (admin, eventi del player, profilo) modificano il DB e
-// POI registrano l'Evento con la service role: se la chiave manca, meglio
-// rifiutare subito (503) che lasciare righe senza Evento nel registro.
-const SCRITTURA = /^\/api\/(admin|events|profilo)\//;
+// Le route che scrivono con la service role (admin; consegna del test, che
+// corregge con la service role) modificano il DB e POI registrano l'Evento: se
+// la chiave manca, meglio rifiutare subito (503) che lasciare righe senza
+// Evento nel registro. Gli eventi del player video/documento e il profilo
+// passano per RPC con il client dell'utente e non ne hanno bisogno.
+const SCRITTURA = /^\/api\/(admin\/|events\/quiz$)/;
 // POST di sola lettura (nessuna scrittura, nessun Evento): passano comunque.
 const SOLO_LETTURA = /^\/api\/admin\/attestati\/anteprima$/;
 const MUTANTI = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { appendEvent } from '@/lib/audit';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { coperturaSecondi, normalizzaSegmenti } from '@/lib/visione';
 import { provaEmissioneAutomatica } from '@/lib/attestati';
+import { ErroreRegistrazione, registraEventoPlayer } from '@/lib/eventi-player';
 
 const ALLOWED = new Set(['video.play', 'video.pause', 'video.seek', 'video.ended', 'video.progress']);
 
@@ -34,28 +34,11 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
-  const { data: persona } = await supabase
-    .from('persona')
-    .select('id, tenant_id')
-    .eq('auth_user_id', user.id)
-    .single();
-  if (!persona) return NextResponse.json({ ok: false }, { status: 403 });
-
-  // L'iscrizione deve appartenere a questa persona (RLS lo garantirebbe,
-  // ma controlliamo esplicitamente per dare 403 invece di 200 silenzioso).
-  const { data: iscrizione } = await supabase
-    .from('iscrizione')
-    .select('id, persona_id')
-    .eq('id', iscrizioneId)
-    .maybeSingle();
-  if (!iscrizione || iscrizione.persona_id !== persona.id) {
-    return NextResponse.json({ ok: false, error: 'iscrizione non valida' }, { status: 403 });
-  }
-
-  // D26 — enforcement server-side dello sblocco sequenziale anche sull'API.
-  // Una chiamata diretta a /api/events/video su un LO bloccato deve fallire.
-  const progresso = await computeProgressoForIscrizione(supabase, iscrizione.id);
-  if (!progresso) return NextResponse.json({ ok: false }, { status: 403 });
+  // D26 — enforcement server-side dello sblocco sequenziale anche sull'API,
+  // con la regola completa (visione integrale: copertura ricostruita dal log).
+  // La RPC ripete il controllo "per Eventi" nel DB (titolarità, LO in corso).
+  const progresso = await computeProgressoForIscrizione(supabase, iscrizioneId);
+  if (!progresso) return NextResponse.json({ ok: false, error: 'iscrizione non valida' }, { status: 403 });
   const item = progresso.items.find((i) => i.learning_object_id === learningObjectId);
   if (!item) {
     return NextResponse.json({ ok: false, error: 'LO non in corso' }, { status: 403 });
@@ -73,6 +56,7 @@ export async function POST(request: Request) {
   const cleanPayload: Record<string, unknown> = { ...(payload ?? {}) };
   delete cleanPayload.segmenti_visti;
   delete cleanPayload.copertura_secondi;
+  delete cleanPayload.iscrizione_id;
   if (payload && 'segmenti_visti' in payload) {
     const cfgDurata = Number((item.lo_config as { durata_secondi?: unknown }).durata_secondi);
     const playerDurata = Number(payload.durata_secondi);
@@ -87,21 +71,17 @@ export async function POST(request: Request) {
     }
   }
 
-  await appendEvent({
-    tenantId: persona.tenant_id,
-    eventType,
-    actor: { persona_id: persona.id, type: 'persona' },
-    subjectType: 'learning_object',
-    subjectId: learningObjectId,
-    payload: {
-      iscrizione_id: iscrizione.id,
-      ...cleanPayload,
-    },
-  });
+  let esito;
+  try {
+    esito = await registraEventoPlayer(supabase, { iscrizioneId, learningObjectId, eventType, payload: cleanPayload });
+  } catch (err) {
+    if (err instanceof ErroreRegistrazione) return NextResponse.json({ ok: false, error: err.message }, { status: err.status });
+    throw err;
+  }
 
   // Fase 5: se questo era l'ultimo passo, l'attestato si emette da solo
   // (politica `automatica`). Mai un errore verso il player.
-  const attestato = eventType === 'video.ended' ? await provaEmissioneAutomatica(iscrizione.id, persona.id) : null;
+  const attestato = eventType === 'video.ended' ? await provaEmissioneAutomatica(iscrizioneId, esito.persona_id) : null;
 
   return NextResponse.json({ ok: true, attestato: attestato ? { numero: attestato.numero } : null });
 }

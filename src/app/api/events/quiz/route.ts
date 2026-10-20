@@ -6,6 +6,7 @@ import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { configQuizDa, correggi, type RisposteDate } from '@/lib/quiz';
 import type { QuizDomandaRow } from '@/lib/db-types';
 import { provaEmissioneAutomatica } from '@/lib/attestati';
+import { ErroreRegistrazione, registraEventoPlayer } from '@/lib/eventi-player';
 
 // Test finale (Fase 5). Due eventi:
 //  - quiz.started   → apertura di un tentativo (payload: tentativo)
@@ -61,14 +62,13 @@ export async function POST(request: Request) {
   const tentativo = tentativiFatti + 1;
 
   if (eventType === 'quiz.started') {
-    await appendEvent({
-      tenantId: persona.tenant_id,
-      eventType,
-      actor: { persona_id: persona.id, type: 'persona' },
-      subjectType: 'learning_object',
-      subjectId: learningObjectId,
-      payload: { iscrizione_id: iscrizione.id, tentativo },
-    });
+    // Avvio: RPC unica con il client dell'utente (nessuna service role).
+    try {
+      await registraEventoPlayer(supabase, { iscrizioneId: iscrizione.id, learningObjectId, eventType, payload: { tentativo } });
+    } catch (err) {
+      if (err instanceof ErroreRegistrazione) return NextResponse.json({ ok: false, error: err.message }, { status: err.status });
+      throw err;
+    }
     return NextResponse.json({ ok: true, tentativo });
   }
 

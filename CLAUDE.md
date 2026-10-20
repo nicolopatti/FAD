@@ -434,6 +434,32 @@ scratchpad `pw/` (da portare in repo con i test E2E del Blocco E). Senza
 `SUPABASE_SERVICE_ROLE_KEY` nell'ambiente le route di scrittura falliscono dopo la
 modifica DB: dal container si provano solo letture e validazioni.
 
+## Blocco B #5/#7 — RPC unica del player + policy RLS unite (2026-10-20)
+
+Migration `20261020000010_blocco_b_rpc_player_policy_unione.sql` (**applicata sul
+live**), pgTAP `supabase/tests/blocco_b_rpc_player_policy.sql` (14/14 sul live).
+- **#5 RPC `evento_player_registra(p_iscrizione_id, p_learning_object_id,
+  p_event_type, p_payload)`** (SECURITY DEFINER, EXECUTE solo `authenticated` +
+  `service_role`): una sola chiamata con il **client dell'utente** (JWT, niente
+  service role) che verifica titolarità dell'iscrizione, LO nella struttura del
+  corso, famiglia dell'evento coerente col tipo di LO, sblocco sequenziale "per
+  Eventi" (D26) e appende via `audit_append` con `payload.iscrizione_id` imposto
+  dal server. Tipi ammessi: `video.*`, `documento.*`, `quiz.started`. Helper TS
+  `src/lib/eventi-player.ts` (`registraEventoPlayer`, errori → 401/403/400).
+  `/api/events/video` e `/api/events/documento` **non usano più `appendEvent` né la
+  service role**: tengono il controllo D26 completo con `compliance.ts` (serve per la
+  visione integrale, che la RPC non conosce) e poi chiamano la RPC. `/api/events/quiz`:
+  `quiz.started` via RPC, `quiz.submitted` resta con service role (legge le risposte
+  giuste e corregge). Il fail-fast del middleware ora copre solo `/api/admin/*` (meno
+  anteprima) e `/api/events/quiz`: **dal container, senza chiave di servizio, il player
+  video/documento scrive davvero** (verificato: seq 201–202 sul live, catena integra).
+- **#7 policy unite** (advisor 0006 "multiple permissive policies" → 0): `evento_read`
+  ingloba le 3 policy admin (l'admin legge gli eventi del player, del test, delle
+  presenze, dei depositi e degli attestati del tenant — più di prima, serve al report
+  fondo sotto RLS admin), `iscrizione_read`/`persona_read_self_or_auditor`/
+  `attestato_read_self` includono admin e auditor; le policy doppie sono state tolte
+  (`DROP` composto a runtime per il trabocchetto #13).
+
 ## Hardening Tappa 1 — grant, guardia audit_append, service role (2026-10-19)
 
 Ripresa dopo 4 mesi di fermo. **Il progetto Supabase era in pausa dal 2026-06-09**
