@@ -9,7 +9,7 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Area admin — ondata A (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **NON ancora su `main`**: da provare nel browser, poi merge solo con autorizzazione)
+## Area admin — ondate A e B (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **NON ancora su `main`**: da provare nel browser, poi merge solo con autorizzazione)
 
 Richiesta dell'utente: "contenuti" come lista piatta non ha senso, i webinar stanno allo
 stesso livello dei corsi; serviva un'analisi obiettiva e proposte per un'area admin usabile
@@ -92,9 +92,38 @@ codice senza tavole intermedie.
   corso → edizione → sessione; assegnare un docente e sceglierlo in una sessione;
   "Assegna a tutti" il piano; Concludi edizione dalla scheda Stato; l'agenda; i redirect
   dai vecchi indirizzi. Poi **merge su `main` solo con autorizzazione esplicita**.
-- **Prossime ondate** (dal doc di analisi): **B libreria** (pagina contenuto con campi reali
-  invece del JSON, "Sostituisci file/video", libreria raggruppata per corso con orfani,
-  ricerca sul server nel pannello Dalla libreria); **C scala** (`corso.archiviato_at`,
+**Ondata B fatta (libreria, stessa sessione, "procedi con l'ondata B"):**
+- *Ricerca sul server*: `GET /api/admin/learning-objects/cerca?q=&tipo=&escludi_corso=`
+  (titolo `ilike`, attivi, max 30 + `troncato`, `usato_in` per riga) e `POST …/cerca
+  {titoli}` che classifica i titoli di un CSV (esiste già in libreria?). Entrambe di sola
+  lettura: la POST è esente dal fail-fast del middleware (`SOLO_LETTURA`). Il pannello
+  "Dalla libreria" di `Lezioni.tsx` interroga il server a ogni battuta (250 ms) con filtro
+  tipo; la pagina Lezioni **non carica più la libreria intera**; l'anteprima CSV classifica
+  via POST (se la chiamata fallisce, decide comunque il server all'import).
+- *Pagina del contenuto* (`learning-objects/[id]`): niente più JSON. `ContenutoForm.tsx`:
+  titolo; per i video ID/link Vimeo + durata con **sostituzione del video** (conferma se
+  usato in N corsi) e anteprima iframe a richiesta; per i PDF nome e peso, **Apri il PDF**
+  (signed URL dal browser con la policy di lettura del tenant) e **Sostituisci PDF**
+  (upload su `documenti/{tenant}/{loId}-{ts}.pdf`, il file precedente resta nel bucket);
+  per i test il `QuizEditor`. Card "Usato come lezione in" (corsi con posizione e stato,
+  link alla scheda Lezioni) e `ArchiviaPanel` (ex `EditLearningObjectForm`). Briciole
+  Corsi → Libreria → titolo.
+- *Backend*: `src/lib/lo-config.ts` (validatori video/documento condivisi da POST e PATCH);
+  `PATCH /api/admin/learning-objects/[id]` accetta `config` anche per video e documento
+  (sostituzione sempre ammessa: D22 protegge la sequenza, non il contenuto; per i test
+  resta il blocco a corso attivo). Evento `learning_object.updated` con la nuova config
+  (nessuna PII).
+- *Libreria* (`LibreriaView.tsx`, sostituisce `ContenutiTable`): vista **Per corso**
+  (predefinita: un gruppo per corso, attivi → bozze → conclusi, lezioni in ordine, "anche in
+  N altri corsi", gruppo finale **In nessun corso** con Archivia) oppure **Elenco** (tabella
+  con ordinamento); filtri tipo e Attivi/Archiviati/Tutti, ricerca per titolo/file/ID.
+- *Verifiche*: typecheck 0, lint 0, unit 39/39, build 41 route, `scratchpad/pw/funcB.mjs`
+  **13/13** (vista per corso, elenco, pagina video senza JSON con anteprima, pagina PDF con
+  Sostituisci/Apri, pagina test, API cerca GET/POST, pannello Dalla libreria sul corso in
+  bozza con risultati e ricerca vuota), smoke E2E **72/72**. L'anteprima Vimeo nel
+  container mostra l'icona rotta (vimeo.com non raggiungibile da qui). Non provati da qui
+  (scrivono): sostituzione del video, sostituzione del PDF.
+- **Prossime ondate** (dal doc di analisi): **C scala** (`corso.archiviato_at`,
   catalogo a lista con ricerca/paginazione sul server, tabella categorie in Impostazioni,
   pagine Persone e Aziende con dedup per partita IVA, selettori a ricerca, azioni in blocco,
   dashboard con conteggi).

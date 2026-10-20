@@ -1,95 +1,47 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import type { LearningObjectRow } from '@/lib/db-types';
 import { Icon } from '@/components/admin/Atlante';
 import { useFeedback } from '@/components/ui/Feedback';
+import { useCall } from '@/components/admin/useCall';
+import { ErrorBanner } from '@/components/admin/ErrorBanner';
 
-export function EditLearningObjectForm({ lo }: { lo: LearningObjectRow }) {
-  const router = useRouter();
-  const { confirm, toast } = useFeedback();
-  const [titolo, setTitolo] = useState(lo.titolo);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+/** Archivia o ripristina un contenuto della libreria (mai cancellazione fisica). */
+export function ArchiviaPanel({ lo, inCorsi }: { lo: LearningObjectRow; inCorsi: number }) {
+  const { confirm } = useFeedback();
+  const { call, busy, error } = useCall();
   const archived = lo.archiviato_at !== null;
-  const dirty = titolo.trim() !== lo.titolo;
-
-  async function saveTitolo(e: React.FormEvent) {
-    e.preventDefault();
-    if (!dirty) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/learning-objects/${lo.id}`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ titolo }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      router.refresh();
-      toast('Titolo salvato.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function archiveOrUnarchive() {
     if (!archived) {
       const ok = await confirm({
         titolo: `Archiviare "${lo.titolo}"?`,
-        messaggio: 'Il contenuto sparisce dalla libreria attiva e non potrà essere aggiunto a nuovi corsi. I corsi che già lo usano continuano a funzionare. Puoi ripristinarlo in qualsiasi momento.',
+        messaggio: inCorsi > 0
+          ? `Sparisce dalla libreria e non si potrà aggiungere a nuovi corsi. I ${inCorsi} ${inCorsi === 1 ? 'corso che lo usa continua' : 'corsi che lo usano continuano'} a funzionare. Si può ripristinare in qualsiasi momento.`
+          : 'Sparisce dalla libreria e non si potrà aggiungere a nuovi corsi. Si può ripristinare in qualsiasi momento.',
         conferma: 'Archivia',
       });
       if (!ok) return;
     }
-    setError(null);
-    setBusy(true);
     try {
-      const path = archived ? 'unarchive' : 'archive';
-      const res = await fetch(`/api/admin/learning-objects/${lo.id}/${path}`, { method: 'POST' });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      router.refresh();
-      toast(archived ? 'Contenuto ripristinato.' : 'Contenuto archiviato.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
+      await call('POST', `/api/admin/learning-objects/${lo.id}/${archived ? 'unarchive' : 'archive'}`, undefined, { successo: archived ? 'Contenuto ripristinato.' : 'Contenuto archiviato.' });
+    } catch { /* banner */ }
   }
 
   return (
-    <>
-      <form className="card" onSubmit={saveTitolo}>
-        <div className="card__head"><h3>Modifica</h3></div>
-        <div className="card__body">
-          {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
-          <div className="field">
-            <label>Titolo</label>
-            <input className="input" value={titolo} onChange={(e) => setTitolo(e.target.value)} disabled={busy} />
-          </div>
-          <button type="submit" className="btn" disabled={busy || !dirty}>{busy ? 'Salvo…' : 'Salva titolo'}</button>
-        </div>
-      </form>
-
-      <div className="card">
-        <div className="card__head"><h3>{archived ? 'Ripristina' : 'Archivia'}</h3></div>
-        <div className="card__body">
-          <p className="muted" style={{ marginBottom: 12 }}>
-            {archived
-              ? 'Il contenuto torna disponibile per essere aggiunto a nuove strutture corso.'
-              : 'Soft-archive: la riga resta consultabile ma non potrà più essere aggiunta a nuove strutture corso. Nessun DELETE fisico.'}
-          </p>
-          <button type="button" className={`btn ${archived ? '' : 'btn--danger'}`} onClick={archiveOrUnarchive} disabled={busy}>
-            <Icon name="archive" /> {busy ? '…' : archived ? 'Ripristina' : 'Archivia'}
-          </button>
-        </div>
+    <div className="card">
+      <div className="card__head"><h3>{archived ? 'Archiviato' : 'Archiviazione'}</h3></div>
+      <div className="card__body">
+        <ErrorBanner error={error} />
+        <p className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
+          {archived
+            ? 'Il contenuto non compare nella libreria attiva. Ripristinalo per poterlo aggiungere di nuovo ai corsi.'
+            : 'Un contenuto archiviato resta consultabile e continua a funzionare nei corsi che lo usano; non si può più aggiungere a corsi nuovi.'}
+        </p>
+        <button type="button" className={`btn ${archived ? '' : 'btn--secondary'}`} onClick={archiveOrUnarchive} disabled={busy}>
+          <Icon name="archive" /> {archived ? 'Ripristina' : 'Archivia'}
+        </button>
       </div>
-    </>
+    </div>
   );
 }

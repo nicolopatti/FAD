@@ -8,7 +8,7 @@ import { updateSession } from '@/lib/supabase/middleware';
 // passano per RPC con il client dell'utente e non ne hanno bisogno.
 const SCRITTURA = /^\/api\/(admin\/|events\/quiz$|profilo\/(password|informativa)$)/;
 // POST di sola lettura (nessuna scrittura, nessun Evento): passano comunque.
-const SOLO_LETTURA = /^\/api\/admin\/attestati\/anteprima$/;
+const SOLO_LETTURA = /^\/api\/admin\/(attestati\/anteprima|learning-objects\/cerca)$/;
 const MUTANTI = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
 export async function middleware(request: NextRequest) {

@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
-import type { CorsoRow, LearningObjectRow, StrutturaCorsoConLO } from '@/lib/db-types';
+import type { CorsoRow, StrutturaCorsoConLO } from '@/lib/db-types';
 import { Lezioni } from '../../_components/Lezioni';
 
 export const dynamic = 'force-dynamic';
@@ -30,19 +30,5 @@ export default async function CorsoLezioniPage({ params }: { params: { id: strin
   ]);
   const frozen = (edizioni.count ?? 0) > 0;
 
-  // La libreria serve solo a corso in bozza (pannello "Dalla libreria").
-  let availableLo: LearningObjectRow[] = [];
-  if (!frozen) {
-    const usati = new Set(struttura.map((s) => s.learning_object_id));
-    const allLo = unwrap(await supabase
-      .from('learning_object')
-      .select('id, tenant_id, type, titolo, config, archiviato_at, creato_il')
-      .is('archiviato_at', null)
-      .order('titolo', { ascending: true })
-      .limit(500)
-      .returns<LearningObjectRow[]>(), 'i contenuti disponibili');
-    availableLo = allLo.filter((lo) => !usati.has(lo.id));
-  }
-
-  return <Lezioni corso={corso} struttura={struttura} availableLo={availableLo} frozen={frozen} />;
+  return <Lezioni corso={corso} struttura={struttura} frozen={frozen} />;
 }

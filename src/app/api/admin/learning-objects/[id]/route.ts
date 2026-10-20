@@ -3,10 +3,15 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 import { validaConfigQuiz } from '@/lib/quiz';
+import { validateDocumentoConfig, validateVideoConfig } from '@/lib/lo-config';
 
 type UpdateBody = {
   titolo?: string;
-  /** solo per i test: soglia/tentativi/ordine/correzione (congelati con D22) */
+  /**
+   * Nuova configurazione: per i test soglia/tentativi/ordine/correzione (fissati
+   * con D22); per video e documento la sostituzione del video o del file (sempre
+   * ammessa: D22 protegge la sequenza del corso, non il contenuto della lezione).
+   */
   config?: Record<string, unknown>;
 };
 
@@ -42,15 +47,18 @@ export async function PATCH(
   if (body.config && typeof body.config === 'object') {
     const { data: lo } = await supabase.from('learning_object').select('type').eq('id', params.id).maybeSingle();
     if (!lo) return NextResponse.json({ ok: false, error: 'contenuto non trovato' }, { status: 404 });
-    if (lo.type !== 'quiz') {
-      return NextResponse.json({ ok: false, error: 'le proprietà di questo contenuto non si modificano: archivialo e creane uno nuovo' }, { status: 400 });
+    if (lo.type === 'quiz') {
+      const cfg = validaConfigQuiz(body.config);
+      if (typeof cfg === 'string') return NextResponse.json({ ok: false, error: cfg }, { status: 400 });
+      if (await loCongelato(supabase, params.id)) {
+        return NextResponse.json({ ok: false, error: 'Il test è una lezione di un corso attivo: soglia e regole non si possono più modificare.' }, { status: 409 });
+      }
+      updates.config = cfg;
+    } else {
+      const cfg = lo.type === 'video' ? validateVideoConfig(body.config) : validateDocumentoConfig(body.config, session.tenantId);
+      if (typeof cfg === 'string') return NextResponse.json({ ok: false, error: cfg }, { status: 400 });
+      updates.config = cfg;
     }
-    const cfg = validaConfigQuiz(body.config);
-    if (typeof cfg === 'string') return NextResponse.json({ ok: false, error: cfg }, { status: 400 });
-    if (await loCongelato(supabase, params.id)) {
-      return NextResponse.json({ ok: false, error: 'Il test è usato in un corso congelato: soglia e regole non si possono più modificare.' }, { status: 409 });
-    }
-    updates.config = cfg;
   }
 
   if (Object.keys(updates).length === 0) {

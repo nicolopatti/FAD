@@ -97,7 +97,9 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     }
   }
   await paginaOk(page, '/admin/corsi/new', `admin@${tag}: nuovo corso`, 'Crea un corso');
-  await paginaOk(page, '/admin/learning-objects', `admin@${tag}: libreria`, 'Libreria dei contenuti');
+  await paginaOk(page, '/admin/learning-objects', `admin@${tag}: libreria per corso`, 'Per corso');
+  const hrefLo = await page.locator('.libitem__title a').first().getAttribute('href').catch(() => null);
+  if (hrefLo) await paginaOk(page, hrefLo, `admin@${tag}: pagina del contenuto`, 'Usato come lezione in');
   await paginaOk(page, '/admin/learning-objects/new', `admin@${tag}: nuovo contenuto`, /Test/);
   await paginaOk(page, '/admin/agenda', `admin@${tag}: agenda`, 'Agenda');
   await paginaOk(page, '/admin/rendicontazione', `admin@${tag}: rendicontazione`, 'Report fondi');
@@ -111,6 +113,8 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     check('admin: anteprima PDF del modello', pdf.status() === 200 && (pdf.headers()['content-type'] ?? '').includes('application/pdf'), String(pdf.status()));
     // Scrittura con corpo vuoto: 400 (validazione) o 503 (chiave di servizio
     // assente, middleware fail-fast). Mai 500, mai 200.
+    const cerca = await page.request.get(`${BASE}/api/admin/learning-objects/cerca?q=a`);
+    check('admin: ricerca nella libreria sul server', cerca.status() === 200, String(cerca.status()));
     const w = await page.request.post(`${BASE}/api/admin/piani`, { data: {} });
     check('admin: scrittura senza dati rifiutata in modo controllato (400 o 503)', [400, 503].includes(w.status()), String(w.status()));
   }

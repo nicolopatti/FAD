@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { CorsoRow, LearningObjectRow, LearningObjectType, StrutturaCorsoConLO } from '@/lib/db-types';
+import type { CorsoRow, LearningObjectType, StrutturaCorsoConLO } from '@/lib/db-types';
 import { parseDelimited } from '@/lib/csv';
 import { useFeedback } from '@/components/ui/Feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -21,12 +21,10 @@ import { TIPO_CHIP, TIPO_ICON, TIPO_LABEL, matchCol } from './shared';
 export function Lezioni({
   corso,
   struttura,
-  availableLo,
   frozen,
 }: {
   corso: CorsoRow;
   struttura: StrutturaCorsoConLO[];
-  availableLo: LearningObjectRow[];
   frozen: boolean;
 }) {
   const { call, busy, error, setError, setBusy } = useCall();
@@ -61,8 +59,8 @@ export function Lezioni({
           {aggiungi !== 'chiuso' && (
             <div className="card__body">
               {aggiungi === 'nuovo' && <NuovaLezione corso={corso} busy={busy} call={call} onError={setError} onBusy={setBusy} />}
-              {aggiungi === 'libreria' && <DallaLibreria corsoId={corso.id} availableLo={availableLo} busy={busy} call={call} />}
-              {aggiungi === 'csv' && <DaCsv corsoId={corso.id} availableLo={availableLo} struttura={struttura} busy={busy} call={call} />}
+              {aggiungi === 'libreria' && <DallaLibreria corsoId={corso.id} busy={busy} call={call} />}
+              {aggiungi === 'csv' && <DaCsv corsoId={corso.id} struttura={struttura} busy={busy} call={call} />}
             </div>
           )}
         </div>
@@ -362,21 +360,46 @@ function NuovaLezione({
   );
 }
 
-// ── Dalla libreria ───────────────────────────────────────────────────────
-function DallaLibreria({ corsoId, availableLo, busy, call }: { corsoId: string; availableLo: LearningObjectRow[]; busy: boolean; call: CallFn }) {
+// ── Dalla libreria (ricerca sul server) ─────────────────────────────────
+type Trovato = { id: string; type: LearningObjectType; titolo: string; config: Record<string, unknown>; usato_in: number };
+
+function DallaLibreria({ corsoId, busy, call }: { corsoId: string; busy: boolean; call: CallFn }) {
   const [q, setQ] = useState('');
   const [tipo, setTipo] = useState<'tutti' | LearningObjectType>('tutti');
-  const filtered = useMemo(() => {
-    const n = q.trim().toLowerCase();
-    return availableLo.filter((lo) => (tipo === 'tutti' || lo.type === tipo) && (!n || lo.titolo.toLowerCase().includes(n)));
-  }, [availableLo, q, tipo]);
+  const [risultati, setRisultati] = useState<Trovato[] | null>(null);
+  const [troncato, setTroncato] = useState(false);
+  const [cercando, setCercando] = useState(false);
+  const [errore, setErrore] = useState<string | null>(null);
+
+  // Interroga il server a ogni cambio di ricerca o tipo (con una breve attesa).
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      setCercando(true);
+      setErrore(null);
+      try {
+        const p = new URLSearchParams({ escludi_corso: corsoId });
+        if (q.trim()) p.set('q', q.trim());
+        if (tipo !== 'tutti') p.set('tipo', tipo);
+        const res = await fetch(`/api/admin/learning-objects/cerca?${p}`);
+        const json = await res.json();
+        if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+        setRisultati(json.risultati as Trovato[]);
+        setTroncato(Boolean(json.troncato));
+      } catch (err) {
+        setErrore(err instanceof Error ? err.message : String(err));
+      } finally {
+        setCercando(false);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, tipo, corsoId]);
 
   return (
     <>
       <div className="toolbar" style={{ marginBottom: 12 }}>
         <div className="search">
           <Icon name="search" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca nella libreria…" aria-label="Cerca nella libreria" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca nella libreria per titolo…" aria-label="Cerca nella libreria" autoFocus />
         </div>
         <div className="toolbar__spacer" />
         <div className="seg seg--mono" role="group" aria-label="Tipo">
@@ -385,24 +408,30 @@ function DallaLibreria({ corsoId, availableLo, busy, call }: { corsoId: string; 
           ))}
         </div>
       </div>
-      {filtered.length === 0 ? (
-        <div className="muted" style={{ fontSize: 13 }}>
-          {availableLo.length === 0 ? 'Nessun contenuto disponibile: tutti quelli in libreria sono già nel corso.' : 'Nessun contenuto corrisponde alla ricerca.'}
-        </div>
+      {errore && <div className="muted" style={{ fontSize: 13 }}>{errore}</div>}
+      {risultati === null ? (
+        <div className="muted" style={{ fontSize: 13 }}>Cerco…</div>
+      ) : risultati.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13 }}>{q.trim() || tipo !== 'tutti' ? 'Nessun contenuto corrisponde alla ricerca.' : 'Nessun contenuto disponibile: tutti quelli in libreria sono già nel corso.'}</div>
       ) : (
-        <div style={{ maxHeight: 360, overflow: 'auto' }}>
-          {filtered.map((lo) => (
+        <div style={{ maxHeight: 360, overflow: 'auto', opacity: cercando ? 0.6 : 1 }}>
+          {risultati.map((lo) => (
             <div key={lo.id} className="libitem">
               <span className={`type-ico type-ico--${lo.type}`}><Icon name={TIPO_ICON[lo.type]} /></span>
               <div className="libitem__main">
                 <div className="libitem__title">{lo.titolo}</div>
-                <div className="libitem__meta">{TIPO_LABEL[lo.type]}{lo.type === 'video' && typeof lo.config?.durata_secondi === 'number' ? ` · ${fmtDurataSec(lo.config.durata_secondi as number)}` : ''}</div>
+                <div className="libitem__meta">
+                  {TIPO_LABEL[lo.type]}
+                  {lo.type === 'video' && typeof lo.config?.durata_secondi === 'number' ? ` · ${fmtDurataSec(lo.config.durata_secondi as number)}` : ''}
+                  {lo.usato_in > 0 ? ` · in ${lo.usato_in} ${lo.usato_in === 1 ? 'corso' : 'corsi'}` : ' · in nessun corso'}
+                </div>
               </div>
               <button type="button" className="btn btn--secondary btn--xs" disabled={busy} onClick={() => call('POST', `/api/admin/corsi/${corsoId}/struttura`, { learning_object_id: lo.id }, { successo: `"${lo.titolo}" aggiunto al corso.` })}>
                 <Icon name="plus" /> Aggiungi
               </button>
             </div>
           ))}
+          {troncato && <div className="muted" style={{ fontSize: 12, padding: '8px 0' }}>Mostro i primi 30 risultati: affina la ricerca.</div>}
         </div>
       )}
     </>
@@ -423,13 +452,11 @@ type ImportStrutturaRow = {
 
 function DaCsv({
   corsoId,
-  availableLo,
   struttura,
   busy,
   call,
 }: {
   corsoId: string;
-  availableLo: LearningObjectRow[];
   struttura: StrutturaCorsoConLO[];
   busy: boolean;
   call: CallFn;
@@ -440,11 +467,19 @@ function DaCsv({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const titlesInCourse = useMemo(() => new Set(struttura.map((s) => s.learning_object?.titolo?.toLowerCase().trim()).filter(Boolean)), [struttura]);
-  const libByTitle = useMemo(() => new Map(availableLo.map((lo) => [lo.titolo.toLowerCase().trim(), lo])), [availableLo]);
 
-  function parse(text: string) {
+  async function parse(text: string) {
     try {
       const { headers, rows: raw } = parseDelimited(text);
+      // Quali titoli esistono già in libreria? Lo dice il server.
+      const libByTitle = new Set<string>();
+      try {
+        const ci0 = matchCol(headers, ['titolo', 'title', 'nome', 'contenuto']);
+        const titoli = ci0 >= 0 ? raw.map((r) => (r[ci0] ?? '').trim()).filter(Boolean) : [];
+        const res = await fetch('/api/admin/learning-objects/cerca', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ titoli }) });
+        const json = await res.json();
+        if (res.ok && json.ok) for (const k of Object.keys(json.trovati ?? {})) libByTitle.add(k);
+      } catch { /* senza classificazione: il server decide comunque all'import */ }
       const ci = {
         titolo: matchCol(headers, ['titolo', 'title', 'nome', 'contenuto']),
         tipo: matchCol(headers, ['tipo', 'type']),
