@@ -122,9 +122,9 @@ export function CorsoEditor({
           <Icon name="snowflake" className="banner__icon" />
           <div className="banner__body">
             <strong>Corso congelato.</strong> Ha {edizioni.length}{' '}
-            {edizioni.length === 1 ? 'edizione' : 'edizioni'}: la struttura, i dati e gli oggetti
+            {edizioni.length === 1 ? 'edizione' : 'edizioni'}: titolo, categoria, regole di fruizione, struttura e oggetti
             didattici sono in <strong>sola lettura</strong> perché le persone già iscritte fruiscano
-            sempre dello stesso percorso. L&apos;<strong>immagine di copertina resta modificabile</strong>.
+            sempre dello stesso percorso. <strong>Descrizione e immagine di copertina restano modificabili</strong>.
           </div>
         </div>
       )}
@@ -199,13 +199,16 @@ function SezioneDati({
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const dirty =
-    !frozen &&
-    (titolo.trim() !== corso.titolo ||
+  // A corso congelato (D22) resta modificabile solo la descrizione (e la
+  // copertina): il trigger DB rifiuta gli altri campi.
+  const descrizioneDirty = descrizione.trim() !== (corso.descrizione ?? '');
+  const dirty = frozen
+    ? descrizioneDirty
+    : titolo.trim() !== corso.titolo ||
       (categoria || null) !== (corso.categoria ?? null) ||
-      descrizione.trim() !== (corso.descrizione ?? '') ||
+      descrizioneDirty ||
       sblocco !== corso.sblocco_sequenziale ||
-      integrale !== Boolean(corso.visione_integrale));
+      integrale !== Boolean(corso.visione_integrale);
 
   const catOptions = useMemo(() => {
     const set = [...CATEGORIE];
@@ -216,13 +219,19 @@ function SezioneDati({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!dirty) return;
-    await call('PATCH', `/api/admin/corsi/${corso.id}`, {
-      titolo,
-      descrizione: descrizione || null,
-      categoria: categoria || null,
-      sblocco_sequenziale: sblocco,
-      visione_integrale: integrale,
-    }, { successo: 'Dati del corso salvati.', busy: setSalvando });
+    const body = frozen
+      ? { descrizione: descrizione.trim() || null }
+      : {
+          titolo,
+          descrizione: descrizione.trim() || null,
+          categoria: categoria || null,
+          sblocco_sequenziale: sblocco,
+          visione_integrale: integrale,
+        };
+    await call('PATCH', `/api/admin/corsi/${corso.id}`, body, {
+      successo: frozen ? 'Descrizione salvata.' : 'Dati del corso salvati.',
+      busy: setSalvando,
+    });
   }
 
   async function uploadCover(file: File) {
@@ -276,7 +285,8 @@ function SezioneDati({
             </div>
             <div className="field">
               <label>Descrizione</label>
-              <textarea className="textarea" rows={3} value={descrizione} onChange={(e) => setDescrizione(e.target.value)} disabled={busy || frozen} />
+              <textarea className="textarea" rows={3} value={descrizione} onChange={(e) => setDescrizione(e.target.value)} disabled={busy} />
+              <div className="field__hint">È il testo che il discente legge nella pagina del corso. Si può aggiornare anche a corso congelato.</div>
             </div>
             <div className="row between" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: '12px 14px', background: 'var(--bg)' }}>
               <div>
@@ -334,11 +344,11 @@ function SezioneDati({
           </div>
         </div>
 
-        {!frozen && (
-          <div style={{ marginTop: 14 }}>
-            <button type="submit" className="btn" disabled={busy || !dirty}>{salvando ? 'Salvo…' : 'Salva dati'}</button>
-          </div>
-        )}
+        <div style={{ marginTop: 14 }}>
+          <button type="submit" className="btn" disabled={busy || !dirty}>
+            {salvando ? 'Salvo…' : frozen ? 'Salva descrizione' : 'Salva dati'}
+          </button>
+        </div>
       </div>
     </form>
   );

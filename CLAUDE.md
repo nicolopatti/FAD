@@ -118,6 +118,18 @@ Verifiche ondata 2: `typecheck` 0, `build` 28 route, `test:unit` 20/20,
 overflow. **Da provare nel browser dall'utente**: il player fino a fine lezione
 (schermata finale e "Lezione successiva"), la tab bar su telefono.
 
+**Rifiniture dopo la verifica dell'utente (2026-10-20, "Molto bello"):** i chip
+"6 lezioni · 56 min · visione integrale" dell'hero del corso erano "stile Claude" →
+tolti, i dati stanno nel pannello laterale come righe (Lezioni/Durata/Modalità/
+Completate/Idoneità). **La descrizione del corso non è più congelata da D22**
+(decisione dell'utente, opzione 2): migration
+`20261020000002_corso_descrizione_modificabile.sql` (**applicata sul live**) ridefinisce
+`tg_corso_freeze` senza `descrizione`; restano congelati titolo, categoria, sblocco
+sequenziale, visione integrale. Nel Course Builder la textarea Descrizione è sempre
+attiva e a corso congelato il pulsante diventa "Salva descrizione" (PATCH con la sola
+`descrizione`; l'Evento `corso.updated` non porta il testo). pgTAP
+`supabase/tests/corso_descrizione_modificabile.sql` (6, verificato sul live in rollback).
+
 **Prossime ondate** (vedi artifact revisione, sezione "Piano per ondate"):
 2 discente (login nuovo, fine lezione/corso, nav mobile A, testi senza gergo,
 movimento) → 3 admin → 4 auditor + tema scuro. Per far girare l'app in
@@ -209,7 +221,7 @@ via MCP `execute_sql`. **Eseguito sul live il 2026-10-20** con i 6 ID forniti da
 prova)" (6 LO video Vimeo 1236864492/490/489/491/528/539, 55'45" totali, sblocco
 sequenziale), edizione `6d2ef44e-…` codice `ED-FIN-PROVA-01`, iscrizione del discente
 demo `b8ffac43-…`. Catena 0 problemi. Il corso è **congelato** (D22) dalla creazione
-dell'edizione: titolo/descrizione non modificabili; i `config` dei LO sì. **Da
+dell'edizione: titolo non modificabile (la descrizione sì, dal 2026-10-20); i `config` dei LO sì. **Da
 verificare nel browser**: riproduzione (dipende dai domini consentiti su Vimeo per
 quei 6 video) e sblocco sequenziale.
 
