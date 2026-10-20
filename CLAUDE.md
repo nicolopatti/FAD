@@ -85,8 +85,14 @@ import CSV della struttura e dal `VimeoPlayer` (`vimeoEmbedUrl`). Un link di
 (`npm run test:unit`, 6). **Corso di prova a 6 video**: template
 `supabase/seed/corso_prova_video.sql` (DO block, idempotente sul codice edizione,
 Eventi via `audit_append`): compilare `v_video` con titolo/ID/hash/durata e lanciarlo
-via MCP `execute_sql`. Serve che l'utente fornisca gli ID numerici (o i link dei
-singoli video) e le durate: la cartella Vimeo condivisa non è leggibile da qui.
+via MCP `execute_sql`. **Eseguito sul live il 2026-10-20** con i 6 ID forniti dall'utente: corso
+`45ce11f0-38c3-40e1-83df-2d8a7c7a6777` "I finanziamenti pubblici e privati (corso di
+prova)" (6 LO video Vimeo 1236864492/490/489/491/528/539, 55'45" totali, sblocco
+sequenziale), edizione `6d2ef44e-…` codice `ED-FIN-PROVA-01`, iscrizione del discente
+demo `b8ffac43-…`. Catena 0 problemi. Il corso è **congelato** (D22) dalla creazione
+dell'edizione: titolo/descrizione non modificabili; i `config` dei LO sì. **Da
+verificare nel browser**: riproduzione (dipende dai domini consentiti su Vimeo per
+quei 6 video) e sblocco sequenziale.
 
 **Autorizzazione di sessione (2026-10-19):** l'utente ha autorizzato
 esplicitamente tutte le modifiche senza chiedere conferma, incluso il push su

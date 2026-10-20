@@ -1,4 +1,4 @@
--- Corso di prova a N video (2026-10-20). Crea nella libreria del tenant demo i
+-- Corso di prova a 6 video (2026-10-20) — eseguito sul live il 2026-10-20. Crea nella libreria del tenant demo i
 -- learning object video, il corso, la struttura ordinata (sblocco sequenziale),
 -- una edizione e l'iscrizione del discente demo, registrando gli Eventi come
 -- farebbe l'area admin (learning_object.created, corso.created, struttura.added,
@@ -17,17 +17,17 @@ declare
   v_tenant   uuid := '00000000-0000-0000-0000-000000000001';
   v_admin    uuid := 'aaaa3333-aaaa-aaaa-aaaa-aaaaaaaaaaaa';   -- persona admin demo
   v_discente uuid := 'aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa';   -- persona discente demo
-  v_titolo   text := 'Corso di prova — 6 video';
-  v_descr    text := 'Corso di prova con sei capitoli video in sequenza.';
-  v_codice   text := 'ED-PROVA-6V';
+  v_titolo   text := 'I finanziamenti pubblici e privati (corso di prova)';
+  v_descr    text := 'Sei lezioni video in sequenza: perché esistono i finanziamenti, il sistema pubblico e quello privato, il confronto, il welfare e come orientarsi tra le opportunità. Durata complessiva 55 minuti e 45 secondi.';
+  v_codice   text := 'ED-FIN-PROVA-01';
   -- titolo, vimeo_id (solo cifre), vimeo_hash (o NULL), durata_secondi
   v_video jsonb := '[
-    {"titolo": "Capitolo 1", "vimeo_id": "0000000001", "vimeo_hash": null, "durata_secondi": 600},
-    {"titolo": "Capitolo 2", "vimeo_id": "0000000002", "vimeo_hash": null, "durata_secondi": 600},
-    {"titolo": "Capitolo 3", "vimeo_id": "0000000003", "vimeo_hash": null, "durata_secondi": 600},
-    {"titolo": "Capitolo 4", "vimeo_id": "0000000004", "vimeo_hash": null, "durata_secondi": 600},
-    {"titolo": "Capitolo 5", "vimeo_id": "0000000005", "vimeo_hash": null, "durata_secondi": 600},
-    {"titolo": "Capitolo 6", "vimeo_id": "0000000006", "vimeo_hash": null, "durata_secondi": 600}
+    {"titolo": "Lezione 01 - Perché esistono i finanziamenti", "vimeo_id": "1236864492", "vimeo_hash": null, "durata_secondi": 519},
+    {"titolo": "Lezione 02 - Il sistema dei finanziamenti pubblici", "vimeo_id": "1236864490", "vimeo_hash": null, "durata_secondi": 555},
+    {"titolo": "Lezione 03 - Il sistema dei finanziamenti privati", "vimeo_id": "1236864489", "vimeo_hash": null, "durata_secondi": 519},
+    {"titolo": "Lezione 04 - Finanziamenti pubblici e privati a confronto", "vimeo_id": "1236864491", "vimeo_hash": null, "durata_secondi": 526},
+    {"titolo": "Lezione 05 - Cosa viene finanziato nel welfare", "vimeo_id": "1236864528", "vimeo_hash": null, "durata_secondi": 590},
+    {"titolo": "Lezione 06 - Come orientarsi tra le opportunità di finanziamento", "vimeo_id": "1236864539", "vimeo_hash": null, "durata_secondi": 636}
   ]'::jsonb;
   v_corso uuid; v_ediz uuid; v_iscr uuid; v_lo uuid; v_str uuid;
   v_row jsonb; v_cfg jsonb; v_ord int := 0;
