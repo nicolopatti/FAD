@@ -160,11 +160,44 @@ report fondi tengono "idoneo" (termine tecnico).
   `scratchpad/pw/func6.mjs` **29/29** (pubblico 390, discente 1440/390, auditor,
   admin). Senza chiave di servizio: emissione automatica e PDF pubblico (503) non si
   provano da qui.
-- **Da provare nel browser dall'utente (gate M5)**: `/admin/ente` (ragione sociale,
-  firmatario, logo), ore del corso, "riemetti" su Rossi (nuovo numero, vecchio
-  "sostituito" nella verifica pubblica), completare il corso "solo test" → attestato
-  automatico con PDF/badge/LinkedIn, `/verifica/<codice>` dal QR del PDF, pagina
-  Attestati. Dopo il via libera: **merge su `main` solo con autorizzazione esplicita.**
+- *Verificato in anteprima Vercel via strumento Vercel (`web_fetch_vercel_url`, che
+  non passa dalla rete del container)*: `/verifica/<codice>` risponde "Attestato
+  autentico" con i dati giusti, codice inesistente → "Nessun attestato", PDF pubblico
+  200 `application/pdf` generato e salvato nel bucket `attestati` (6.850 byte). Il
+  branch alias `fad-git-<branch>-…` non è risolto dallo strumento: usare l'hostname
+  del deploy (`list_deployments` con `branch`).
+- **Editor del modello dell'attestato** (richiesta dell'utente dopo il riscontro:
+  "serve un editor per scegliere tra formati e decidere cosa scrivere, loghi e firme
+  per singolo corso"; supera lo scope OUT "un solo template" del brief). Migration
+  `20261020000009_fase5_attestato_modello.sql` (**applicata sul live**):
+  `tenant.attestato_modello` e `corso.attestato_modello` jsonb, **non congelati**
+  (valgono per le emissioni future; ogni attestato porta il modello risolto nello
+  snapshot `contenuto.modello`). `src/lib/attestato-modello.ts`: `ModelloAttestato`
+  (layout classico|essenziale|elegante, titolo, intro, frase, testo_aggiuntivo,
+  intestazione, citta, logo_path, loghi_secondari ≤3, firmatari ≤2 con firma_path,
+  mostra {nascita, ore, riferimento, edizione, esito_test, lezioni, qr}),
+  `normalizzaParziale` (input client), `risolviModello(ente, modelloEnte,
+  modelloCorso)` (predefinito ← ente ← corso, vuoti riempiti dai dati dell'ente),
+  segnaposto `{nome} {corso} {ore} {ente} {edizione} {data}`. `attestato-pdf.ts`
+  riscritto: 3 layout (Helvetica / Helvetica allineato a sinistra / Times con
+  cornice oro), `corpoDettagli` tronca con "..." sopra `yMin` per non sovrapporsi a
+  firme e QR; `pathImmagini`/`modelloDi`; immagini dall'URL pubblico del bucket
+  `loghi` (`attestato-serve.ts` `immagineLoghi`, nessuna chiave richiesta).
+  `src/components/admin/ModelloEditor.tsx` (ambito `ente` in `/admin/ente` =
+  predefinito; ambito `corso` = sezione 6 del builder con interruttore "modello
+  specifico" e "Torna al modello dell'ente"); anteprima `POST
+  /api/admin/attestati/anteprima` {modello, corso_id, ambito} → PDF con "Maria
+  Esempio" (nessuna scrittura), mostrata in un iframe da blob. PATCH ente/corso
+  accettano `attestato_modello` (Evento `corso.attestato_modello_updated`).
+  "Riemetti" è ora un pulsante nella colonna Attestato. Verifiche: resa dei 3 layout
+  rasterizzata (`scratchpad/pdf-layout.ts`), Playwright `func7.mjs` **11/11**.
+  Attenzione: la `<input>` degli switch è nascosta → nei test cliccare `.switch`.
+- **Da provare nel browser dall'utente (gate M5)**: `/admin/ente` (dati + modello
+  predefinito con logo e firma), nel corso sezione 6 "Attestato" (modello specifico,
+  anteprima), ore del corso, "Riemetti" su Rossi (nuovo numero, vecchio "sostituito"
+  nella verifica pubblica), completare il corso "solo test" → attestato automatico
+  con PDF/badge/LinkedIn, pagina Attestati. Dopo il via libera: **merge su `main`
+  solo con autorizzazione esplicita.**
 
 ## UX — revisione, mockup e ondata 1 (2026-10-20, branch `claude/affectionate-hawking-03ev7i`)
 
