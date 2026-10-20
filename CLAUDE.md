@@ -197,14 +197,18 @@ attiva e a corso congelato il pulsante diventa "Salva descrizione" (PATCH con la
   filtri completamento, dettaglio, download CSV, toggle tema persistente) tutti ok;
   schermate chiaro/scuro a 1440/390 (auditor, discente, admin, login) senza overflow.
 
-**Prossime ondate** (vedi artifact revisione, sezione "Piano per ondate"):
-2 discente (login nuovo, fine lezione/corso, nav mobile A, testi senza gergo,
-movimento) → 3 admin → 4 auditor + tema scuro. Per far girare l'app in
-locale/crawler: ambiente con `*.supabase.co` consentito (fatto), `npx next dev
--p 3100` con `NODE_USE_ENV_PROXY=1` e le env pubbliche; Chromium non passa dal
-proxy → nel crawler le richieste a supabase.co sono inoltrate via `route()` +
-`fetch` di Node (script in scratchpad `pw/crawl.mjs`, da portare in repo con i
-test E2E del Blocco E).
+**Le 4 ondate sono chiuse e su `main` (2026-10-20).** Ricetta per far girare
+l'app in locale/crawler: ambiente con `*.supabase.co` consentito (fatto),
+`NODE_USE_ENV_PROXY=1 NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=…
+NEXT_PUBLIC_TENANT_ID=… setsid nohup npx next dev -p 3100 &` (fermarlo prima di
+`npm run build`: condividono `.next`; per fermarlo `pkill -f "next-serve[r]"`, il
+pattern con le parentesi quadre evita che `pkill` uccida la propria shell);
+Chromium non passa dal proxy → nei crawler le richieste a supabase.co sono
+inoltrate via `route()` + `fetch` di Node, e **lo script Node va lanciato con
+`NODE_USE_ENV_PROXY=1`** (senza, il login fallisce con "fetch failed"). Script in
+scratchpad `pw/` (da portare in repo con i test E2E del Blocco E). Senza
+`SUPABASE_SERVICE_ROLE_KEY` nell'ambiente le route di scrittura falliscono dopo la
+modifica DB: dal container si provano solo letture e validazioni.
 
 ## Hardening Tappa 1 — grant, guardia audit_append, service role (2026-10-19)
 
@@ -907,9 +911,27 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
-> **Aggiornamento 2026-10-20 sera: è in corso il lavoro UX (sezione "UX — revisione,
-> mockup e ondata 1" in testa al file): riprendere da lì, ondata 2. Il resto di
-> questa nota resta valido per i temi non-UX.**
+> **Aggiornamento 2026-10-20 notte: le 4 ondate UX sono finite e mergiate su
+> `main`** (fast-forward del branch `claude/affectionate-hawking-03ev7i`, 9 commit,
+> autorizzato dall'utente: "Va procedi"). Deploy Vercel Production aggiornato.
+> Stato dettagliato nella sezione "UX — revisione, mockup e ondata 1…4" in testa al
+> file. **Cosa resta sul fronte UX, in ordine:**
+> 1. **Prove nel browser dall'utente** delle azioni che scrivono (non eseguibili dal
+>    container senza `SUPABASE_SERVICE_ROLE_KEY`): Duplica corso, modifica edizione,
+>    assegnazione piano a un iscritto, nuovo piano, riordino con le frecce; player
+>    fino a fine lezione e tab bar su telefono; tema scuro sui propri dispositivi.
+>    Per far girare anche queste prove dal container: aggiungere il segreto
+>    `SUPABASE_SERVICE_ROLE_KEY` nelle impostazioni dell'ambiente cloud (menu
+>    ambiente → Modifica), **mai incollarlo in chat**; una nuova sessione lo vede.
+> 2. **Rifiniture dopo il riscontro dell'utente** (come fatto per i chip dell'hero e
+>    per la descrizione modificabile): raccoglierle e farle in un'unica passata.
+> 3. **Debito tecnico UX**: portare in repo i crawler Playwright dello scratchpad
+>    (`pw/crawl.mjs`, `shots*.mjs`, `func3_ro.mjs`, `func4.mjs`) come test E2E del
+>    Blocco E; `/audit/completamento` ricalcola ancora ~10 query per iscrizione
+>    (Blocco B #2); le route di scrittura fanno la modifica DB **prima** di
+>    `appendEvent` → senza chiave di servizio lasciano dati senza Evento (valutare un
+>    controllo fail-fast all'avvio o la RPC unica del Blocco B #5).
+> Il resto di questa nota resta valido per i temi non-UX.
 >
 > **Aggiornamento 2026-10-20 (leggere PRIMA del resto di questa sezione, che è
 > storica).** Stato: Fase 1–4 chiuse; hardening Tappa 1 fatto (sicurezza log, indici,
