@@ -4,7 +4,7 @@ import { appendEvent } from '@/lib/audit';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { coperturaSecondi, normalizzaSegmenti } from '@/lib/visione';
 
-const ALLOWED = new Set(['video.play', 'video.pause', 'video.seek', 'video.ended']);
+const ALLOWED = new Set(['video.play', 'video.pause', 'video.seek', 'video.ended', 'video.progress']);
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);

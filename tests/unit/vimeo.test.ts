@@ -31,7 +31,7 @@ describe('parseVimeoRef', () => {
 
 describe('vimeoEmbedUrl', () => {
   it('aggiunge h solo se presente', () => {
-    expect(vimeoEmbedUrl('1084894652')).toBe('https://player.vimeo.com/video/1084894652?dnt=1');
-    expect(vimeoEmbedUrl('1084894652', '9f3a1b2c4d')).toBe('https://player.vimeo.com/video/1084894652?dnt=1&h=9f3a1b2c4d');
+    expect(vimeoEmbedUrl('1084894652')).toBe('https://player.vimeo.com/video/1084894652?dnt=1&title=0&byline=0&portrait=0');
+    expect(vimeoEmbedUrl('1084894652', '9f3a1b2c4d')).toBe('https://player.vimeo.com/video/1084894652?dnt=1&title=0&byline=0&portrait=0&h=9f3a1b2c4d');
   });
 });

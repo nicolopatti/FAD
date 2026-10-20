@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { vimeoEmbedUrl } from '@/lib/vimeo';
 import { coperturaPercentuale, unisciSegmenti, type Segmento } from '@/lib/visione';
 
@@ -15,6 +16,8 @@ type VimeoPlayerInstance = {
   getCurrentTime: () => Promise<number>;
   setCurrentTime: (seconds: number) => Promise<number>;
   setPlaybackRate: (rate: number) => Promise<number>;
+  play: () => Promise<void>;
+  destroy?: () => Promise<void>;
 };
 
 type Props = {
@@ -25,6 +28,8 @@ type Props = {
   /** Tratti già riprodotti nelle sessioni precedenti (dal log): il player riparte da qui. */
   trattiIniziali?: Segmento[];
   coperturaIniziale?: number;
+  /** Link al corso, mostrato nella schermata finale. */
+  corsoHref?: string;
   iscrizioneId: string;
   learningObjectId: string;
 };
@@ -36,13 +41,21 @@ const CONTINUITA_SECONDI = 2;
 // Tolleranza oltre il massimo visto entro cui un seek in avanti è ammesso in
 // modalità integrale (arrotondamenti del player).
 const TOLLERANZA_SEEK = 1.5;
+// Checkpoint `video.progress` durante la riproduzione: limita a questo intervallo
+// la perdita di copertura se la pagina si chiude senza un evento di pausa.
+const CHECKPOINT_MS = 60_000;
 
 export function VimeoPlayer({
-  vimeoId, vimeoHash, visioneIntegrale = false, trattiIniziali, coperturaIniziale, iscrizioneId, learningObjectId,
+  vimeoId, vimeoHash, visioneIntegrale = false, trattiIniziali, coperturaIniziale, corsoHref,
+  iscrizioneId, learningObjectId,
 }: Props) {
+  const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playerRef = useRef<VimeoPlayerInstance | null>(null);
   const [copertura, setCopertura] = useState<number | null>(coperturaIniziale ?? null);
   const [avviso, setAvviso] = useState<string | null>(null);
+  // Schermata finale nostra: copre quella di Vimeo ("More from …", Follow).
+  const [finito, setFinito] = useState(false);
 
   useEffect(() => {
     let player: VimeoPlayerInstance | null = null;
@@ -53,6 +66,8 @@ export function VimeoPlayer({
     let ultimo: number | null = null;
     let durata = 0;
     let ultimoAggiornamentoUi = 0;
+    let inRiproduzione = false;
+    let checkpoint: ReturnType<typeof setInterval> | null = null;
 
     const snapshot = () => unisciSegmenti(tratti);
     // Limite in avanti (modalità integrale): la fine del tratto riprodotto
@@ -63,9 +78,19 @@ export function VimeoPlayer({
       return primo && primo[0] <= 1 ? primo[1] : 0;
     };
 
+    // Alla chiusura/nascondimento della pagina, se il video sta andando, si manda
+    // una pausa con l'ultima posizione nota: senza, il tratto aperto andrebbe perso.
+    const onPageHide = () => {
+      if (!inRiproduzione) return;
+      inRiproduzione = false;
+      sendRef.current?.('video.pause', conTrattiRef.current?.({ posizione_secondi: ultimo ?? 0, motivo: 'pagehide' }) ?? {});
+    };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') onPageHide(); };
+
     function attach() {
       if (!window.Vimeo || !iframeRef.current) return;
       player = new window.Vimeo.Player(iframeRef.current);
+      playerRef.current = player;
       // Il tracciamento è silenzioso: gli eventi vanno al log del tenant via API,
       // ma non sono mostrati al discente (la vista grezza è dell'auditor).
       const send = (eventType: string, payload: Record<string, unknown>) => {
@@ -87,6 +112,16 @@ export function VimeoPlayer({
         segmenti_visti: snapshot(),
         durata_secondi: durata || undefined,
       });
+      sendRef.current = send;
+      conTrattiRef.current = conTratti;
+      const startCheckpoint = () => {
+        if (checkpoint) clearInterval(checkpoint);
+        checkpoint = setInterval(() => {
+          if (!inRiproduzione || ultimo == null) return;
+          send('video.progress', { posizione_secondi: ultimo, durata_secondi: durata || undefined });
+        }, CHECKPOINT_MS);
+      };
+      const stopCheckpoint = () => { if (checkpoint) { clearInterval(checkpoint); checkpoint = null; } };
 
       player.on('timeupdate', (d: any) => {
         const s = Number(d?.seconds);
@@ -118,9 +153,16 @@ export function VimeoPlayer({
       });
       player.on('play', (d: any) => {
         ultimo = null; // il prossimo campione apre (o riprende) un tratto
+        inRiproduzione = true;
+        setFinito(false);
+        startCheckpoint();
         send('video.play', { posizione_secondi: d?.seconds ?? 0 });
       });
-      player.on('pause', (d: any) => send('video.pause', conTratti({ posizione_secondi: d?.seconds ?? 0 })));
+      player.on('pause', (d: any) => {
+        inRiproduzione = false;
+        stopCheckpoint();
+        send('video.pause', conTratti({ posizione_secondi: d?.seconds ?? 0 }));
+      });
       player.on('seeked', (d: any) => {
         const to = Number(d?.seconds ?? 0);
         const limite = limiteAvanzamento();
@@ -146,10 +188,17 @@ export function VimeoPlayer({
       }
       player.on('ended', (d: any) => {
         if (Number.isFinite(d?.duration) && d.duration > 0) durata = d.duration;
+        inRiproduzione = false;
+        stopCheckpoint();
         send('video.ended', conTratti({}));
         if (durata > 0) setCopertura(coperturaPercentuale(snapshot(), durata));
+        setFinito(true);
+        // Il server ricalcola il completamento dal log: aggiorna chip e lista.
+        setTimeout(() => router.refresh(), 1200);
       });
     }
+    window.addEventListener('pagehide', onPageHide);
+    document.addEventListener('visibilitychange', onVisibility);
 
     if (window.Vimeo) {
       attach();
@@ -167,7 +216,22 @@ export function VimeoPlayer({
         document.head.appendChild(s);
       }
     }
-  }, [vimeoId, vimeoHash, visioneIntegrale, trattiIniziali, iscrizioneId, learningObjectId]);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (checkpoint) clearInterval(checkpoint);
+    };
+  }, [vimeoId, vimeoHash, visioneIntegrale, trattiIniziali, iscrizioneId, learningObjectId, router]);
+
+  const sendRef = useRef<((eventType: string, payload: Record<string, unknown>) => void) | null>(null);
+  const conTrattiRef = useRef<((extra: Record<string, unknown>) => Record<string, unknown>) | null>(null);
+
+  const rivedi = () => {
+    const p = playerRef.current;
+    if (!p) return;
+    setFinito(false);
+    p.setCurrentTime(0).then(() => p.play()).catch(() => undefined);
+  };
 
   return (
     <div>
@@ -188,6 +252,27 @@ export function VimeoPlayer({
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen
         />
+        {finito && (
+          <div
+            style={{
+              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, textAlign: 'center',
+              background: 'rgba(26, 24, 20, 0.96)', color: '#f4efe6',
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 600 }}>Lezione terminata</div>
+            <div style={{ fontSize: 14, opacity: 0.85, maxWidth: 420 }}>
+              {visioneIntegrale
+                ? 'La visione è stata registrata. Il completamento viene verificato sul log in base al tempo reale di riproduzione.'
+                : 'La visione è stata registrata nel log.'}
+              {copertura != null ? ` Riprodotto: ${copertura}%.` : ''}
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
+              <button type="button" className="btn" onClick={rivedi}>Rivedi</button>
+              {corsoHref && <a className="btn" href={corsoHref}>Torna al corso</a>}
+            </div>
+          </div>
+        )}
       </div>
       {visioneIntegrale && (
         <div className="muted" style={{ marginTop: 10, fontSize: 13, display: 'flex', gap: 12, flexWrap: 'wrap' }}>

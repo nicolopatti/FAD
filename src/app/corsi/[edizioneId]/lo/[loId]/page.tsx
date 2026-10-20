@@ -94,6 +94,7 @@ export default async function LearningObjectPage({
                   visioneIntegrale={prog.visione_integrale}
                   trattiIniziali={item.segmenti_visti}
                   coperturaIniziale={item.copertura_percentuale}
+                  corsoHref={`/corsi/${params.edizioneId}`}
                   iscrizioneId={iscrizione.id}
                   learningObjectId={item.learning_object_id}
                 />

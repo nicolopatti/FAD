@@ -62,7 +62,10 @@ export function vimeoEmbedUrl(
   vimeoHash?: string | null,
   opts: { bloccaVelocita?: boolean } = {},
 ): string {
-  let url = `https://player.vimeo.com/video/${encodeURIComponent(vimeoId)}?dnt=1`;
+  // title/byline/portrait=0: niente titolo, autore e avatar Vimeo sopra il video
+  // (è la piattaforma a presentare la lezione). La schermata finale di Vimeo
+  // ("More from …") non è disattivabile da URL: il player la copre con la propria.
+  let url = `https://player.vimeo.com/video/${encodeURIComponent(vimeoId)}?dnt=1&title=0&byline=0&portrait=0`;
   if (vimeoHash) url += `&h=${encodeURIComponent(vimeoHash)}`;
   // Visione integrale: nasconde il menu della velocità di riproduzione.
   if (opts.bloccaVelocita) url += '&speed=false';

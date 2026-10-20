@@ -100,14 +100,23 @@ describe('ricostruisciTrattiDaEventi (tempo reale, timestamp server)', () => {
     expect(tratti).toEqual([[0, 10]]);
   });
 
-  it('un evento di chiusura mancante perde il tratto (errore per difetto)', () => {
+  it('un play chiuso da un altro play (scheda chiusa) perde il tratto: errore per difetto', () => {
     const tratti = ricostruisciTrattiDaEventi([
       ev('video.play', 0, { posizione_secondi: 0 }),
-      ev('video.play', 300, { posizione_secondi: 0 }),
-      ev('video.pause', 310, { posizione_secondi: 10 }),
+      ev('video.play', 600, { posizione_secondi: 0 }), // ricaricamento 10 minuti dopo, senza pausa
+      ev('video.pause', 610, { posizione_secondi: 10 }),
     ], 519);
-    // il primo play viene chiuso dal secondo al tempo reale: 300 s a 1x → [0, ~300]
-    expect(coperturaSecondi(tratti)).toBeGreaterThanOrEqual(300);
-    expect(coperturaSecondi(tratti)).toBeLessThan(310);
+    expect(tratti).toEqual([[0, 10]]);
+  });
+
+  it('il checkpoint video.progress limita la perdita a un intervallo', () => {
+    const tratti = ricostruisciTrattiDaEventi([
+      ev('video.play', 0, { posizione_secondi: 0 }),
+      ev('video.progress', 60, { posizione_secondi: 60 }),
+      ev('video.progress', 120, { posizione_secondi: 120 }),
+      ev('video.play', 900, { posizione_secondi: 0 }), // pausa mai arrivata
+      ev('video.pause', 905, { posizione_secondi: 5 }),
+    ], 519);
+    expect(tratti).toEqual([[0, 120]]);
   });
 });

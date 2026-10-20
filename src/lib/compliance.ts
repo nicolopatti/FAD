@@ -118,7 +118,7 @@ export async function computeProgressoForIscrizione(
   // informativo (un player a 2x o una chiamata forgiata non contano).
   const integrale = Boolean(corso.visione_integrale);
   const hasVideo = items.some((i) => i.lo_type === 'video');
-  const coverageTypes = hasVideo ? ['video.play', 'video.pause', 'video.seek', 'video.ended'] : [];
+  const coverageTypes = hasVideo ? ['video.play', 'video.pause', 'video.seek', 'video.ended', 'video.progress'] : [];
   const eventTypes = Array.from(new Set([...completionTypes, ...coverageTypes]));
   type EventoCompletamento = {
     subject_id: string | null;

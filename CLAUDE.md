@@ -122,6 +122,21 @@ il trigger). Meccanica:
   in avanti è la fine del tratto contiguo dall'inizio. Gli eventi precedenti al
   2026-10-20 contano col tempo reale: sul corso di prova la Lezione 01 "completata
   trascinando" torna **non completata** (voluto).
+- Eventi persi: un play chiuso da un ALTRO play (scheda chiusa senza pausa) **perde il
+  tratto** (prima dava credito al tempo reale: errore per eccesso). Per limitare la
+  perdita il player manda `video.progress` (checkpoint, posizione) ogni 60 s di
+  riproduzione e un `video.pause` su `pagehide`/`visibilitychange` (keepalive).
+  `video.progress` è ammesso dall'API e letto dalla compliance.
+- Schermata finale: Vimeo mostra "More from <autore>" + Follow (impostazione per
+  video su Vimeo, non disattivabile da URL); il player la **copre** con una schermata
+  propria ("Lezione terminata", Rivedi, Torna al corso) e dopo `ended` fa
+  `router.refresh()` per aggiornare chip/lista dal log. L'embed ha
+  `title=0&byline=0&portrait=0` (niente titolo/autore/avatar Vimeo sopra il video).
+  Se si vuole togliere la schermata Vimeo alla radice: su Vimeo, per video o come
+  default account, Embed → End screen → "Empty"/"Thumbnail".
+- Verifica sul log reale (2026-10-20, Lezione 01, 38 eventi seq 97–134): il giro
+  "trascina alla fine" ricostruisce il 15,7% → non completata; il giro intero a 1x
+  ricostruisce [0, 519] → 100% → completata.
 - Player in modalità integrale: velocità bloccata a 1x (`speed=false` nell'embed +
   `setPlaybackRate(1)` su `playbackratechange`), niente salti in avanti, "Riprodotto
   finora: N%" cumulativo, testo che spiega che conta il tempo reale.

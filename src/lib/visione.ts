@@ -96,10 +96,13 @@ export function visioneIntegraleCompleta(segmenti: ReadonlyArray<Segmento>, dura
  * tempo reale. Qui si usano solo i timestamp server (`occurred_at`, scritti da
  * `audit_append`) e le posizioni dichiarate:
  *   play(pos) a t0 → stato "in riproduzione" da pos;
- *   pause(pos)/seek/ended a t1 → tratto [pos0, min(pos_dichiarata, pos0 + (t1−t0)·TOLLERANZA)].
+ *   pause(pos)/seek/ended/progress a t1 → tratto [pos0, min(pos_dichiarata, pos0 + (t1−t0)·TOLLERANZA)].
  * A velocità 1x le due cose coincidono; a 2x il tratto vale la metà del dichiarato;
- * una chiamata forgiata senza attesa reale vale ~0. Un evento di chiusura mancante
- * (scheda chiusa) perde il tratto: errore per difetto, mai per eccesso.
+ * una chiamata forgiata senza attesa reale vale ~0. Un tratto aperto da un play e
+ * chiuso da un ALTRO play (scheda chiusa senza pausa) si PERDE: non si sa quando la
+ * riproduzione si è fermata. Per limitare la perdita il player manda un
+ * `video.progress` (checkpoint) ogni 60 s di riproduzione e un `video.pause` alla
+ * chiusura della pagina: errore per difetto, mai per eccesso.
  */
 export type EventoVideo = {
   event_type: string;
@@ -138,9 +141,8 @@ export function ricostruisciTrattiDaEventi(eventi: ReadonlyArray<EventoVideo>, d
     if (d != null && d > 0 && d > durata) durata = d;
     switch (e.event_type) {
       case 'video.play': {
-        // Un play senza pausa precedente (evento perso): chiudi il tratto aperto
-        // al tempo reale, poi riparti dalla posizione dichiarata.
-        chiudi(t, null);
+        // Un play senza chiusura precedente (evento perso): il tratto aperto si
+        // scarta — non si sa quando la riproduzione si è fermata davvero.
         inizioPos = num(p.posizione_secondi) ?? 0;
         inizioT = t;
         break;
@@ -148,6 +150,17 @@ export function ricostruisciTrattiDaEventi(eventi: ReadonlyArray<EventoVideo>, d
       case 'video.pause':
         chiudi(t, num(p.posizione_secondi));
         break;
+      case 'video.progress': {
+        // Checkpoint periodico: chiude il tratto alla posizione dichiarata (limitata
+        // al tempo reale) e lo riapre dalla stessa posizione.
+        const pos = num(p.posizione_secondi);
+        if (inizioPos != null) {
+          chiudi(t, pos);
+          const riparti = pos != null ? Math.min(pos, out[out.length - 1]?.[1] ?? pos) : null;
+          if (riparti != null) { inizioPos = riparti; inizioT = t; }
+        }
+        break;
+      }
       case 'video.seek': {
         // Il tratto prima del salto finisce al tempo reale; dopo il salto il
         // player continua a riprodurre dalla nuova posizione SOLO se stava già
