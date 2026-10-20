@@ -48,7 +48,9 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
     .is('sostituito_da', null)
     .maybeSingle<AttestatoRow>();
   let { data: attestato } = await caricaAttestato();
-  if (!attestato && prog.idonea && politica === 'automatica') {
+  // Solo per i corsi con un percorso FAD (obbligatori > 0): per i corsi di sole
+  // sessioni l'idoneità dipende dalla frequenza e l'emissione parte dalle presenze.
+  if (!attestato && prog.idonea && prog.obbligatori_totale > 0 && politica === 'automatica') {
     const emesso = await provaEmissioneAutomatica(iscrizione.id, session.personaId);
     if (emesso) attestato = (await caricaAttestato()).data;
   }

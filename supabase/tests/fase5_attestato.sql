@@ -62,8 +62,9 @@ select is((public.attestato_verifica('non-un-codice'))->>'trovato', 'false', '15
 select is(
   (public.attestato_verifica((current_setting('t.r2')::jsonb)->>'codice_verifica'))::text like '%1980-01-01%'
   or has_function_privilege('anon', 'public.attestato_emetti(uuid, jsonb, uuid, uuid, uuid, text)', 'execute')
+  or has_function_privilege('authenticated', 'public.attestato_emetti(uuid, jsonb, uuid, uuid, uuid, text)', 'execute')
   or not has_function_privilege('anon', 'public.attestato_verifica(text)', 'execute'),
-  false, '16 verifica senza data di nascita; anon: solo verifica, mai emissione');
+  false, '16 verifica senza data di nascita; anon: solo verifica; emissione solo service role (migration 000012)');
 
 -- 17) freeze D22 esteso: ore_totali compilabile da NULL, poi immutabile
 select lives_ok(format($$ update public.corso set ore_totali = 8 where id = %L $$, current_setting('t.corso')), '17a ore_totali compilabile da NULL a corso congelato');

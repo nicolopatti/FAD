@@ -33,7 +33,12 @@ export default function ReimpostaPage() {
     async function pronto(client: SupabaseClient) {
       if (risolto) return;
       risolto = true;
-      const { data } = await client.from('evento').select('id').eq('event_type', 'informativa.accettata').limit(1);
+      // Solo gli Eventi della PROPRIA persona: auditor e admin leggono anche quelli altrui.
+      const { data: { user } } = await client.auth.getUser();
+      const { data: persona } = user ? await client.from('persona').select('id').eq('auth_user_id', user.id).maybeSingle<{ id: string }>() : { data: null };
+      const { data } = persona
+        ? await client.from('evento').select('id').eq('event_type', 'informativa.accettata').eq('actor->>persona_id', persona.id).limit(1)
+        : { data: null };
       setPrimo(!data || data.length === 0);
       setStato('pronto');
     }

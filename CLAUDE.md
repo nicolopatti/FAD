@@ -433,6 +433,46 @@ scratchpad `pw/` (da portare in repo con i test E2E del Blocco E). Senza
 `SUPABASE_SERVICE_ROLE_KEY` nell'ambiente le route di scrittura falliscono dopo la
 modifica DB: dal container si provano solo letture e validazioni.
 
+## Revisione di fine sessione (2026-10-20, "hai altro da fare?")
+
+- **CI rotta da ieri sera senza che nessuno se ne accorgesse**: lo step `test unitari
+  (lib pure: vimeo, …)` aveva i due punti nel nome non virgolettato → YAML non valido →
+  ogni run "failure" con **zero job** (nessuna email di errore utile). Corretto con i
+  nomi fra virgolette; aggiunto lo step `npm run lint` (ESLint `next/core-web-vitals`,
+  `.eslintrc.json` nuovo: prima `next lint` chiedeva interattivamente la configurazione).
+  **Regola**: dopo ogni modifica a un workflow, `python3 -c "import yaml; …"` e
+  controllare che il run su GitHub abbia dei job.
+- **Smoke sulle anteprime**: le anteprime Vercel sono protette (Deployment Protection):
+  curl riceve la pagina di accesso di Vercel (HTTP 200, non la nostra). Il workflow ora
+  manda l'header `x-vercel-protection-bypass` se esiste il secret
+  `VERCEL_AUTOMATION_BYPASS_SECRET` (Vercel → Settings → Deployment Protection →
+  Protection Bypass for Automation), altrimenti **salta** l'anteprima con un avviso e
+  resta severo sulla produzione. `tests/e2e/lib.mjs` legge `E2E_VERCEL_BYPASS`.
+- **Code review del branch (12 rilievi, tutti chiusi tranne le due duplicazioni minori)**:
+  1. le letture in blocco di `compliance.ts` si troncavano a **1000 righe** (max-rows di
+     PostgREST) e le `in()` con troppi id superavano la lunghezza dell'URL → helper
+     `tutteLeRighe` (pagine da 1000 con `.range`) e `aLotti` (200 id), usati per
+     iscrizioni/strutture/eventi/sessioni/attestati; un errore di lettura ora **lancia**
+     (prima: mappa vuota → tutti "in corso" in silenzio);
+  2. `attestato_emetti`: due emissioni concorrenti potevano creare due attestati validi
+     → migration `20261020000012_attestato_emetti_lock_grant.sql` (**applicata sul
+     live**): `pg_advisory_xact_lock` per iscrizione prima del controllo; EXECUTE
+     revocato ad `authenticated` (un admin col JWT poteva emettere uno snapshot
+     inventato): l'app la chiama solo con la service role. Verificato in rollback;
+     pgTAP `fase5_attestato.sql` #16 aggiornato;
+  3. `risolviModello`: un valore **esplicito** nel modello (logo `null`, firmatari `[]`)
+     ora vince sull'ente (prima il "Togli" dell'editor era inefficace);
+  4. `PATCH /api/admin/ente`: `logo_path`/`firma_path` accettati solo se file nella
+     cartella del tenant (`pathNelTenant`), non più testo libero finito in una URL;
+  5. inviti: non si ricollega un utente Auth esistente con ruolo admin/auditor (sarebbe
+     entrato come staff); ricerca su tutte le pagine della Admin API;
+  6. `/auth/reimposta`: il "primo accesso" guarda solo gli Eventi della propria persona
+     (auditor e admin leggono anche quelli altrui);
+  7. pagina del corso: l'emissione pigra parte solo con obbligatori > 0 (prima girava a
+     ogni apertura dei corsi di sole sessioni); 8. anno/mese LinkedIn nel fuso di Roma;
+  9. URL dei loghi in un solo helper `urlLogo` (`lib/url.ts`). Restano aperte, minori:
+  i dati dell'ente ricostruiti in 4 punti (`datiEnteDa` da fare) e nient'altro.
+
 ## Resto del piano: carico, smoke in CI, inviti/password, staging (2026-10-20, "fai quello che manca")
 
 - **Test di carico (Blocco B/E).** `tests/carico/player.js` (k6, `npm run test:carico`):

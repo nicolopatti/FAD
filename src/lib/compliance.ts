@@ -265,7 +265,7 @@ export async function computeProgressoForIscrizione(
   const eventTypes = tipiEventoPer(items);
   let events: EventoCompletamento[] = [];
   if (loIds.length && eventTypes.length) {
-    const { data } = await supabase
+    events = await tutteLeRighe<EventoCompletamento>((da, a) => supabase
       .from('evento')
       .select('subject_id, event_type, occurred_at, actor, payload')
       .eq('actor->>persona_id', iscrizione.persona_id)
@@ -273,10 +273,36 @@ export async function computeProgressoForIscrizione(
       .in('event_type', eventTypes)
       .in('subject_id', loIds)
       .order('seq', { ascending: true })
-      .returns<EventoCompletamento[]>();
-    events = data ?? [];
+      .range(da, a)
+      .returns<EventoCompletamento[]>(), 'degli eventi');
   }
   return calcolaProgresso(iscrizione, corso, items, events);
+}
+
+// PostgREST risponde al massimo 1000 righe per richiesta (max-rows di Supabase)
+// e le URL con troppi id nella `in()` vengono rifiutate: tutte le letture in
+// blocco passano da qui, a pagine e a lotti. Un errore di lettura è un errore
+// (mai "zero eventi" silenzioso: l'auditor vedrebbe tutti non idonei).
+const PAGINA = 1000;
+const LOTTO_IN = 200;
+type Esito<T> = { data: T[] | null; error: { message: string } | null };
+
+export function aLotti<T>(xs: T[], n = LOTTO_IN): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n));
+  return out;
+}
+
+export async function tutteLeRighe<T>(pagina: (da: number, a: number) => PromiseLike<Esito<T>>, cosa: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let da = 0; ; da += PAGINA) {
+    const { data, error } = await pagina(da, da + PAGINA - 1);
+    if (error) throw new Error(`Lettura ${cosa} non riuscita: ${error.message}`);
+    const righe = data ?? [];
+    out.push(...righe);
+    if (righe.length < PAGINA) break;
+  }
+  return out;
 }
 
 /**
@@ -293,35 +319,41 @@ export async function computeProgressoPerIscrizioni(
   const out = new Map<string, ProgressoIscrizione>();
   const ids = Array.from(new Set(iscrizioneIds));
   if (!ids.length) return out;
-  const { data: iscrizioni } = await supabase.from('iscrizione').select(SELECT_ISCRIZIONE).in('id', ids).returns<IscrEdCorso[]>();
-  const valide = (iscrizioni ?? []).filter((i) => i.edizione?.corso);
+  const iscrizioni: IscrEdCorso[] = [];
+  for (const lotto of aLotti(ids)) {
+    iscrizioni.push(...await tutteLeRighe<IscrEdCorso>((da, a) => supabase.from('iscrizione').select(SELECT_ISCRIZIONE).in('id', lotto).range(da, a).returns<IscrEdCorso[]>(), 'delle iscrizioni'));
+  }
+  const valide = iscrizioni.filter((i) => i.edizione?.corso);
   const corsoIds = Array.from(new Set(valide.map((i) => i.edizione!.corso!.id)));
   if (!corsoIds.length) return out;
-  const { data: struttura } = await supabase
-    .from('struttura_corso')
-    .select(SELECT_STRUTTURA)
-    .in('corso_id', corsoIds)
-    .order('ordine', { ascending: true })
-    .returns<(StrutturaRow & { corso_id: string })[]>();
+  const struttura: (StrutturaRow & { corso_id: string })[] = [];
+  for (const lotto of aLotti(corsoIds)) {
+    struttura.push(...await tutteLeRighe<StrutturaRow & { corso_id: string }>((da, a) => supabase
+      .from('struttura_corso')
+      .select(SELECT_STRUTTURA)
+      .in('corso_id', lotto)
+      .order('ordine', { ascending: true })
+      .range(da, a)
+      .returns<(StrutturaRow & { corso_id: string })[]>(), 'delle strutture'));
+  }
   const itemsPerCorso = new Map<string, StrutturaItem[]>();
-  for (const c of corsoIds) itemsPerCorso.set(c, itemsDaStruttura((struttura ?? []).filter((s) => s.corso_id === c)));
+  for (const c of corsoIds) itemsPerCorso.set(c, itemsDaStruttura(struttura.filter((s) => s.corso_id === c)));
   const eventTypes = Array.from(new Set(corsoIds.flatMap((c) => tipiEventoPer(itemsPerCorso.get(c) ?? []))));
 
-  // Eventi di tutte le iscrizioni in una query (indice evento_payload_iscrizione_idx),
-  // poi distribuiti per iscrizione; il nucleo scarta quelli di LO non in struttura.
+  // Eventi di tutte le iscrizioni a lotti (indice evento_payload_iscrizione_idx) e a
+  // pagine, poi distribuiti per iscrizione; il nucleo scarta quelli di LO non in struttura.
   const eventiPer = new Map<string, EventoCompletamento[]>();
   if (eventTypes.length) {
-    const PASSO = 200;
-    for (let i = 0; i < valide.length; i += PASSO) {
-      const lotto = valide.slice(i, i + PASSO).map((x) => x.id);
-      const { data } = await supabase
+    for (const lotto of aLotti(valide.map((x) => x.id))) {
+      const eventi = await tutteLeRighe<EventoCompletamento & { payload: { iscrizione_id?: string } | null }>((da, a) => supabase
         .from('evento')
         .select('subject_id, event_type, occurred_at, actor, payload')
         .in('payload->>iscrizione_id', lotto)
         .in('event_type', eventTypes)
         .order('seq', { ascending: true })
-        .returns<(EventoCompletamento & { payload: { iscrizione_id?: string } | null })[]>();
-      for (const e of data ?? []) {
+        .range(da, a)
+        .returns<(EventoCompletamento & { payload: { iscrizione_id?: string } | null })[]>(), 'degli eventi');
+      for (const e of eventi) {
         const k = e.payload?.iscrizione_id;
         if (!k) continue;
         if (!eventiPer.has(k)) eventiPer.set(k, []);
@@ -478,36 +510,41 @@ export async function computeFrequenzaPerIscrizioni(
   const out = new Map<string, FrequenzaIscrizione>();
   const ids = Array.from(new Set(iscrizioneIds));
   if (!ids.length) return out;
-  const { data: iscrizioni } = await supabase
-    .from('iscrizione')
-    .select('id, edizione_id, edizione:edizione_id ( id, corso:corso_id ( id, soglia_frequenza_percentuale ) )')
-    .in('id', ids)
-    .returns<IscrEdSoglia[]>();
-  const lista = iscrizioni ?? [];
+  const lista: IscrEdSoglia[] = [];
+  for (const lotto of aLotti(ids)) {
+    lista.push(...await tutteLeRighe<IscrEdSoglia>((da, a) => supabase
+      .from('iscrizione')
+      .select('id, edizione_id, edizione:edizione_id ( id, corso:corso_id ( id, soglia_frequenza_percentuale ) )')
+      .in('id', lotto)
+      .range(da, a)
+      .returns<IscrEdSoglia[]>(), 'delle iscrizioni'));
+  }
   if (!lista.length) return out;
   const edizioneIds = Array.from(new Set(lista.map((i) => i.edizione_id)));
-  const { data: sessioni } = await supabase
-    .from('sessione')
-    .select('id, edizione_id, durata_minuti, annullato_at')
-    .in('edizione_id', edizioneIds)
-    .returns<SessioneMini[]>();
   const sessioniPer = new Map<string, SessioneMini[]>();
-  for (const s of sessioni ?? []) {
-    if (!sessioniPer.has(s.edizione_id)) sessioniPer.set(s.edizione_id, []);
-    sessioniPer.get(s.edizione_id)!.push(s);
+  for (const lotto of aLotti(edizioneIds)) {
+    const sessioni = await tutteLeRighe<SessioneMini>((da, a) => supabase
+      .from('sessione')
+      .select('id, edizione_id, durata_minuti, annullato_at')
+      .in('edizione_id', lotto)
+      .range(da, a)
+      .returns<SessioneMini[]>(), 'delle sessioni');
+    for (const s of sessioni) {
+      if (!sessioniPer.has(s.edizione_id)) sessioniPer.set(s.edizione_id, []);
+      sessioniPer.get(s.edizione_id)!.push(s);
+    }
   }
   const eventiPer = new Map<string, PresEvt[]>();
-  const PASSO = 200;
-  for (let i = 0; i < lista.length; i += PASSO) {
-    const lotto = lista.slice(i, i + PASSO).map((x) => x.id);
-    const { data } = await supabase
+  for (const lotto of aLotti(lista.map((x) => x.id))) {
+    const eventi = await tutteLeRighe<PresEvt>((da, a) => supabase
       .from('evento')
       .select('id, subject_id, payload')
       .in('event_type', TIPI_PRESENZA)
       .in('payload->>iscrizione_id', lotto)
       .order('seq', { ascending: true })
-      .returns<PresEvt[]>();
-    for (const e of data ?? []) {
+      .range(da, a)
+      .returns<PresEvt[]>(), 'delle presenze');
+    for (const e of eventi) {
       const k = e.payload?.iscrizione_id;
       if (!k) continue;
       if (!eventiPer.has(k)) eventiPer.set(k, []);

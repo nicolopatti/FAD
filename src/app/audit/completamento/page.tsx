@@ -1,7 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { requireAuditor } from '@/lib/auth-context';
-import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni, regolaLabel } from '@/lib/compliance';
+import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni, regolaLabel, aLotti, tutteLeRighe } from '@/lib/compliance';
 import type { IscrizioneAuditRow } from '@/lib/db-types';
 import { CompletamentoTable, type RigaCompletamento } from './CompletamentoTable';
 import { ScopeEdizione, type EdizioneScope } from './ScopeEdizione';
@@ -58,15 +58,18 @@ export default async function CompletamentoPage({ searchParams }: { searchParams
   const ids = iscrizioni.map((i) => i.id);
 
   // Attestati validi (uno per iscrizione): l'auditor li legge via RLS.
-  const { data: attestati } = ids.length
-    ? await supabase
+  type AttMini = { id: string; iscrizione_id: string; numero: string; emesso_at: string; emesso_da: string | null };
+  const attestati: AttMini[] = [];
+  for (const lotto of aLotti(ids)) {
+    attestati.push(...await tutteLeRighe<AttMini>((da, a) => supabase
       .from('attestato')
       .select('id, iscrizione_id, numero, emesso_at, emesso_da')
-      .in('iscrizione_id', ids)
+      .in('iscrizione_id', lotto)
       .is('sostituito_da', null)
-      .returns<{ id: string; iscrizione_id: string; numero: string; emesso_at: string; emesso_da: string | null }[]>()
-    : { data: [] };
-  const attestatoDi = new Map((attestati ?? []).map((a) => [a.iscrizione_id, a]));
+      .range(da, a)
+      .returns<AttMini[]>(), 'degli attestati'));
+  }
+  const attestatoDi = new Map(attestati.map((a) => [a.iscrizione_id, a]));
 
   // Ricalcolo dagli Eventi per ogni iscrizione (D8): la verità è il registro,
   // non le colonne-cache. In blocco (Blocco B #2): un numero fisso di query per

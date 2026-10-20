@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
-import { normalizzaParziale } from '@/lib/attestato-modello';
+import { normalizzaParziale, pathNelTenant } from '@/lib/attestato-modello';
 
 type Body = {
   ragione_sociale?: string | null;
@@ -30,6 +30,13 @@ export async function PATCH(request: Request) {
   if (body.attestato_modello !== undefined) {
     // Modello predefinito dell'attestato: normalizzato (campi non validi scartati).
     updates.attestato_modello = body.attestato_modello === null ? null : normalizzaParziale(body.attestato_modello);
+  }
+  // Logo e firma: solo file del bucket `loghi` nella cartella del tenant (il path
+  // finisce nello snapshot e in una URL costruita dal server).
+  for (const k of ['logo_path', 'firma_path'] as const) {
+    if (typeof updates[k] === 'string' && !pathNelTenant(updates[k] as string, session.tenantId)) {
+      return NextResponse.json({ ok: false, error: `${k === 'logo_path' ? 'Il logo' : 'La firma'} deve essere un file caricato nella cartella dell’ente.` }, { status: 400 });
+    }
   }
   if (typeof updates.linkedin_organization_id === 'string' && !/^\d{1,12}$/.test(updates.linkedin_organization_id)) {
     return NextResponse.json({ ok: false, error: 'L’ID della pagina LinkedIn è un numero (lo trovi nell’URL della pagina aziendale su LinkedIn).' }, { status: 400 });

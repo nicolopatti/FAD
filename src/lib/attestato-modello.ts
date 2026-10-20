@@ -67,6 +67,10 @@ function testo(v: unknown, max: number, fallback: string): string {
 function pathOk(v: unknown): string | null {
   return typeof v === 'string' && /^[0-9a-f-]{36}\/[\w.-]+$/i.test(v) ? v : null;
 }
+/** Path di un file del bucket `loghi` dentro la cartella del tenant indicato. */
+export function pathNelTenant(v: unknown, tenantId: string): boolean {
+  return pathOk(v) !== null && (v as string).toLowerCase().startsWith(`${tenantId.toLowerCase()}/`);
+}
 
 /** Normalizza un modello parziale ricevuto dal client (scarta ciò che non è valido). */
 export function normalizzaParziale(input: unknown): ModelloParziale {
@@ -128,10 +132,13 @@ export function risolviModello(ente: DatiEnte, modelloEnte: unknown, modelloCors
   };
   if (!base.intestazione) base.intestazione = ente.ragione_sociale;
   if (!base.citta) base.citta = ente.citta ?? '';
-  if (!base.logo_path) base.logo_path = ente.logo_path ?? null;
-  if (base.firmatari.length === 0 && ente.firmatario_nome) {
-    base.firmatari = [{ nome: ente.firmatario_nome, ruolo: ente.firmatario_ruolo ?? '', firma_path: ente.firma_path ?? null }];
-  }
+  // Logo e firmatari: un valore ESPLICITO nel modello (anche "nessuno": logo_path
+  // null, firmatari []) vince; solo se il modello non ne parla si prendono dall'ente.
+  const logoDichiarato = 'logo_path' in c ? c.logo_path : 'logo_path' in e ? e.logo_path : undefined;
+  base.logo_path = logoDichiarato === undefined ? ente.logo_path ?? null : logoDichiarato ?? null;
+  const firmatariDichiarati = c.firmatari ?? e.firmatari;
+  if (firmatariDichiarati !== undefined) base.firmatari = firmatariDichiarati;
+  else base.firmatari = ente.firmatario_nome ? [{ nome: ente.firmatario_nome, ruolo: ente.firmatario_ruolo ?? '', firma_path: ente.firma_path ?? null }] : [];
   return base;
 }
 

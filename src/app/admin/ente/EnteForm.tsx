@@ -7,11 +7,10 @@ import { Field } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { EnteRow } from '@/lib/db-types';
+import { urlLogo } from '@/lib/url';
 
 export function logoUrl(path?: string | null): string | null {
-  if (!path) return null;
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return base ? `${base}/storage/v1/object/public/loghi/${path}` : null;
+  return urlLogo(path);
 }
 
 export function EnteForm({ ente }: { ente: EnteRow }) {

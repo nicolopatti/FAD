@@ -16,6 +16,18 @@ import type { SessionContext } from './auth-context';
  */
 export type PersonaDaInvitare = { id: string; email: string; nome: string; auth_user_id: string | null };
 
+/** Cerca un utente Auth per email scorrendo tutte le pagine (la Admin API non filtra per email). */
+async function trovaUtenteAuth(service: SupabaseClient, email: string) {
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(error.message);
+    const u = data.users.find((x) => x.email?.toLowerCase() === email);
+    if (u) return u;
+    if (data.users.length < 1000) return null;
+  }
+  return null;
+}
+
 export async function invitaPersona(
   userClient: SupabaseClient,
   session: SessionContext,
@@ -35,10 +47,14 @@ export async function invitaPersona(
   if (inv.error) {
     const m = inv.error.message.toLowerCase();
     if (m.includes('already been registered') || m.includes('already registered') || m.includes('already exists')) {
-      // Utente Auth già esistente (es. invitato in passato e poi scollegato): lo si ricollega.
-      const lista = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const u = lista.data?.users.find((x) => x.email?.toLowerCase() === email);
+      // Utente Auth già esistente (es. invitato in passato e poi scollegato): lo si
+      // ricollega, ma MAI se porta un ruolo di staff (il JWT entrerebbe come admin/auditor).
+      const u = await trovaUtenteAuth(service, email);
       if (!u) throw new Error(inv.error.message);
+      const ruolo = (u.app_metadata as { role?: string } | undefined)?.role;
+      if (ruolo === 'admin' || ruolo === 'auditor') {
+        throw new Error(`L'email ${email} appartiene a un utente con ruolo ${ruolo}: non può essere collegata a un iscritto.`);
+      }
       authUserId = u.id;
       giaRegistrato = true;
     } else {

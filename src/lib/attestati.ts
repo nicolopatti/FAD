@@ -307,13 +307,16 @@ export async function provaEmissioneAutomatica(iscrizioneId: string, attorePerso
 /** Link "Aggiungi al profilo" di LinkedIn, precompilato dallo snapshot. */
 export function linkedInAddToProfileUrl(a: Pick<AttestatoRow, 'numero' | 'codice_verifica' | 'emesso_at' | 'contenuto'>, baseUrl: string): string {
   const c = a.contenuto as unknown as AttestatoContenuto;
-  const d = new Date(a.emesso_at);
+  // Anno e mese nel fuso di Roma, come il numero dell'attestato (non nel fuso del server).
+  const parti = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Rome', year: 'numeric', month: 'numeric' }).formatToParts(new Date(a.emesso_at));
+  const anno = parti.find((p) => p.type === 'year')?.value ?? '';
+  const mese = parti.find((p) => p.type === 'month')?.value ?? '';
   const params = new URLSearchParams({
     startTask: 'CERTIFICATION_NAME',
     name: c.corso?.titolo ?? 'Attestato',
     organizationName: c.ente?.ragione_sociale ?? '',
-    issueYear: String(d.getFullYear()),
-    issueMonth: String(d.getMonth() + 1),
+    issueYear: anno,
+    issueMonth: mese,
     certUrl: `${baseUrl}/verifica/${a.codice_verifica}`,
     certId: a.numero,
   });

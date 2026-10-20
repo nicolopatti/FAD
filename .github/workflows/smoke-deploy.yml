@@ -27,35 +27,50 @@ jobs:
     env:
       URL: ${{ github.event.deployment_status.environment_url || github.event.inputs.url || 'https://fad-wine.vercel.app' }}
       HA_SECRETS: ${{ secrets.E2E_DISCENTE_PASSWORD != '' && secrets.E2E_AUDITOR_PASSWORD != '' && secrets.E2E_ADMIN_PASSWORD != '' }}
+      # Le anteprime Vercel sono protette (Deployment Protection): senza il
+      # "Protection Bypass for Automation" (Vercel → Project → Settings →
+      # Deployment Protection) la pagina di accesso di Vercel risponde al posto
+      # dell'app. Con il secret VERCEL_AUTOMATION_BYPASS_SECRET si passa.
+      BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      ANTEPRIMA: ${{ github.event_name == 'deployment_status' && github.event.deployment.environment != 'Production' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: pagine pubbliche (${{ env.URL }})
         run: |
           set -euo pipefail
-          code=$(curl -sS -L -o /tmp/login.html -w '%{http_code}' "$URL/login")
+          H=()
+          if [ -n "$BYPASS" ]; then H=(-H "x-vercel-protection-bypass: $BYPASS"); fi
+          code=$(curl -sS -L "${H[@]}" -o /tmp/login.html -w '%{http_code}' "$URL/login")
+          if grep -qi "vercel.com/sso-api\|Authentication Required\|_vercel_sso" /tmp/login.html; then
+            if [ "$ANTEPRIMA" = "true" ]; then
+              echo "anteprima protetta da Vercel: aggiungi il secret VERCEL_AUTOMATION_BYPASS_SECRET per provarla (salto)"; echo "SALTA=1" >> "$GITHUB_ENV"; exit 0
+            fi
+            echo "la produzione risponde con la pagina di protezione di Vercel"; exit 1
+          fi
           test "$code" = "200" || { echo "login: HTTP $code"; exit 1; }
           grep -q "Bentornato" /tmp/login.html || { echo "login: testo atteso non trovato"; exit 1; }
-          code=$(curl -sS -L -o /dev/null -w '%{http_code}' "$URL/verifica/000000000000000000000000")
+          code=$(curl -sS -L "${H[@]}" -o /dev/null -w '%{http_code}' "$URL/verifica/000000000000000000000000")
           test "$code" = "200" || { echo "verifica: HTTP $code"; exit 1; }
-          code=$(curl -sS -o /dev/null -w '%{http_code}' "$URL/api/attestati/00000000-0000-0000-0000-000000000000/pdf")
+          code=$(curl -sS "${H[@]}" -o /dev/null -w '%{http_code}' "$URL/api/attestati/00000000-0000-0000-0000-000000000000/pdf")
           test "$code" = "401" || { echo "pdf privato: HTTP $code (atteso 401)"; exit 1; }
           echo "ok: login, verifica pubblica, pdf privato protetto"
 
       - uses: actions/setup-node@v4
-        if: env.HA_SECRETS == 'true'
+        if: env.HA_SECRETS == 'true' && env.SALTA != '1'
         with:
           node-version: '20'
           cache: 'npm'
       - name: dipendenze + Chromium
-        if: env.HA_SECRETS == 'true'
+        if: env.HA_SECRETS == 'true' && env.SALTA != '1'
         run: |
           npm ci
           npx playwright install --with-deps chromium
       - name: E2E dei tre ruoli (sola lettura)
-        if: env.HA_SECRETS == 'true'
+        if: env.HA_SECRETS == 'true' && env.SALTA != '1'
         env:
           E2E_BASE_URL: ${{ env.URL }}
+          E2E_VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           E2E_DISCENTE_EMAIL: ${{ secrets.E2E_DISCENTE_EMAIL }}
           E2E_DISCENTE_PASSWORD: ${{ secrets.E2E_DISCENTE_PASSWORD }}
           E2E_AUDITOR_EMAIL: ${{ secrets.E2E_AUDITOR_EMAIL }}

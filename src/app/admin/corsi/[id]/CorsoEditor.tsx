@@ -1184,7 +1184,7 @@ function SezioneIscritti({
   const attive = tutteLeEdizioni ? edizioni : attiveSolo;
   const [selId, setSelId] = useState<string>(attive[0]?.id ?? '');
   const sel = attive.find((e) => e.id === selId) ?? attive[0];
-  const iscritti = sel ? iscrittiByEdizione[sel.id] ?? [] : [];
+  const iscritti = useMemo(() => (sel ? iscrittiByEdizione[sel.id] ?? [] : []), [sel, iscrittiByEdizione]);
   const selAttiva = sel ? edizioneStato(sel) === 'attiva' : false;
 
   const [mode, setMode] = useState<'manuale' | 'csv'>('manuale');

@@ -7,11 +7,10 @@ import { Field } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { LAYOUT_LABEL, type Firmatario, type LayoutAttestato, type ModelloAttestato, type ModelloParziale } from '@/lib/attestato-modello';
+import { urlLogo } from '@/lib/url';
 
 export function loghiUrl(path?: string | null): string | null {
-  if (!path) return null;
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return base ? `${base}/storage/v1/object/public/loghi/${path}` : null;
+  return urlLogo(path);
 }
 
 const MOSTRA_LABEL: Record<keyof ModelloAttestato['mostra'], string> = {

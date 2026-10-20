@@ -366,7 +366,10 @@ produzione e a richiesta: controlla le pagine pubbliche con `curl` e, se nei
 Secrets del repo ci sono `E2E_DISCENTE_PASSWORD`, `E2E_AUDITOR_PASSWORD`,
 `E2E_ADMIN_PASSWORD` (più le email, opzionali), esegue anche la suite E2E dei tre
 ruoli contro quell'URL. Un fallimento arriva come email di GitHub Actions: è il
-monitoraggio minimo senza servizi aggiuntivi.
+monitoraggio minimo senza servizi aggiuntivi. Le **anteprime** Vercel sono
+protette: per provarle serve il secret `VERCEL_AUTOMATION_BYPASS_SECRET`
+(Vercel → Settings → Deployment Protection → Protection Bypass for Automation);
+senza, il workflow le salta con un avviso e controlla solo la produzione.
 
 ### Inviti, password dimenticata, cambio password
 

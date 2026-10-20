@@ -31,7 +31,9 @@ export async function apriBrowser() {
 }
 
 export async function nuovaPagina(browser, viewport = { width: 1440, height: 900 }) {
-  const ctx = await browser.newContext({ viewport, locale: 'it-IT' });
+  // Anteprime Vercel protette: il "Protection Bypass for Automation" passa come header.
+  const bypass = process.env.E2E_VERCEL_BYPASS;
+  const ctx = await browser.newContext({ viewport, locale: 'it-IT', ...(bypass ? { extraHTTPHeaders: { 'x-vercel-protection-bypass': bypass } } : {}) });
   if (process.env.E2E_PROXY_SUPABASE === '1') {
     await ctx.route(/supabase\.co/, async (route) => {
       const req = route.request();

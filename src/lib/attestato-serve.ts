@@ -2,6 +2,7 @@ import { createSupabaseServiceClient } from './supabase/service';
 import { generaAttestatoPdf, pathImmagini, type Immagini } from './attestato-pdf';
 import type { AttestatoContenuto } from './attestati';
 import type { AttestatoRow } from './db-types';
+import { urlLogo } from './url';
 
 type Service = ReturnType<typeof createSupabaseServiceClient>;
 
@@ -11,10 +12,10 @@ function servizio(): Service | null {
 
 /** Un'immagine dal bucket pubblico `loghi` (URL pubblico: nessuna chiave richiesta). */
 export async function immagineLoghi(path: string): Promise<Uint8Array | null> {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!base) return null;
+  const url = urlLogo(path);
+  if (!url) return null;
   try {
-    const r = await fetch(`${base}/storage/v1/object/public/loghi/${path}`, { cache: 'no-store' });
+    const r = await fetch(url, { cache: 'no-store' });
     if (!r.ok) return null;
     return new Uint8Array(await r.arrayBuffer());
   } catch {
