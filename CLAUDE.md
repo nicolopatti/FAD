@@ -441,7 +441,9 @@ modifica DB: dal container si provano solo letture e validazioni.
   nomi fra virgolette; aggiunto lo step `npm run lint` (ESLint `next/core-web-vitals`,
   `.eslintrc.json` nuovo: prima `next lint` chiedeva interattivamente la configurazione).
   **Regola**: dopo ogni modifica a un workflow, `python3 -c "import yaml; …"` e
-  controllare che il run su GitHub abbia dei job.
+  controllare che il run su GitHub abbia dei job. La CI girava solo su `main` e sulle
+  PR: ora anche sui push dei branch `claude/**` (prima, sul branch di sessione, i run
+  "push" comparivano SOLO perché il YAML era rotto).
 - **Smoke sulle anteprime**: le anteprime Vercel sono protette (Deployment Protection):
   curl riceve la pagina di accesso di Vercel (HTTP 200, non la nostra). Il workflow ora
   manda l'header `x-vercel-protection-bypass` se esiste il secret

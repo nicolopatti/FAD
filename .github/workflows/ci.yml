@@ -3,7 +3,8 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main]
+    # Anche i branch di sessione: senza PR aperta la CI non girerebbe mai sul lavoro in corso.
+    branches: [main, 'claude/**']
 
 jobs:
   build:
