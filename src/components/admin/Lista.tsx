@@ -5,7 +5,7 @@
 // tasto indietro funziona e il Server Component carica solo le righe della
 // pagina. Ricerca con attesa di 300 ms, segmenti e paginatore come link.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -17,20 +17,20 @@ export function useFiltriUrl() {
   const router = useRouter();
   const pathname = usePathname() ?? '';
   const params = useSearchParams();
-  function href(cambia: Record<string, string | null | undefined>, azzeraPagina = true): Route {
-    const next = new URLSearchParams(params?.toString() ?? '');
+  const attuale = params?.toString() ?? '';
+  // Identità stabile (dipende solo da indirizzo e filtri): così gli effetti che la
+  // usano (es. l'attesa della ricerca) non ripartono a ogni render.
+  const href = useCallback((cambia: Record<string, string | null | undefined>, azzeraPagina = true): Route => {
+    const next = new URLSearchParams(attuale);
     for (const [k, v] of Object.entries(cambia)) {
       if (v == null || v === '') next.delete(k); else next.set(k, v);
     }
     if (azzeraPagina) next.delete('pagina');
     const qs = next.toString();
     return (qs ? `${pathname}?${qs}` : pathname) as Route;
-  }
-  return {
-    params,
-    href,
-    set(cambia: Record<string, string | null | undefined>, azzeraPagina = true) { router.replace(href(cambia, azzeraPagina)); },
-  };
+  }, [attuale, pathname]);
+  const set = useCallback((cambia: Record<string, string | null | undefined>, azzeraPagina = true) => { router.replace(href(cambia, azzeraPagina)); }, [href, router]);
+  return { params, href, set };
 }
 
 /** Casella di ricerca legata a `?q=` con attesa di 300 ms. */

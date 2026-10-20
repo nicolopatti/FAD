@@ -43,9 +43,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   let corsiAggiornati = 0;
   if (typeof updates.nome === 'string' && updates.nome !== cat.nome) {
     // Propaga ai soli corsi in bozza: quelli con edizioni sono congelati.
-    const { data: conEdizioni } = await supabase.from('edizione').select('corso_id');
-    const congelati = new Set((conEdizioni ?? []).map((e) => e.corso_id as string));
     const { data: corsi } = await supabase.from('corso').select('id').eq('categoria', cat.nome);
+    const ids = (corsi ?? []).map((c) => c.id as string);
+    const { data: conEdizioni } = ids.length ? await supabase.from('edizione').select('corso_id').in('corso_id', ids) : { data: [] };
+    const congelati = new Set((conEdizioni ?? []).map((e) => e.corso_id as string));
     for (const c of corsi ?? []) {
       if (congelati.has(c.id as string)) continue;
       const { error: e } = await supabase.from('corso').update({ categoria: updates.nome }).eq('id', c.id);

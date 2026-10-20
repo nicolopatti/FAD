@@ -57,7 +57,10 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!isc) return NextResponse.json({ ok: false, error: 'iscrizione non trovata' }, { status: 404 });
 
   const { error } = await supabase.from('iscrizione').delete().eq('id', params.id);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  if (error) {
+    const msg = error.code === '23503' ? 'L’iscrizione ha un attestato o altri dati collegati e non si rimuove: resta nel registro.' : error.message;
+    return NextResponse.json({ ok: false, error: msg }, { status: error.code === '23503' ? 409 : 400 });
+  }
 
   await appendEvent({
     tenantId: session.tenantId,

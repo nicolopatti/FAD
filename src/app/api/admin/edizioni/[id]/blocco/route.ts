@@ -81,7 +81,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         }
         case 'rimuovi': {
           const { error: e } = await supabase.from('iscrizione').delete().eq('id', i.id);
-          if (e) throw new Error(e.message);
+          if (e) throw new Error(e.code === '23503' ? 'ha un attestato o altri dati collegati: non si rimuove' : e.message);
           await appendEvent({ tenantId: session.tenantId, eventType: 'iscrizione.removed', actor, subjectType: 'iscrizione', subjectId: i.id, payload: { edizione_id: i.edizione_id, persona_id: i.persona_id } });
           fatti += 1;
           break;
