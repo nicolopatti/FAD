@@ -8,6 +8,7 @@ import { Icon, fmtData } from '@/components/admin/Atlante';
 import { Field, Pager } from '@/components/admin/Form';
 import { useCall, type CallFn } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
+import { BulkBar } from '@/components/admin/Lista';
 import { isEmail, isCodiceFiscale, type Errori } from '@/lib/validazione';
 import { matchCol, type IscrittoRow, type PianoMini } from '../../../_components/shared';
 
@@ -35,6 +36,8 @@ export function Iscritti({
   const [q, setQ] = useState('');
   const [pagina, setPagina] = useState(1);
   const [aggiungi, setAggiungi] = useState(iscritti.length === 0 && attiva);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [pianoBlocco, setPianoBlocco] = useState('');
 
   const filtrati = useMemo(() => {
     const n = q.trim().toLowerCase();
@@ -51,6 +54,33 @@ export function Iscritti({
     await call('PATCH', `/api/admin/iscrizioni/${i.iscrizione_id}`, { piano_id: pianoId || null }, {
       successo: piano ? `${i.cognome} ${i.nome}: piano "${piano.titolo}" assegnato.` : `${i.cognome} ${i.nome}: nessun piano finanziato.`,
     });
+  }
+
+  const selezionati = iscritti.filter((i) => sel.has(i.iscrizione_id));
+  const tuttiSel = visibili.length > 0 && visibili.every((i) => sel.has(i.iscrizione_id));
+  function toggleSel(id: string) { setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }); }
+  function toggleTutti() { setSel((s) => { const n = new Set(s); if (tuttiSel) visibili.forEach((i) => n.delete(i.iscrizione_id)); else visibili.forEach((i) => n.add(i.iscrizione_id)); return n; }); }
+
+  type EsitoBlocco = { fatti?: number; saltati?: { iscrizione_id: string; motivo: string }[] };
+  /** Azione in blocco sui selezionati: una chiamata, l'esito dice cosa è stato fatto e cosa no. */
+  async function inBlocco(azione: 'invita' | 'piano' | 'attestato' | 'rimuovi', extra: Record<string, unknown> = {}) {
+    const n = selezionati.length;
+    const testi = {
+      invita: { t: `Inviare l'invito a ${n} iscritt${n === 1 ? 'o' : 'i'}?`, m: 'Ognuno riceve un\'email con il link per scegliere la password. Chi ha già un accesso viene saltato.', c: 'Invia gli inviti', ok: 'inviti inviati' },
+      piano: { t: `Assegnare il piano a ${n} iscritt${n === 1 ? 'o' : 'i'}?`, m: extra.piano_id ? 'Il piano finanziato scelto sostituisce quello eventualmente già assegnato.' : 'Il piano finanziato viene tolto agli iscritti selezionati.', c: 'Assegna', ok: 'iscritti aggiornati' },
+      attestato: { t: `Emettere l'attestato a ${n} iscritt${n === 1 ? 'o' : 'i'}?`, m: 'Viene emesso solo a chi risulta completato adesso e non ha già un attestato valido; gli altri vengono saltati con il motivo.', c: 'Emetti', ok: 'attestati emessi' },
+      rimuovi: { t: `Rimuovere ${n} iscritt${n === 1 ? 'o' : 'i'} dall'edizione?`, m: 'Le persone restano in anagrafica; viene tolta solo l\'iscrizione a questa edizione.', c: 'Rimuovi', ok: 'iscritti rimossi' },
+    }[azione];
+    if (!(await confirm({ titolo: testi.t, messaggio: testi.m, conferma: testi.c, pericolosa: azione === 'rimuovi' }))) return;
+    try {
+      const r = (await call('POST', `/api/admin/edizioni/${edizioneId}/blocco`, { azione, iscrizione_ids: selezionati.map((i) => i.iscrizione_id), ...extra })) as EsitoBlocco;
+      const fatti = r.fatti ?? 0;
+      if (r.saltati?.length) {
+        const primo = r.saltati[0]; const p = iscritti.find((i) => i.iscrizione_id === primo.iscrizione_id);
+        toast(`${fatti} ${testi.ok}, ${r.saltati.length} saltat${r.saltati.length === 1 ? 'o' : 'i'}: ${p ? `${p.cognome} ${p.nome}` : 'iscrizione'} (${primo.motivo})`, fatti > 0 ? 'ok' : 'errore');
+      } else toast(`${fatti} ${testi.ok}.`);
+      setSel(new Set());
+    } catch { /* banner */ }
   }
 
   const [riemetti, setRiemetti] = useState<{ iscrizione_id: string; motivazione: string } | null>(null);
@@ -112,11 +142,26 @@ export function Iscritti({
                   </div>
                 </div>
               )}
-              <div className="tbl-wrap"><table className="tbl tbl--zebra">
-                <thead><tr><th>Cognome e nome</th><th>Email</th><th>Accesso</th><th>Codice fiscale</th><th>Azienda</th><th>Piano finanziato</th>{politicaAttestato !== 'nessuna' && <th>Attestato</th>}<th></th></tr></thead>
+              <BulkBar n={selezionati.length} cosa={selezionati.length === 1 ? 'iscritto selezionato' : 'iscritti selezionati'} onAzzera={() => setSel(new Set())}>
+                {selezionati.some((i) => !i.accesso) && <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => inBlocco('invita')}>Invita</button>}
+                {piani.length > 0 && (
+                  <span className="row" style={{ gap: 6 }}>
+                    <select className="select select--sm" value={pianoBlocco} onChange={(e) => setPianoBlocco(e.target.value)} disabled={busy} aria-label="Piano da assegnare" style={{ width: 'auto' }}>
+                      <option value="">— nessun piano —</option>
+                      {piani.map((p) => <option key={p.id} value={p.id}>{p.titolo}</option>)}
+                    </select>
+                    <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => inBlocco('piano', { piano_id: pianoBlocco || null })}>Assegna piano</button>
+                  </span>
+                )}
+                {politicaAttestato !== 'nessuna' && <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => inBlocco('attestato')} title="Solo a chi ha completato il percorso"><Icon name="shield" /> Emetti attestati</button>}
+                <button type="button" className="btn btn--danger btn--sm" disabled={busy} onClick={() => inBlocco('rimuovi')}><Icon name="trash" /> Rimuovi</button>
+              </BulkBar>
+              <div className="tbl-wrap"><table className="tbl tbl--zebra tbl--lista">
+                <thead><tr><th className="t-check"><input type="checkbox" checked={tuttiSel} onChange={toggleTutti} aria-label="Seleziona tutti gli iscritti visibili" /></th><th>Cognome e nome</th><th>Email</th><th>Accesso</th><th>Codice fiscale</th><th>Azienda</th><th>Piano finanziato</th>{politicaAttestato !== 'nessuna' && <th>Attestato</th>}<th></th></tr></thead>
                 <tbody>
                   {visibili.map((i) => (
-                    <tr key={i.iscrizione_id}>
+                    <tr key={i.iscrizione_id} className={sel.has(i.iscrizione_id) ? 'is-selected' : ''}>
+                      <td className="t-check"><input type="checkbox" checked={sel.has(i.iscrizione_id)} onChange={() => toggleSel(i.iscrizione_id)} aria-label={`Seleziona ${i.cognome} ${i.nome}`} /></td>
                       <td className="t-title">{i.cognome} {i.nome}</td>
                       <td className="muted">{i.email}</td>
                       <td>
@@ -159,7 +204,7 @@ export function Iscritti({
                     </tr>
                   ))}
                   {visibili.length === 0 && (
-                    <tr><td colSpan={8} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
+                    <tr><td colSpan={9} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
                   )}
                 </tbody>
               </table></div>
@@ -289,7 +334,7 @@ function IscrittoManuale({ edizioneId, piani, busy, call }: { edizioneId: string
 }
 
 type ImportIscrittoRow = {
-  riga: number; cognome: string; nome: string; email: string; codice_fiscale: string; azienda: string; data_nascita: string; luogo_nascita: string;
+  riga: number; cognome: string; nome: string; email: string; codice_fiscale: string; azienda: string; partita_iva: string; data_nascita: string; luogo_nascita: string;
   esito: 'nuovo' | 'duplicato' | 'errore'; motivo?: string;
 };
 
@@ -311,6 +356,7 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
         email: matchCol(headers, ['email', 'e-mail', 'indirizzo email']),
         cf: matchCol(headers, ['codice fiscale', 'cf', 'codice_fiscale', 'fiscal code']),
         azienda: matchCol(headers, ['azienda', 'ragione sociale', 'company', 'datore']),
+        piva: matchCol(headers, ['partita iva', 'p.iva', 'piva', 'partita_iva', 'vat']),
         dn: matchCol(headers, ['data di nascita', 'data nascita', 'nato il', 'birth date', 'data_nascita']),
         ln: matchCol(headers, ['luogo di nascita', 'luogo nascita', 'nato a', 'birth place', 'luogo_nascita']),
       };
@@ -322,6 +368,7 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
         const email = (ci.email >= 0 ? r[ci.email] : '')?.trim() ?? '';
         const cf = (ci.cf >= 0 ? r[ci.cf] : '')?.trim() ?? '';
         const azienda = (ci.azienda >= 0 ? r[ci.azienda] : '')?.trim() ?? '';
+        const partita_iva = (ci.piva >= 0 ? r[ci.piva] : '')?.trim() ?? '';
         const data_nascita = (ci.dn >= 0 ? r[ci.dn] : '')?.trim() ?? '';
         const luogo_nascita = (ci.ln >= 0 ? r[ci.ln] : '')?.trim() ?? '';
         let esito: ImportIscrittoRow['esito'] = 'nuovo';
@@ -330,7 +377,7 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
         if (!cognome || !nome || !email) { esito = 'errore'; motivo = 'cognome/nome/email mancanti'; }
         else if (emails.has(ek) || (ck && cfs.has(ck)) || seenEmail.has(ek) || (ck && seenCf.has(ck))) { esito = 'duplicato'; motivo = 'già iscritto'; }
         if (esito === 'nuovo') { seenEmail.add(ek); if (ck) seenCf.add(ck); }
-        return { riga: idx + 1, cognome, nome, email, codice_fiscale: cf, azienda, data_nascita, luogo_nascita, esito, motivo };
+        return { riga: idx + 1, cognome, nome, email, codice_fiscale: cf, azienda, partita_iva, data_nascita, luogo_nascita, esito, motivo };
       });
       setRows(out);
     } catch (e) {
@@ -347,7 +394,7 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
       await call('POST', `/api/admin/edizioni/${edizioneId}/iscritti/import`, {
         rows: importabili.map((r) => ({
           cognome: r.cognome, nome: r.nome, email: r.email,
-          codice_fiscale: r.codice_fiscale || null, azienda: r.azienda || null,
+          codice_fiscale: r.codice_fiscale || null, azienda: r.azienda || null, partita_iva: r.partita_iva || null,
           data_nascita: r.data_nascita || null, luogo_nascita: r.luogo_nascita || null,
         })),
       }, { successo: `${importabili.length} iscritt${importabili.length === 1 ? 'o importato' : 'i importati'}.` });
@@ -366,7 +413,7 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
       >
         <Icon name="upload" className="dropzone__icon" />
         <div className="dropzone__t">Trascina qui un file .csv</div>
-        <div className="dropzone__s">colonne: Cognome, Nome, Email, Codice fiscale, Azienda, Data di nascita (gg/mm/aaaa), Luogo di nascita · da Excel: salva come CSV</div>
+        <div className="dropzone__s">colonne: Cognome, Nome, Email, Codice fiscale, Azienda, Partita IVA, Data di nascita (gg/mm/aaaa), Luogo di nascita · da Excel: salva come CSV</div>
       </div>
       <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(parse); e.target.value = ''; }} />
 

@@ -83,7 +83,7 @@ export function LibreriaView({ rows, corsi, tabs }: { rows: ContenutoRow[]; cors
 
   // Vista per corso: gruppi ordinati per stato (attivi, bozze, conclusi) e titolo.
   const gruppi = useMemo(() => {
-    const ordineStato: Record<StatoCorso, number> = { attivo: 0, bozza: 1, concluso: 2 };
+    const ordineStato: Record<StatoCorso, number> = { attivo: 0, bozza: 1, concluso: 2, archiviato: 3 };
     const byCorso = new Map<string, { r: ContenutoRow; ordine: number }[]>();
     for (const r of filtered) for (const c of r.corsi) { const arr = byCorso.get(c.id) ?? []; arr.push({ r, ordine: c.ordine }); byCorso.set(c.id, arr); }
     const out = corsi

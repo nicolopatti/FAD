@@ -17,7 +17,7 @@ export default async function LearningObjectsListPage() {
   const [loR, strutturaR, corsiR, edizioniR] = await Promise.all([
     supabase.from('learning_object').select('id, tenant_id, type, titolo, config, archiviato_at, creato_il').order('creato_il', { ascending: false }).returns<LearningObjectRow[]>(),
     supabase.from('struttura_corso').select('learning_object_id, corso_id, ordine'),
-    supabase.from('corso').select('id, titolo'),
+    supabase.from('corso').select('id, titolo, archiviato_at'),
     supabase.from('edizione').select('corso_id, concluso_at, annullato_at').returns<EdMini[]>(),
   ]);
 
@@ -29,7 +29,7 @@ export default async function LearningObjectsListPage() {
     usi.set(id, arr);
   }
   const edizioni = unwrap(edizioniR, 'le edizioni');
-  const corsi: CorsoLibreria[] = unwrap(corsiR, 'i corsi').map((c) => ({ id: c.id as string, titolo: c.titolo as string, stato: corsoStato(edizioni.filter((e) => e.corso_id === c.id)) }));
+  const corsi: CorsoLibreria[] = unwrap(corsiR, 'i corsi').map((c) => ({ id: c.id as string, titolo: c.titolo as string, stato: corsoStato(edizioni.filter((e) => e.corso_id === c.id), c.archiviato_at as string | null) }));
 
   const rows: ContenutoRow[] = unwrap(loR, 'i contenuti').map((lo) => ({
     id: lo.id,

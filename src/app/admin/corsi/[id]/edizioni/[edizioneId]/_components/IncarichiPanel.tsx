@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { INCARICO_RUOLI, INCARICO_RUOLO_LABEL, RUOLI_DIDATTICI, type IncaricoConPersona, type IncaricoRuolo } from '@/lib/db-types';
 import { Icon } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
@@ -11,12 +11,12 @@ import { isEmail, type Errori } from '@/lib/validazione';
 
 export type PersonaScelta = { id: string; nome: string; cognome: string; email: string };
 
-/** Scheda "Docenti e tutor" dell'edizione: incarichi (D30) con persona e ruolo. */
-export function IncarichiPanel({ edizioneId, attiva, incarichi, persone, sessioniPerIncarico }: { edizioneId: string; attiva: boolean; incarichi: IncaricoConPersona[]; persone: PersonaScelta[]; sessioniPerIncarico: Record<string, number> }) {
+/** Scheda "Docenti e tutor" dell'edizione: incarichi (D30) con persona e ruolo; la persona si cerca sul server. */
+export function IncarichiPanel({ edizioneId, attiva, incarichi, sessioniPerIncarico }: { edizioneId: string; attiva: boolean; incarichi: IncaricoConPersona[]; sessioniPerIncarico: Record<string, number> }) {
   const { confirm } = useFeedback();
   const { call, busy, error } = useCall();
   const [aggiungi, setAggiungi] = useState(incarichi.length === 0 && attiva);
-  const [origine, setOrigine] = useState<'esistente' | 'nuova'>(persone.length > 0 ? 'esistente' : 'nuova');
+  const [origine, setOrigine] = useState<'esistente' | 'nuova'>('esistente');
   const [q, setQ] = useState('');
   const [personaId, setPersonaId] = useState('');
   const [nome, setNome] = useState('');
@@ -26,11 +26,21 @@ export function IncarichiPanel({ edizioneId, attiva, incarichi, persone, session
   const [errs, setErrs] = useState<Errori>({});
   const [salvando, setSalvando] = useState(false);
 
-  const candidati = useMemo(() => {
-    const n = q.trim().toLowerCase();
-    const out = persone.filter((p) => !n || `${p.cognome} ${p.nome} ${p.email}`.toLowerCase().includes(n));
-    return out.slice(0, 50);
-  }, [persone, q]);
+  const [candidati, setCandidati] = useState<PersonaScelta[]>([]);
+  const [troncato, setTroncato] = useState(false);
+  // Ricerca sul server (GET /api/admin/persone/cerca): niente anagrafica intera nella pagina.
+  useEffect(() => {
+    if (!aggiungi || origine !== 'esistente') return;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/persone/cerca?q=${encodeURIComponent(q.trim())}`);
+        const json = await res.json();
+        setCandidati(json.persone ?? []);
+        setTroncato(Boolean(json.troncato));
+      } catch { setCandidati([]); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, aggiungi, origine]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,7 +107,7 @@ export function IncarichiPanel({ edizioneId, attiva, incarichi, persone, session
             <div><h3>Assegna un docente o tutor</h3><div className="sub">Una persona già in anagrafica oppure una nuova.</div></div>
             <div className="row">
               <div className="seg">
-                <button type="button" className={origine === 'esistente' ? 'is-active' : ''} onClick={() => setOrigine('esistente')} disabled={persone.length === 0}>In anagrafica</button>
+                <button type="button" className={origine === 'esistente' ? 'is-active' : ''} onClick={() => setOrigine('esistente')}>In anagrafica</button>
                 <button type="button" className={origine === 'nuova' ? 'is-active' : ''} onClick={() => setOrigine('nuova')}>Persona nuova</button>
               </div>
               {incarichi.length > 0 && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setAggiungi(false)}>Chiudi</button>}
@@ -106,7 +116,7 @@ export function IncarichiPanel({ edizioneId, attiva, incarichi, persone, session
           <div className="card__body">
             {origine === 'esistente' ? (
               <div className="grid-2">
-                <Field id="inc-q" label="Cerca la persona" required error={errs.persona} hint={candidati.length === 50 ? 'Mostro i primi 50: affina la ricerca.' : undefined}>
+                <Field id="inc-q" label="Cerca la persona" required error={errs.persona} hint={troncato ? 'Mostro i primi 30: affina la ricerca.' : candidati.length === 0 && q.trim() ? 'Nessuna persona trovata: aggiungila come persona nuova.' : undefined}>
                   <div className="search" style={{ marginBottom: 8 }}>
                     <Icon name="search" />
                     <input id="inc-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cognome, nome o email" disabled={busy} />

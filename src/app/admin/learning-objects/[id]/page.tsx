@@ -13,7 +13,7 @@ import { QuizEditor } from './QuizEditor';
 
 export const dynamic = 'force-dynamic';
 
-type UsoRow = { corso_id: string; ordine: number; corso: { id: string; titolo: string } | null };
+type UsoRow = { corso_id: string; ordine: number; corso: { id: string; titolo: string; archiviato_at: string | null } | null };
 type EdMini = { corso_id: string; concluso_at: string | null; annullato_at: string | null };
 
 /** Pagina di un contenuto della libreria: dati reali, corsi che lo usano, archiviazione. */
@@ -28,12 +28,12 @@ export default async function EditLearningObjectPage({ params }: { params: { id:
     .maybeSingle<LearningObjectRow>();
   if (!lo) notFound();
 
-  const usi = unwrap(await supabase.from('struttura_corso').select('corso_id, ordine, corso:corso_id ( id, titolo )').eq('learning_object_id', lo.id).returns<UsoRow[]>(), 'i corsi che usano il contenuto');
+  const usi = unwrap(await supabase.from('struttura_corso').select('corso_id, ordine, corso:corso_id ( id, titolo, archiviato_at )').eq('learning_object_id', lo.id).returns<UsoRow[]>(), 'i corsi che usano il contenuto');
   const corsiIds = Array.from(new Set(usi.map((u) => u.corso_id)));
   const edizioni = corsiIds.length ? unwrap(await supabase.from('edizione').select('corso_id, concluso_at, annullato_at').in('corso_id', corsiIds).returns<EdMini[]>(), 'le edizioni') : [];
   const corsi = corsiIds.map((id) => {
     const u = usi.find((x) => x.corso_id === id);
-    return { id, titolo: u?.corso?.titolo ?? 'Corso', ordine: u?.ordine ?? 0, stato: corsoStato(edizioni.filter((e) => e.corso_id === id)) };
+    return { id, titolo: u?.corso?.titolo ?? 'Corso', ordine: u?.ordine ?? 0, stato: corsoStato(edizioni.filter((e) => e.corso_id === id), u?.corso?.archiviato_at ?? null) };
   }).sort((a, b) => a.titolo.localeCompare(b.titolo, 'it'));
   // Per i test, il freeze D22 vale anche sulle domande.
   const congelato = corsi.some((c) => c.stato !== 'bozza');

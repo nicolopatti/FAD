@@ -10,12 +10,19 @@ Decisioni di riferimento: `piattaforma-elearning-stato-progetto-v8.md` (D1–D37
 > Tutto il resto (assemblatore corsi, quiz, attestati, webinar, report fondi…)
 > resta **fuori** dalla Fase 1.
 
-## Area admin (ondata A, 2026-10-21): il corso è l'unità di lavoro
+## Area admin (ondate A–C, 2026-10-21): il corso è l'unità di lavoro
 
-Menu a cinque voci: **Dashboard** (edizioni in corso con prontezza, sessioni della
-settimana, code di riconciliazione aperte), **Corsi** (catalogo con stati Bozza/Attivo/
-Concluso + scheda "Libreria dei contenuti"), **Agenda** (tutte le sessioni, sola lettura),
-**Rendicontazione** (report fondi + attestati), **Impostazioni** (ente e modello attestato).
+Menu a sei voci: **Dashboard** (edizioni in corso con prontezza, sessioni della
+settimana, code di riconciliazione aperte), **Corsi** (catalogo a lista filtrato e
+paginato sul server — `?q=&stato=&categoria=&ordine=&pagina=` — con stati Bozza/Attivo/
+Concluso/Archiviato, archiviazione anche in blocco, + scheda "Libreria dei contenuti"),
+**Persone** (anagrafica con ricerca e paginazione sul server, scheda persona, invito in
+blocco; scheda **Aziende** con partita IVA unica e unione dei doppioni), **Agenda** (tutte
+le sessioni, sola lettura), **Rendicontazione** (report fondi + attestati), **Impostazioni**
+(ente e modello attestato; **Categorie dei corsi**). Le liste leggono le viste
+`corso_riepilogo`, `edizione_riepilogo`, `persona_riepilogo`, `azienda_riepilogo`
+(`security_invoker`: valgono le RLS). Tra gli iscritti di un'edizione: selezione e azioni in
+blocco (invita, assegna piano, emetti attestati agli idonei, rimuovi).
 Pagina del corso a schede con un indirizzo per scheda: `/admin/corsi/<id>` (Panoramica),
 `/lezioni`, `/edizioni`, `/attestato`, `/impostazioni`. **Pagina dell'edizione**
 `/admin/corsi/<id>/edizioni/<edId>` con schede Iscritti (indice), `/sessioni`

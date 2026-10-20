@@ -123,10 +123,88 @@ codice senza tavole intermedie.
   bozza con risultati e ricerca vuota), smoke E2E **72/72**. L'anteprima Vimeo nel
   container mostra l'icona rotta (vimeo.com non raggiungibile da qui). Non provati da qui
   (scrivono): sostituzione del video, sostituzione del PDF.
-- **Prossime ondate** (dal doc di analisi): **C scala** (`corso.archiviato_at`,
-  catalogo a lista con ricerca/paginazione sul server, tabella categorie in Impostazioni,
-  pagine Persone e Aziende con dedup per partita IVA, selettori a ricerca, azioni in blocco,
-  dashboard con conteggi).
+**Ondata C fatta (scala, stessa sessione, "Avanti procediamo"):**
+- *Schema* (`20261021000002_ondata_c_scala.sql`, **applicata sul live**; test
+  `supabase/tests/ondata_c_scala.sql` **10/10** in rollback via MCP): `corso.archiviato_at`
+  (**fuori dal freeze D22**, come la copertina: vale anche a corso congelato); tabella
+  **`categoria`** per tenant (unique su `lower(nome)`, RLS read tenant / write admin, seed
+  con le 5 categorie prima cablate + quelle usate dai corsi; `corso.categoria` resta testo
+  congelato: la rinomina si propaga ai soli corsi in bozza); `azienda.partita_iva`
+  normalizzata e **unica per tenant** (indice parziale); RPC **`azienda_unisci(da, a,
+  attore)`** SECURITY DEFINER (admin del tenant o service role: sposta le iscrizioni,
+  completa i campi vuoti, elimina il doppione con DELETE composto a runtime, Evento
+  `azienda.unita {da, n_iscrizioni}`); **4 viste `security_invoker`** (le RLS delle tabelle
+  valgono): `corso_riepilogo` (n_lezioni, durata_sec, n_edizioni, n_edizioni_attive,
+  n_iscritti, `stato` bozza|attivo|concluso|archiviato), `edizione_riepilogo` (stato,
+  n_iscritti, n_con_piano, n_sessioni, n_sessioni_future, n_da_riconciliare, n_attestati,
+  n_incarichi), `persona_riepilogo` (accesso, n_iscrizioni, n_attestati, n_incarichi,
+  ultima_iscrizione_il), `azienda_riepilogo` (n_iscrizioni, n_persone). Niente grant ad anon.
+- *Catalogo* (`/admin/corsi`, `CatalogoLista.tsx`, `CorsiCatalog.tsx` eliminato): **lista
+  sul server** dalla vista con `?q=&stato=&categoria=&ordine=&pagina=` (25 per pagina,
+  `count: 'exact'`), segmenti Tutti/Attivi/Bozze/Conclusi/**Archiviati** con conteggi
+  (head count per stato), selettore categoria dal DB, miniatura della copertina, caselle di
+  selezione + **barra azioni in blocco** (Archivia / Ripristina). Primitive in
+  `components/admin/Lista.tsx`: `useFiltriUrl` (filtri nell'URL con `router.replace`),
+  `RicercaUrl` (300 ms), `SegUrl` (link), `SelectUrl`, `PagerUrl` (link `?pagina=`),
+  `BulkBar`, `parsePagina`/`intervallo`/`PER_PAGINA`. CSS `.seg a`, `.t-check`,
+  `tr.is-selected`, `.tbl--lista`, `.lista-corso`, `.cover--thumb`, `.bulkbar`.
+- *Archiviazione*: `POST /api/admin/corsi/archivia {corso_ids, ripristina?}` (max 200; si
+  archivia solo senza edizioni attive, esito `fatti`/`saltati` con motivo; Eventi
+  `corso.archived`/`corso.unarchived {titolo}`). Testata del corso dalla vista
+  (`(corso)/layout.tsx`): chip Archiviato, banner, `CorsoAzioni` con Archivia/Ripristina
+  (niente "Nuova edizione" se archiviato; `EdizioniPanel` idem). Catalogo predefinito,
+  dashboard, conteggio del menu e libreria per corso escludono/ordinano gli archiviati
+  (`corsoStato(edizioni, archiviatoAt)`, `StatoCorso` include `'archiviato'`).
+- *Categorie*: `/admin/impostazioni/categorie` (`CategorieEditor`: aggiungi, rinomina
+  inline, su/giù, elimina solo se non usata, chip "usate dai corsi ma non in elenco");
+  `ImpostazioniTabs` (Ente e attestati | Categorie dei corsi); API `GET/POST
+  /api/admin/categorie`, `PATCH/DELETE /api/admin/categorie/[id]` (Eventi
+  `categoria.created/updated/removed {nome}`; la PATCH con nuovo nome aggiorna i corsi
+  senza edizioni). `NewCorsoForm` e `FormImpostazioni` ricevono `categorie` dal DB
+  (`CATEGORIE` cablata eliminata da `shared.ts`).
+- *Persone e Aziende* (voce di menu **Persone**, 6 voci; icona `settings` per
+  Impostazioni): `/admin/persone` (`PersoneLista`: ricerca cognome/nome/email/CF sul server,
+  segmenti Tutte/Con accesso/Da invitare e Tutti i ruoli/Docenti e tutor/Senza iscrizioni,
+  paginazione, selezione + **Invita chi non ha accesso**); `/admin/persone/[id]`
+  (`PersonaForm`: anagrafica + nascita, `PATCH /api/admin/persone/[id]` con Evento
+  `persona.updated {campi}` senza valori; iscrizioni con link, attestati validi, incarichi);
+  `/admin/aziende` (`AziendeLista`: ricerca, **Nuova azienda** `POST /api/admin/aziende`,
+  modifica inline `PATCH /api/admin/aziende/[id]`, **Unisci in…** con ricerca sul server
+  → `POST /api/admin/aziende/[id]/unisci {in}` → RPC); `PersoneTabs`. Ricerche di sola
+  lettura `GET /api/admin/persone/cerca?q=` e `GET /api/admin/aziende/cerca?q=&escludi=`
+  (max 30 + `troncato`). `IncarichiPanel` cerca la persona sul server (la pagina docenti non
+  carica più 500 persone). `lib/anagrafiche.ts` (validazioni categoria/azienda,
+  `AZIENDA_SELECT`), `lib/iscritti.ts` `normalizzaPartitaIva` + `addIscritto` riconosce
+  l'azienda **prima per P.IVA** poi per ragione sociale (CSV iscritti: colonna "Partita
+  IVA"; Evento `azienda.created {origine, ha_partita_iva}`).
+- *Azioni in blocco sugli iscritti* (`Iscritti.tsx`: caselle + `BulkBar`): `POST
+  /api/admin/edizioni/[id]/blocco {azione: invita|piano|attestato|rimuovi, iscrizione_ids,
+  piano_id?}` (max 500, una iscrizione alla volta con gli stessi Eventi delle azioni
+  singole, esito `fatti`/`saltati` con motivo; l'attestato solo agli idonei senza attestato
+  valido via `emettiAttestatoManuale`).
+- *Dashboard*: solo conteggi (`head: true`) e le 12 edizioni attive più recenti dalla
+  vista `edizione_riepilogo` (con `corso`); niente più iscrizioni/attestati/coda caricati per
+  intero; KPI Iscritti → `/admin/persone`. Pagina Edizioni del corso dalla vista.
+- *Etichette* `eventi-etichette.ts`: `corso.archived/unarchived`, `categoria.*`,
+  `persona.updated`, `azienda.created/updated/unita`.
+- *Verifiche*: typecheck 0, lint 0, unit 39/39, fase4 15/15, build **52 route**;
+  `scratchpad/pw/funcC.mjs` **37/37** (catalogo: righe, segmenti, ricerca che aggiorna
+  l'URL e filtra sul server, filtro da link, ordine per titolo, categorie dal DB, selezione +
+  barra in blocco, archivia → 503 controllato; testata corso con Archivia; categorie;
+  persone con filtri, ricerca, pagina oltre l'ultima → torna alla prima tenendo i filtri;
+  scheda persona; aziende con nuova/unisci; iscritti in blocco; docenti con ricerca sul
+  server; dashboard; 0 overflow a 1440/390, 0 errori JS), schermate in `shotsC/`; smoke E2E
+  **99/99** (controlli nuovi: catalogo lista/URL/archiviati, iscritti in blocco, categorie,
+  persone con scheda, aziende, API cerca persone/aziende e categorie). Trabocchetto nuovo: **le funzioni esportate da un modulo `'use client'`
+  (`Lista.tsx`) arrivano ai Server Component come riferimenti vuoti** ("is not a
+  function"): le pure (`parsePagina`, `intervallo`, `PER_PAGINA`, `fuoriIntervallo`,
+  `hrefPaginaUno`) stanno in `lib/paginazione.ts`. PostgREST risponde 416 se `?pagina=` è
+  oltre l'ultima: le liste reindirizzano alla prima pagina con gli stessi filtri. Dal container senza
+  chiave di servizio le scritture rispondono 503 (archivia, categorie, persone, aziende,
+  blocco): **da provare nel browser dall'utente** nell'anteprima Vercel: archiviare e
+  ripristinare un corso concluso, creare/rinominare una categoria, modificare una persona,
+  creare un'azienda con P.IVA e unirne due, invitare/assegnare piano/emettere attestati in
+  blocco, importare un CSV con la colonna Partita IVA.
 
 ## Fase 5 — test finale e attestato (2026-10-20, branch `claude/affectionate-hawking-03ev7i`, **su `main` dalla sera del 2026-10-20** con autorizzazione esplicita dell'utente "riporta su main"; Task 1–6 fatti, gate M5a chiuso, gate M5 da chiudere nel browser)
 

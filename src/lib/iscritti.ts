@@ -7,6 +7,7 @@ export type IscrittoInput = {
   email?: string;
   codice_fiscale?: string | null;
   azienda?: string | null;
+  partita_iva?: string | null;  // se presente, l'azienda si riconosce per P.IVA prima che per nome
   piano_id?: string | null;
   data_nascita?: string | null;   // YYYY-MM-DD (per l'attestato)
   luogo_nascita?: string | null;
@@ -19,6 +20,12 @@ function dataIso(v: string | null | undefined): string | null {
   const m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/); // formato italiano gg/mm/aaaa
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   return null;
+}
+
+/** Partita IVA normalizzata (solo cifre/lettere maiuscole, senza spazi o prefisso IT); null se vuota. */
+export function normalizzaPartitaIva(v: string | null | undefined): string | null {
+  const s = (v ?? '').replace(/\s/g, '').toUpperCase().replace(/^IT/, '');
+  return s ? s.slice(0, 16) : null;
 }
 
 export type AddIscrittoResult =
@@ -45,6 +52,7 @@ export async function addIscritto(
   const email = (input.email ?? '').trim().toLowerCase();
   const cf = (input.codice_fiscale ?? '')?.trim() || null;
   const azienda = (input.azienda ?? '')?.trim() || null;
+  const partitaIva = normalizzaPartitaIva(input.partita_iva);
   const pianoId = (input.piano_id ?? '')?.trim() || null;
   const dataNascita = dataIso(input.data_nascita);
   const luogoNascita = (input.luogo_nascita ?? '')?.trim().slice(0, 120) || null;
@@ -56,26 +64,42 @@ export async function addIscritto(
     return { status: 'error', error: 'data di nascita non valida (usa gg/mm/aaaa)' };
   }
 
-  // 1) Azienda (opzionale) — find-or-create per ragione sociale nel tenant.
+  // 1) Azienda (opzionale) — find-or-create: prima per partita IVA (unica nel
+  //    tenant), poi per ragione sociale. Una P.IVA nuova su un nome già noto
+  //    completa l'azienda esistente.
   let aziendaId: string | null = null;
-  if (azienda) {
-    const { data: existing } = await supabase
-      .from('azienda')
-      .select('id')
-      .eq('tenant_id', ctx.tenantId)
-      .ilike('ragione_sociale', azienda)
-      .limit(1)
-      .maybeSingle();
-    if (existing) {
-      aziendaId = existing.id as string;
+  if (azienda || partitaIva) {
+    type AzMini = { id: string; partita_iva: string | null };
+    let trovata: AzMini | null = null;
+    if (partitaIva) {
+      const { data } = await supabase.from('azienda').select('id, partita_iva').eq('tenant_id', ctx.tenantId).eq('partita_iva', partitaIva).limit(1).maybeSingle<AzMini>();
+      trovata = data ?? null;
+    }
+    if (!trovata && azienda) {
+      const { data } = await supabase.from('azienda').select('id, partita_iva').eq('tenant_id', ctx.tenantId).ilike('ragione_sociale', azienda).limit(1).maybeSingle<AzMini>();
+      trovata = data ?? null;
+    }
+    if (trovata) {
+      aziendaId = trovata.id;
+      if (partitaIva && !trovata.partita_iva) {
+        await supabase.from('azienda').update({ partita_iva: partitaIva }).eq('id', trovata.id);
+      }
     } else {
       const { data: created, error } = await supabase
         .from('azienda')
-        .insert({ tenant_id: ctx.tenantId, ragione_sociale: azienda })
+        .insert({ tenant_id: ctx.tenantId, ragione_sociale: azienda ?? `P.IVA ${partitaIva}`, partita_iva: partitaIva })
         .select('id')
         .single();
       if (error) return { status: 'error', error: `azienda: ${error.message}` };
       aziendaId = created.id as string;
+      await appendEvent({
+        tenantId: ctx.tenantId,
+        eventType: 'azienda.created',
+        actor: { persona_id: ctx.personaId, type: 'persona' },
+        subjectType: 'azienda',
+        subjectId: aziendaId,
+        payload: { origine: 'iscrizione', ha_partita_iva: partitaIva !== null },
+      });
     }
   }
 

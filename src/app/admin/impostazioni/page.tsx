@@ -4,6 +4,7 @@ import type { EnteRow } from '@/lib/db-types';
 import { normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
 import { ModelloEditor } from '@/components/admin/ModelloEditor';
 import { EnteForm } from './EnteForm';
+import { ImpostazioniTabs } from '@/components/admin/SezioneTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,15 +23,17 @@ export default async function EntePage() {
   }
   const datiEnte = { ragione_sociale: ente.ragione_sociale?.trim() || ente.nome, citta: ente.citta, firmatario_nome: ente.firmatario_nome, firmatario_ruolo: ente.firmatario_ruolo, logo_path: ente.logo_path, firma_path: ente.firma_path };
   const salvato = ente.attestato_modello ? normalizzaParziale(ente.attestato_modello) : null;
+  const { count: nCategorie } = await supabase.from('categoria').select('id', { count: 'exact', head: true });
 
   return (
     <>
       <div className="page-head">
         <div className="page-head__lead">
           <h1>Impostazioni</h1>
-          <p>Dati dell&apos;ente di formazione (intestazione, firmatario, logo) e modello predefinito degli attestati. Ogni corso può avere un modello suo nella sua scheda &quot;Attestato&quot;. Le modifiche valgono per gli attestati emessi da qui in poi.</p>
+          <p>Dati dell&apos;ente di formazione (intestazione, firmatario, logo), modello predefinito degli attestati e categorie dei corsi. Ogni corso può avere un modello suo nella sua scheda &quot;Attestato&quot;. Le modifiche valgono per gli attestati emessi da qui in poi.</p>
         </div>
       </div>
+      <ImpostazioniTabs nCategorie={nCategorie ?? 0} />
       <EnteForm ente={ente} />
       <div className="card" style={{ maxWidth: 980, marginTop: 18 }}>
         <div className="card__head"><div><h3>Modello predefinito dell&apos;attestato</h3><div className="sub">Layout, testi, loghi, firme e campi che usano tutti i corsi, salvo quelli con un modello proprio. Intestazione, luogo, logo e firmatario vuoti prendono i dati dell&apos;ente qui sopra.</div></div></div>

@@ -7,9 +7,7 @@ import { Icon } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
 
-const CATEGORIE = ['Sicurezza', 'Privacy', 'Antincendio', 'Primo soccorso', 'Formazione'];
-
-export function NewCorsoForm() {
+export function NewCorsoForm({ categorie }: { categorie: string[] }) {
   const router = useRouter();
   const { toast } = useFeedback();
   const [titolo, setTitolo] = useState('');
@@ -77,10 +75,10 @@ export function NewCorsoForm() {
           <Field id="nc-titolo" label="Titolo" required error={errTitolo}>
             <input id="nc-titolo" className="input" value={titolo} onChange={(e) => { setTitolo(e.target.value); if (errTitolo) setErrTitolo(null); }} disabled={busy} placeholder="es. Sicurezza sul lavoro — Formazione generale" autoFocus aria-invalid={Boolean(errTitolo)} />
           </Field>
-          <Field id="nc-categoria" label="Categoria" hint="Serve per il segnaposto della copertina e per ritrovare il corso nel catalogo.">
+          <Field id="nc-categoria" label="Categoria" hint={<>Serve per il segnaposto della copertina e per ritrovare il corso nel catalogo. L&apos;elenco si gestisce in <Link href="/admin/impostazioni/categorie">Impostazioni → Categorie</Link>.</>}>
             <select id="nc-categoria" className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={busy}>
               <option value="">— nessuna —</option>
-              {CATEGORIE.map((c) => <option key={c} value={c}>{c}</option>)}
+              {categorie.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
           <Field id="nc-descrizione" label="Descrizione" hint="È il testo che il discente legge nella pagina del corso. Resta modificabile anche dopo.">

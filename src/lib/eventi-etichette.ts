@@ -81,6 +81,15 @@ export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[]
   { tipo: 'ente.updated', etichetta: 'Dati dell’ente aggiornati', gruppo: 'catalogo' },
   { tipo: 'tenant.created', etichetta: 'Ente creato', gruppo: 'catalogo' },
   { tipo: 'corso.attestato_modello_updated', etichetta: 'Modello attestato del corso aggiornato', gruppo: 'catalogo' },
+  { tipo: 'corso.archived', etichetta: 'Corso archiviato', gruppo: 'catalogo' },
+  { tipo: 'corso.unarchived', etichetta: 'Corso ripristinato', gruppo: 'catalogo' },
+  { tipo: 'categoria.created', etichetta: 'Categoria creata', gruppo: 'catalogo' },
+  { tipo: 'categoria.updated', etichetta: 'Categoria rinominata', gruppo: 'catalogo' },
+  { tipo: 'categoria.removed', etichetta: 'Categoria eliminata', gruppo: 'catalogo' },
+  { tipo: 'persona.updated', etichetta: 'Anagrafica aggiornata', gruppo: 'edizioni' },
+  { tipo: 'azienda.created', etichetta: 'Azienda creata', gruppo: 'edizioni' },
+  { tipo: 'azienda.updated', etichetta: 'Azienda modificata', gruppo: 'edizioni' },
+  { tipo: 'azienda.unita', etichetta: 'Aziende unite', gruppo: 'edizioni' },
 ];
 
 const BY_TIPO = new Map(EVENTI.map((e) => [e.tipo, e]));
@@ -175,7 +184,17 @@ export function riassuntoEvento(tipo: string, payload: Record<string, unknown> |
     case 'attestato.sostituito':
       return [str('numero_nuovo') ? `sostituito dal n. ${str('numero_nuovo')}` : null, str('motivazione')].filter(Boolean).join(' · ');
     case 'ente.updated':
+    case 'persona.updated':
+    case 'azienda.updated':
       return Array.isArray(p.campi) ? (p.campi as string[]).join(', ') : '';
+    case 'corso.archived':
+    case 'corso.unarchived':
+    case 'categoria.created':
+    case 'categoria.updated':
+    case 'categoria.removed':
+      return str('titolo') ?? str('nome') ?? '';
+    case 'azienda.unita':
+      return num('n_iscrizioni') != null ? `${num('n_iscrizioni')} iscrizioni spostate` : '';
     default:
       return '';
   }

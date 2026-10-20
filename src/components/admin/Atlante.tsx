@@ -29,6 +29,7 @@ export const ICON_PATHS: Record<string, string> = {
   arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   arrowLeft: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  building: '<path d="M3 21h18"/><path d="M5 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16"/><path d="M15 9h3a1 1 0 0 1 1 1v11"/><path d="M8 8h2M8 12h2M8 16h2"/>',
   archive: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v12h14V8"/><path d="M10 12h4"/>',
   snowflake: '<path d="M12 2v20M4.5 6l15 12M19.5 6l-15 12"/><path d="M12 6l-3-2M12 6l3-2M12 18l-3 2M12 18l3 2"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',

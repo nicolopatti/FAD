@@ -1573,3 +1573,28 @@ h2 { font-weight: 700; letter-spacing: -.015em; }
 @media (max-width: 640px) { .corso-intro { grid-template-columns: 1fr; } }
 /* le colonne delle griglie non devono allargarsi al contenuto (tabelle in tbl-wrap) */
 .grid-2-380 > *, .grid-2 > *, .grid-3 > * { min-width: 0; }
+
+/* ── Ondata C: liste sul server, selezione e azioni in blocco ─────────────── */
+.seg a { display: inline-flex; align-items: center; border: 0; background: none; padding: 7px 13px; font-size: 12px; font-weight: 500; color: var(--ink-2); text-decoration: none; white-space: nowrap; border-radius: var(--r-pill); }
+.seg a:hover { color: var(--ink); text-decoration: none; }
+.seg a.is-active { background: var(--teal); color: var(--teal-ink); }
+.seg--mono a { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.search__clear { border: 0; background: none; color: var(--muted); cursor: pointer; display: inline-flex; padding: 2px; border-radius: 50%; }
+.search__clear:hover { color: var(--ink); background: var(--surface-2); }
+.search__clear svg { width: 14px; height: 14px; }
+.tbl .t-check { width: 36px; padding-right: 0; }
+.tbl .t-check input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.tbl tr.is-selected td { background: var(--accent-soft); }
+.tbl--lista td { vertical-align: middle; }
+.lista-corso { display: flex; align-items: center; gap: 12px; min-width: 240px; }
+.lista-corso__meta { font-size: 12px; margin-top: 2px; }
+.cover--thumb { width: 64px; height: 40px; border-radius: 8px; flex: none; }
+.cover--thumb .cover__cat { display: none; }
+.cover--thumb .cover__glyph svg { width: 18px; height: 18px; }
+.bulkbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: -6px 0 14px; padding: 10px 14px; border-radius: var(--r-lg); background: var(--deep); color: #fff; animation: rise var(--dur-2) var(--ease-out); }
+.bulkbar__n { font-size: 13.5px; }
+.bulkbar__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; }
+.bulkbar .btn--ghost { color: #fff; }
+.bulkbar .btn--secondary { background: #fff; color: var(--deep); }
+.bulkbar .btn--danger { background: color-mix(in srgb, var(--err) 85%, #000); color: #fff; }
+@media (max-width: 640px) { .bulkbar { margin-top: 0; } .lista-corso { min-width: 200px; } }

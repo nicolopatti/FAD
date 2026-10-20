@@ -9,13 +9,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const supabase = createSupabaseServerClient();
 
   // Conteggi per le voci di sidebar (head: solo count, niente righe).
-  const [corsi, agenda] = await Promise.all([
-    supabase.from('corso').select('id', { count: 'exact', head: true }),
+  const [corsi, persone, agenda] = await Promise.all([
+    supabase.from('corso').select('id', { count: 'exact', head: true }).is('archiviato_at', null),
+    supabase.from('persona').select('id', { count: 'exact', head: true }),
     supabase.from('sessione').select('id', { count: 'exact', head: true }).is('annullato_at', null).gte('data_ora', new Date().toISOString()),
   ]);
 
   const counts: Record<string, number> = {
     corsi: corsi.count ?? 0,
+    persone: persone.count ?? 0,
     agenda: agenda.count ?? 0,
   };
 

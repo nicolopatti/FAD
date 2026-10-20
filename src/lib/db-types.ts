@@ -205,13 +205,85 @@ export function edizioneStato(e: Pick<EdizioneRow, 'concluso_at' | 'annullato_at
  * edizioni concluse o annullate. "Congelato" (D22) resta il termine tecnico del
  * registro: in interfaccia si parla di corso attivo o concluso.
  */
-export type StatoCorso = 'bozza' | 'attivo' | 'concluso';
-export function corsoStato(edizioni: Pick<EdizioneRow, 'concluso_at' | 'annullato_at'>[]): StatoCorso {
+export type StatoCorso = 'bozza' | 'attivo' | 'concluso' | 'archiviato';
+export const STATI_CORSO: StatoCorso[] = ['bozza', 'attivo', 'concluso', 'archiviato'];
+export function corsoStato(edizioni: Pick<EdizioneRow, 'concluso_at' | 'annullato_at'>[], archiviatoAt?: string | null): StatoCorso {
+  if (archiviatoAt) return 'archiviato';
   if (edizioni.length === 0) return 'bozza';
   return edizioni.some((e) => edizioneStato(e) === 'attiva') ? 'attivo' : 'concluso';
 }
-export const STATO_CORSO_LABEL: Record<StatoCorso, string> = { bozza: 'Bozza', attivo: 'Attivo', concluso: 'Concluso' };
-export const STATO_CORSO_CHIP: Record<StatoCorso, string> = { bozza: 'chip--ocra', attivo: 'chip--ok', concluso: 'chip--muted' };
+export const STATO_CORSO_LABEL: Record<StatoCorso, string> = { bozza: 'Bozza', attivo: 'Attivo', concluso: 'Concluso', archiviato: 'Archiviato' };
+export const STATO_CORSO_CHIP: Record<StatoCorso, string> = { bozza: 'chip--ocra', attivo: 'chip--ok', concluso: 'chip--muted', archiviato: 'chip--muted' };
+
+// --- Ondata C — viste di riepilogo (security_invoker) e anagrafiche ---------
+/** Riga della vista `corso_riepilogo`: il corso con i conteggi, per liste filtrate e paginate sul server. */
+export type CorsoRiepilogo = {
+  id: string;
+  tenant_id: string;
+  titolo: string;
+  descrizione: string | null;
+  categoria: string | null;
+  cover_path: string | null;
+  sblocco_sequenziale: boolean;
+  visione_integrale: boolean;
+  politica_attestato: PoliticaAttestato | null;
+  ore_totali: number | string | null;
+  creato_il: string;
+  archiviato_at: string | null;
+  n_lezioni: number;
+  durata_sec: number;
+  n_edizioni: number;
+  n_edizioni_attive: number;
+  n_iscritti: number;
+  stato: StatoCorso;
+};
+
+/** Riga della vista `edizione_riepilogo`: l'edizione con i conteggi di prontezza. */
+export type EdizioneRiepilogo = EdizioneRow & {
+  stato: 'attiva' | 'conclusa' | 'annullata';
+  n_iscritti: number;
+  n_con_piano: number;
+  n_sessioni: number;
+  n_sessioni_future: number;
+  n_da_riconciliare: number;
+  n_attestati: number;
+  n_incarichi: number;
+};
+
+export type CategoriaRow = { id: string; tenant_id: string; nome: string; ordine: number; creato_il: string };
+
+export type AziendaRow = {
+  id: string;
+  tenant_id: string;
+  ragione_sociale: string;
+  partita_iva: string | null;
+  codice_fiscale: string | null;
+  codice_ateco: string | null;
+  sede_indirizzo: string | null;
+  sede_cap: string | null;
+  sede_comune: string | null;
+  sede_provincia: string | null;
+  creato_il: string;
+};
+export type AziendaRiepilogo = AziendaRow & { n_iscrizioni: number; n_persone: number };
+
+export type PersonaRiepilogo = {
+  id: string;
+  tenant_id: string;
+  nome: string;
+  cognome: string;
+  email: string;
+  codice_fiscale: string | null;
+  data_nascita: string | null;
+  luogo_nascita: string | null;
+  auth_user_id: string | null;
+  creato_il: string;
+  accesso: boolean;
+  n_iscrizioni: number;
+  n_attestati: number;
+  n_incarichi: number;
+  ultima_iscrizione_il: string | null;
+};
 
 // --- Fase 3 — Incarichi (docenti e tutor di un'edizione, D30) ----------------
 

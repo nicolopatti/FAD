@@ -18,16 +18,16 @@ export default async function CorsoPanoramicaPage({ params }: { params: { id: st
 
   const { data: corso } = await supabase
     .from('corso')
-    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, creato_il')
+    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, archiviato_at, creato_il')
     .eq('id', params.id)
-    .maybeSingle<CorsoRow>();
+    .maybeSingle<CorsoRow & { archiviato_at: string | null }>();
   if (!corso) notFound();
 
   const [struttura, edizioni] = await Promise.all([
     supabase.from('struttura_corso').select('obbligatorio, learning_object:learning_object_id ( type, config )').eq('corso_id', corso.id).returns<StrutturaMini[]>().then((r) => unwrap(r, 'le lezioni')),
     supabase.from('edizione').select('id, tenant_id, corso_id, codice, data_inizio, data_fine, fad_apertura, fad_chiusura, concluso_at, annullato_at, creato_il').eq('corso_id', corso.id).order('creato_il', { ascending: false }).returns<EdizioneRow[]>().then((r) => unwrap(r, 'le edizioni')),
   ]);
-  const stato = corsoStato(edizioni);
+  const stato = corsoStato(edizioni, corso.archiviato_at);
   const attive = edizioni.filter((e) => edizioneStato(e) === 'attiva');
   const ids = attive.map((e) => e.id);
 
@@ -74,9 +74,9 @@ export default async function CorsoPanoramicaPage({ params }: { params: { id: st
             {attive.length === 0 ? (
               <div className="empty">
                 <Icon name="calendar" className="empty__icon" />
-                <div className="empty__t">{stato === 'bozza' ? 'Corso in bozza' : 'Nessuna edizione attiva'}</div>
-                <div className="empty__s">{stato === 'bozza' ? 'Completa le lezioni, poi crea la prima edizione per iscrivere le persone.' : 'Le edizioni passate sono concluse o annullate. Crea una nuova edizione per riaprire il corso.'}</div>
-                <div className="empty__action"><Link className="btn" href={`${base}/edizioni?nuova=1`}><Icon name="plus" /> Nuova edizione</Link></div>
+                <div className="empty__t">{stato === 'bozza' ? 'Corso in bozza' : stato === 'archiviato' ? 'Corso archiviato' : 'Nessuna edizione attiva'}</div>
+                <div className="empty__s">{stato === 'bozza' ? 'Completa le lezioni, poi crea la prima edizione per iscrivere le persone.' : stato === 'archiviato' ? 'Per riusarlo, ripristinalo dalla testata o duplicalo.' : 'Le edizioni passate sono concluse o annullate. Crea una nuova edizione per riaprire il corso.'}</div>
+                {stato !== 'archiviato' && <div className="empty__action"><Link className="btn" href={`${base}/edizioni?nuova=1`}><Icon name="plus" /> Nuova edizione</Link></div>}
               </div>
             ) : (
               <div className="tbl-wrap"><table className="tbl tbl--zebra">

@@ -1,20 +1,20 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { CorsoRow } from '@/lib/db-types';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Icon, Cover, coverUrl } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { useCall } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
-import { CATEGORIE } from './shared';
 
 /**
  * Scheda "Impostazioni" del corso: titolo, categoria, descrizione, copertina e
  * regole di fruizione. A corso attivo (ha edizioni) restano modificabili solo
  * descrizione e copertina: il trigger D22 rifiuta il resto.
  */
-export function FormImpostazioni({ corso, frozen, nEdizioni }: { corso: CorsoRow; frozen: boolean; nEdizioni: number }) {
+export function FormImpostazioni({ corso, frozen, nEdizioni, categorie }: { corso: CorsoRow; frozen: boolean; nEdizioni: number; categorie: string[] }) {
   const { call, busy, error, setError, setBusy } = useCall();
   const [salvando, setSalvando] = useState(false);
   const [errTitolo, setErrTitolo] = useState<string | null>(null);
@@ -37,10 +37,10 @@ export function FormImpostazioni({ corso, frozen, nEdizioni }: { corso: CorsoRow
       integrale !== Boolean(corso.visione_integrale);
 
   const catOptions = useMemo(() => {
-    const set = [...CATEGORIE];
+    const set = [...categorie];
     if (categoria && !set.includes(categoria)) set.push(categoria);
     return set;
-  }, [categoria]);
+  }, [categorie, categoria]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -97,7 +97,7 @@ export function FormImpostazioni({ corso, frozen, nEdizioni }: { corso: CorsoRow
               <Field id="corso-titolo" label="Titolo" required={!frozen} error={errTitolo}>
                 <input id="corso-titolo" className="input" value={titolo} onChange={(e) => { setTitolo(e.target.value); if (errTitolo) setErrTitolo(null); }} disabled={busy || frozen} aria-invalid={Boolean(errTitolo)} />
               </Field>
-              <Field id="corso-categoria" label="Categoria">
+              <Field id="corso-categoria" label="Categoria" hint={frozen ? undefined : <>L&apos;elenco si gestisce in <Link href="/admin/impostazioni/categorie">Impostazioni → Categorie</Link>.</>}>
                 <select id="corso-categoria" className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={busy || frozen}>
                   <option value="">— nessuna —</option>
                   {catOptions.map((c) => <option key={c} value={c}>{c}</option>)}

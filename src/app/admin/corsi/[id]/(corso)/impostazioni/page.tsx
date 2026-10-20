@@ -15,7 +15,11 @@ export default async function CorsoImpostazioniPage({ params }: { params: { id: 
     .eq('id', params.id)
     .maybeSingle<CorsoRow>();
   if (!corso) notFound();
-  const { count } = await supabase.from('edizione').select('id', { count: 'exact', head: true }).eq('corso_id', corso.id);
+  const [{ count }, categorieR] = await Promise.all([
+    supabase.from('edizione').select('id', { count: 'exact', head: true }).eq('corso_id', corso.id),
+    supabase.from('categoria').select('nome').order('ordine').order('nome'),
+  ]);
   const n = count ?? 0;
-  return <FormImpostazioni corso={corso} frozen={n > 0} nEdizioni={n} />;
+  const categorie = (categorieR.data ?? []).map((c) => c.nome as string);
+  return <FormImpostazioni corso={corso} frozen={n > 0} nEdizioni={n} categorie={categorie} />;
 }

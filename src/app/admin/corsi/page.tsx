@@ -1,67 +1,59 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
-import { corsoStato } from '@/lib/db-types';
-import { Icon, durataVideoSecondi } from '@/components/admin/Atlante';
+import type { CorsoRiepilogo } from '@/lib/db-types';
+import { Icon } from '@/components/admin/Atlante';
 import { CorsiTabs } from '@/components/admin/SezioneTabs';
-import { CorsiCatalog, type CorsoCard, type StatoF } from './CorsiCatalog';
+import { fuoriIntervallo, hrefPaginaUno, intervallo, parsePagina, PER_PAGINA } from '@/lib/paginazione';
+import { CatalogoLista, type StatoF, type OrdineF } from './CatalogoLista';
 
 export const dynamic = 'force-dynamic';
 
-type StrutturaJoin = { corso_id: string; learning_object: { type: string; config: Record<string, unknown> } | null };
-type EdizioneMini = { id: string; corso_id: string; concluso_at: string | null; annullato_at: string | null };
+type Params = { q?: string; stato?: string; categoria?: string; ordine?: string; pagina?: string };
 
-export default async function CorsiListPage({ searchParams }: { searchParams?: { stato?: string } }) {
+/**
+ * Catalogo dei corsi: lista filtrata, ordinata e paginata SUL SERVER sulla
+ * vista `corso_riepilogo` (conteggi già calcolati). I corsi archiviati
+ * compaiono solo nel filtro "Archiviati".
+ */
+export default async function CorsiListPage({ searchParams }: { searchParams?: Params }) {
   await requireAdmin();
-  const s = searchParams?.stato;
-  const stato: StatoF = s === 'bozza' || s === 'attivo' || s === 'concluso' ? s : 'tutti';
+  const sp = searchParams ?? {};
+  const q = (sp.q ?? '').trim().slice(0, 80);
+  const stato: StatoF = sp.stato === 'bozza' || sp.stato === 'attivo' || sp.stato === 'concluso' || sp.stato === 'archiviato' ? sp.stato : 'tutti';
+  const categoria = (sp.categoria ?? '').trim();
+  const ordine: OrdineF = sp.ordine === 'titolo' || sp.ordine === 'iscritti' ? sp.ordine : 'recenti';
+  const pagina = parsePagina(sp.pagina);
   const supabase = createSupabaseServerClient();
 
-  const [corsiR, strutturaR, edizioniR, iscrizioniR, libreriaR] = await Promise.all([
-    supabase.from('corso').select('id, titolo, descrizione, categoria, cover_path, sblocco_sequenziale, visione_integrale, creato_il').order('creato_il', { ascending: false }),
-    supabase.from('struttura_corso').select('corso_id, learning_object:learning_object_id ( type, config )').returns<StrutturaJoin[]>(),
-    supabase.from('edizione').select('id, corso_id, concluso_at, annullato_at').returns<EdizioneMini[]>(),
-    supabase.from('iscrizione').select('edizione_id'),
+  let query = supabase.from('corso_riepilogo').select('*', { count: 'exact' });
+  if (stato === 'tutti') query = query.is('archiviato_at', null);
+  else query = query.eq('stato', stato);
+  if (q) {
+    const like = `%${q.replace(/[%_,]/g, ' ')}%`;
+    query = query.or(`titolo.ilike.${like},descrizione.ilike.${like}`);
+  }
+  if (categoria) query = query.eq('categoria', categoria);
+  if (ordine === 'titolo') query = query.order('titolo', { ascending: true });
+  else if (ordine === 'iscritti') query = query.order('n_iscritti', { ascending: false }).order('creato_il', { ascending: false });
+  else query = query.order('creato_il', { ascending: false });
+  const [da, a] = intervallo(pagina);
+
+  const conta = (s: string) => supabase.from('corso_riepilogo').select('id', { count: 'exact', head: true }).eq('stato', s);
+  const [righeR, attivi, bozze, conclusi, archiviati, categorieR, libreriaR] = await Promise.all([
+    query.range(da, a).returns<CorsoRiepilogo[]>(),
+    conta('attivo'), conta('bozza'), conta('concluso'), conta('archiviato'),
+    supabase.from('categoria').select('nome').order('ordine').order('nome'),
     supabase.from('learning_object').select('id', { count: 'exact', head: true }).is('archiviato_at', null),
   ]);
-
-  const struttura = unwrap(strutturaR, 'le lezioni dei corsi');
-  const edizioni = unwrap(edizioniR, 'le edizioni');
-  const iscrizioni = unwrap(iscrizioniR, 'le iscrizioni');
-
-  const byCorsoLo = new Map<string, { type: string; config: Record<string, unknown> }[]>();
-  for (const r of struttura) {
-    if (!r.learning_object) continue;
-    const arr = byCorsoLo.get(r.corso_id) ?? [];
-    arr.push(r.learning_object);
-    byCorsoLo.set(r.corso_id, arr);
-  }
-  const ediByCorso = new Map<string, EdizioneMini[]>();
-  for (const e of edizioni) { const arr = ediByCorso.get(e.corso_id) ?? []; arr.push(e); ediByCorso.set(e.corso_id, arr); }
-  const iscrPerEd = new Map<string, number>();
-  for (const i of iscrizioni) iscrPerEd.set(i.edizione_id as string, (iscrPerEd.get(i.edizione_id as string) ?? 0) + 1);
-
-  const cards: CorsoCard[] = unwrap(corsiR, 'i corsi').map((c) => {
-    const los = byCorsoLo.get(c.id) ?? [];
-    const eds = ediByCorso.get(c.id) ?? [];
-    return {
-      id: c.id,
-      titolo: c.titolo,
-      descrizione: c.descrizione,
-      categoria: c.categoria,
-      cover_path: c.cover_path,
-      sblocco_sequenziale: c.sblocco_sequenziale,
-      visione_integrale: Boolean(c.visione_integrale),
-      creato_il: c.creato_il,
-      n_lezioni: los.length,
-      n_edizioni: eds.length,
-      n_edizioni_attive: eds.filter((e) => !e.concluso_at && !e.annullato_at).length,
-      n_iscritti: eds.reduce((acc, e) => acc + (iscrPerEd.get(e.id) ?? 0), 0),
-      durata_sec: durataVideoSecondi(los),
-      stato: corsoStato(eds),
-    };
-  });
+  if (fuoriIntervallo(righeR.error)) redirect(hrefPaginaUno('/admin/corsi', sp));
+  const righe = unwrap(righeR, 'i corsi');
+  const totale = righeR.count ?? righe.length;
+  const conteggi = { attivo: attivi.count ?? 0, bozza: bozze.count ?? 0, concluso: conclusi.count ?? 0, archiviato: archiviati.count ?? 0 };
+  const categorie = unwrap(categorieR, 'le categorie').map((c) => c.nome as string);
+  const nessunCorso = Object.values(conteggi).every((n) => n === 0);
 
   return (
     <>
@@ -75,7 +67,16 @@ export default async function CorsiListPage({ searchParams }: { searchParams?: {
         </div>
       </div>
       <CorsiTabs nLibreria={libreriaR.count ?? 0} />
-      <CorsiCatalog corsi={cards} statoIniziale={stato} />
+      {nessunCorso ? (
+        <div className="empty">
+          <Icon name="corsi" className="empty__icon" />
+          <div className="empty__t">Nessun corso ancora</div>
+          <div className="empty__s">Crea il primo corso: lezioni, poi la prima edizione con gli iscritti.</div>
+          <div className="empty__action"><Link className="btn" href="/admin/corsi/new"><Icon name="plus" /> Nuovo corso</Link></div>
+        </div>
+      ) : (
+        <CatalogoLista righe={righe} totale={totale} pagina={pagina} perPagina={PER_PAGINA} stato={stato} conteggi={conteggi} categorie={categorie} q={q} />
+      )}
     </>
   );
 }

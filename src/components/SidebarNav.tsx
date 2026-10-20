@@ -46,6 +46,7 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
 
 function isActive(pathname: string, search: string, n: NavItem): boolean {
   if (n.key === 'corsi' && pathname.startsWith('/admin/learning-objects')) return true;
+  if (n.key === 'persone' && pathname.startsWith('/admin/aziende')) return true;
   const [path, query] = n.href.split('?');
   if (query) return pathname === path && search.includes(query);
   if (n.exact) return pathname === path && !search;

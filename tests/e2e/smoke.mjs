@@ -77,8 +77,13 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   const { ctx, page } = await nuovaPagina(browser, vp);
   await accedi(page, 'admin');
   await paginaOk(page, '/admin', `admin@${tag}: dashboard`, 'Edizioni in corso');
-  await paginaOk(page, '/admin/corsi', `admin@${tag}: catalogo corsi`, 'Catalogo');
-  const primo = page.locator('a.course-card').first();
+  await paginaOk(page, '/admin/corsi', `admin@${tag}: catalogo corsi (lista sul server)`, 'Catalogo');
+  check(`admin@${tag}: catalogo con righe e caselle di selezione`, (await page.locator('.tbl--lista tbody tr').count()) > 0 && (await page.locator('.t-check input').count()) > 1);
+  await paginaOk(page, '/admin/corsi?stato=attivo&q=prova', `admin@${tag}: catalogo filtrato dall'URL`, 'Catalogo');
+  check(`admin@${tag}: ricerca "prova" dall'URL`, (await page.locator('.tbl--lista tbody tr').count()) >= 1 && (await page.locator('.search input').inputValue()) === 'prova');
+  await paginaOk(page, '/admin/corsi?stato=archiviato', `admin@${tag}: catalogo, filtro archiviati`, /archiviat/i);
+  await vai(page, '/admin/corsi');
+  const primo = page.locator('.tbl--lista a.t-link[href^="/admin/corsi/"]').first();
   const hrefCorso = (await primo.count()) ? await primo.getAttribute('href') : null;
   if (hrefCorso) {
     await paginaOk(page, hrefCorso, `admin@${tag}: corso, panoramica`, 'In sintesi');
@@ -90,6 +95,10 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     const hrefEd = (await ed.count()) ? await ed.getAttribute('href') : null;
     if (hrefEd) {
       await paginaOk(page, hrefEd, `admin@${tag}: edizione, iscritti`, 'Iscritti');
+      if ((await page.locator('.t-check input').count()) > 1) {
+        await page.locator('tbody .t-check input').first().check();
+        check(`admin@${tag}: azioni in blocco sugli iscritti`, (await page.locator('.bulkbar').count()) === 1 && /Rimuovi/.test(await page.locator('.bulkbar').innerText()));
+      }
       await paginaOk(page, `${hrefEd}/sessioni`, `admin@${tag}: edizione, sessioni`, 'Sessioni');
       await paginaOk(page, `${hrefEd}/docenti`, `admin@${tag}: edizione, docenti`, 'Docenti e tutor');
       await paginaOk(page, `${hrefEd}/fondo`, `admin@${tag}: edizione, fondo`, 'Piano finanziato');
@@ -105,6 +114,14 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await paginaOk(page, '/admin/rendicontazione', `admin@${tag}: rendicontazione`, 'Report fondi');
   await paginaOk(page, '/admin/rendicontazione/attestati', `admin@${tag}: attestati`, 'Attestati');
   await paginaOk(page, '/admin/impostazioni', `admin@${tag}: impostazioni`, 'Modello predefinito');
+  await paginaOk(page, '/admin/impostazioni/categorie', `admin@${tag}: categorie dei corsi`, 'Nuova categoria');
+  check(`admin@${tag}: categorie in elenco`, (await page.locator('.tbl tbody tr').count()) >= 1);
+  await paginaOk(page, '/admin/persone', `admin@${tag}: persone`, 'Persone');
+  check(`admin@${tag}: persone con righe e paginatore`, (await page.locator('.tbl--lista tbody tr').count()) > 0 && (await page.locator('.pager').count()) === 1);
+  await paginaOk(page, '/admin/persone?q=rossi', `admin@${tag}: persone, ricerca dall'URL`, 'Persone');
+  const hrefPersona = await page.locator('.tbl--lista a.t-link[href^="/admin/persone/"]').first().getAttribute('href').catch(() => null);
+  if (hrefPersona) await paginaOk(page, hrefPersona, `admin@${tag}: scheda persona`, 'Anagrafica');
+  await paginaOk(page, '/admin/aziende', `admin@${tag}: aziende`, /Unisci|Nuova azienda/);
   // Indirizzi vecchi: reindirizzati, non rotti.
   await vai(page, '/admin/sessioni');
   check(`admin@${tag}: /admin/sessioni reindirizza all'agenda`, page.url().includes('/admin/agenda'), page.url());
@@ -115,6 +132,14 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     // assente, middleware fail-fast). Mai 500, mai 200.
     const cerca = await page.request.get(`${BASE}/api/admin/learning-objects/cerca?q=a`);
     check('admin: ricerca nella libreria sul server', cerca.status() === 200, String(cerca.status()));
+    const persone = await page.request.get(`${BASE}/api/admin/persone/cerca?q=ros`);
+    const pj = await persone.json().catch(() => ({}));
+    check('admin: ricerca persone sul server', persone.status() === 200 && Array.isArray(pj.persone) && pj.persone.length <= 30, String(persone.status()));
+    const aziende = await page.request.get(`${BASE}/api/admin/aziende/cerca?q=`);
+    check('admin: ricerca aziende sul server', aziende.status() === 200, String(aziende.status()));
+    const cat = await page.request.get(`${BASE}/api/admin/categorie`);
+    const cj = await cat.json().catch(() => ({}));
+    check('admin: elenco categorie', cat.status() === 200 && Array.isArray(cj.categorie) && cj.categorie.length >= 1, String(cat.status()));
     const w = await page.request.post(`${BASE}/api/admin/piani`, { data: {} });
     check('admin: scrittura senza dati rifiutata in modo controllato (400 o 503)', [400, 503].includes(w.status()), String(w.status()));
   }

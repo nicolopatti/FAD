@@ -51,14 +51,14 @@ export function EdizioneCampi({ v, errs, onChange, busy, prefix }: { v: Edizione
 }
 
 /** Scheda "Edizioni" del corso: elenco (ogni riga apre la pagina dell'edizione) + nuova edizione. */
-export function EdizioniPanel({ corsoId, edizioni, apriNuova = false }: { corsoId: string; edizioni: EdizioneLista[]; apriNuova?: boolean }) {
+export function EdizioniPanel({ corsoId, edizioni, apriNuova = false, archiviato = false }: { corsoId: string; edizioni: EdizioneLista[]; apriNuova?: boolean; archiviato?: boolean }) {
   const router = useRouter();
   const { confirm } = useFeedback();
   const { call, busy, error } = useCall();
   const [creando, setCreando] = useState(false);
   const [nuova, setNuova] = useState<EdizioneForm>(EDIZIONE_VUOTA);
   const [errs, setErrs] = useState<Errori>({});
-  const [mostraForm, setMostraForm] = useState(apriNuova || edizioni.length === 0);
+  const [mostraForm, setMostraForm] = useState(!archiviato && (apriNuova || edizioni.length === 0));
   const [soloAttive, setSoloAttive] = useState(true);
 
   const nonAttive = edizioni.filter((e) => edizioneStato(e) !== 'attiva').length;
@@ -106,7 +106,7 @@ export function EdizioniPanel({ corsoId, edizioni, apriNuova = false }: { corsoI
                 {soloAttive ? `Mostra anche ${nonAttive} concluse/annullate` : 'Solo attive'}
               </button>
             )}
-            {!mostraForm && (
+            {!mostraForm && !archiviato && (
               <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => setMostraForm(true)}><Icon name="plus" /> Nuova edizione</button>
             )}
           </div>

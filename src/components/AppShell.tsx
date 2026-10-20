@@ -48,9 +48,10 @@ const NAV_BY_ROLE: Record<Role, { section: string; items: NavItem[] }> = {
     items: [
       { key: 'dashboard', label: 'Dashboard', href: '/admin', ico: 'dashboard', exact: true },
       { key: 'corsi', label: 'Corsi', href: '/admin/corsi', ico: 'corsi' },
+      { key: 'persone', label: 'Persone', href: '/admin/persone', ico: 'users' },
       { key: 'agenda', label: 'Agenda', href: '/admin/agenda', ico: 'sessioni' },
       { key: 'rendicontazione', label: 'Rendicontazione', href: '/admin/rendicontazione', ico: 'report' },
-      { key: 'impostazioni', label: 'Impostazioni', href: '/admin/impostazioni', ico: 'users' },
+      { key: 'impostazioni', label: 'Impostazioni', href: '/admin/impostazioni', ico: 'settings' },
     ],
   },
 };
