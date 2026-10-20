@@ -7,6 +7,7 @@ export type IscrittoInput = {
   email?: string;
   codice_fiscale?: string | null;
   azienda?: string | null;
+  piano_id?: string | null;
 };
 
 export type AddIscrittoResult =
@@ -33,6 +34,7 @@ export async function addIscritto(
   const email = (input.email ?? '').trim().toLowerCase();
   const cf = (input.codice_fiscale ?? '')?.trim() || null;
   const azienda = (input.azienda ?? '')?.trim() || null;
+  const pianoId = (input.piano_id ?? '')?.trim() || null;
 
   if (!cognome || !nome || !email) {
     return { status: 'error', error: 'cognome, nome ed email sono obbligatori' };
@@ -106,9 +108,15 @@ export async function addIscritto(
     .maybeSingle();
   if (gia) return { status: 'duplicate' };
 
+  // Piano finanziato (opzionale): deve esistere nel tenant (RLS `piano_read`).
+  if (pianoId) {
+    const { data: piano } = await supabase.from('piano_formativo_finanziato').select('id').eq('id', pianoId).maybeSingle();
+    if (!piano) return { status: 'error', error: 'piano finanziato non trovato' };
+  }
+
   const { data: isc, error: iscErr } = await supabase
     .from('iscrizione')
-    .insert({ tenant_id: ctx.tenantId, persona_id: personaId, edizione_id: edizioneId, azienda_id: aziendaId })
+    .insert({ tenant_id: ctx.tenantId, persona_id: personaId, edizione_id: edizioneId, azienda_id: aziendaId, piano_id: pianoId })
     .select('id')
     .single();
   if (iscErr) return { status: 'error', error: `iscrizione: ${iscErr.message}` };
@@ -119,7 +127,7 @@ export async function addIscritto(
     actor: { persona_id: ctx.personaId, type: 'persona' },
     subjectType: 'iscrizione',
     subjectId: isc.id as string,
-    payload: { edizione_id: edizioneId, persona_id: personaId, azienda_id: aziendaId },
+    payload: { edizione_id: edizioneId, persona_id: personaId, azienda_id: aziendaId, piano_id: pianoId },
   });
 
   return { status: 'created', iscrizione_id: isc.id as string, persona_creata: personaCreata };

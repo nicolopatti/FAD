@@ -21,6 +21,8 @@ import {
   fmtData,
   regolaLabel,
 } from '@/components/admin/Atlante';
+import { Field, Pager } from '@/components/admin/Form';
+import { isEmail, isCodiceFiscale, parseMmSs, dataDopo, type Errori } from '@/lib/validazione';
 
 export type IscrittoRow = {
   iscrizione_id: string;
@@ -29,18 +31,13 @@ export type IscrittoRow = {
   email: string;
   codice_fiscale: string | null;
   azienda: string | null;
+  piano_id: string | null;
+  piano_titolo: string | null;
 };
 
-const CATEGORIE = ['Sicurezza', 'Privacy', 'Antincendio', 'Primo soccorso', 'Formazione'];
+export type PianoMini = { id: string; titolo: string; codice: string | null; fondo: string | null };
 
-function parseMmSs(v: string): number | null {
-  const t = v.trim();
-  if (!t) return null;
-  if (/^\d+$/.test(t)) return Number(t); // già secondi
-  const m = t.match(/^(\d+):([0-5]?\d)$/);
-  if (!m) return null;
-  return Number(m[1]) * 60 + Number(m[2]);
-}
+const CATEGORIE = ['Sicurezza', 'Privacy', 'Antincendio', 'Primo soccorso', 'Formazione'];
 
 export function CorsoEditor({
   corso,
@@ -48,17 +45,38 @@ export function CorsoEditor({
   edizioni,
   availableLo,
   iscrittiByEdizione,
+  piani,
 }: {
   corso: CorsoRow;
   struttura: StrutturaCorsoConLO[];
   edizioni: EdizioneRow[];
   availableLo: LearningObjectRow[];
   iscrittiByEdizione: Record<string, IscrittoRow[]>;
+  piani: PianoMini[];
 }) {
   const router = useRouter();
-  const { toast } = useFeedback();
+  const { toast, confirm } = useFeedback();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [duplicando, setDuplicando] = useState(false);
+
+  // "Duplica corso": nuovo corso in bozza con stessi dati e struttura, senza
+  // edizioni né iscritti. Utile per ripartire da un corso congelato.
+  async function duplica() {
+    const ok = await confirm({
+      titolo: 'Duplicare questo corso?',
+      messaggio: <>Viene creato un nuovo corso <strong>in bozza</strong> con gli stessi dati e la stessa sequenza di lezioni (che restano condivise nella libreria). Edizioni e iscritti non vengono copiati.</>,
+      conferma: 'Duplica',
+    });
+    if (!ok) return;
+    try {
+      const res = (await call('POST', `/api/admin/corsi/${corso.id}/duplica`, undefined, { busy: setDuplicando })) as { corso: { id: string } };
+      toast('Corso duplicato: sei nella copia, in bozza.');
+      router.push(`/admin/corsi/${res.corso.id}`);
+    } catch {
+      /* errore già mostrato */
+    }
+  }
 
   // D22 — il Corso è congelato appena ha almeno un'Edizione.
   const frozen = edizioni.length > 0;
@@ -106,7 +124,10 @@ export function CorsoEditor({
           </div>
         </div>
         <div className="page-head__actions">
-          <Link className="btn btn--secondary" href="/admin/corsi"><Icon name="arrowLeft" /> Tutti i corsi</Link>
+          <Link className="btn btn--ghost" href="/admin/corsi"><Icon name="arrowLeft" /> Tutti i corsi</Link>
+          <button type="button" className="btn btn--secondary" disabled={busy} onClick={duplica} title="Crea una copia in bozza di questo corso">
+            <Icon name="copy" /> {duplicando ? 'Duplico…' : 'Duplica corso'}
+          </button>
         </div>
       </div>
 
@@ -147,7 +168,7 @@ export function CorsoEditor({
 
       <SezioneEdizioni corsoId={corso.id} edizioni={edizioni} busy={busy} call={call} onError={setError} onBusy={setBusy} />
 
-      <SezioneIscritti edizioni={edizioni} iscrittiByEdizione={iscrittiByEdizione} busy={busy} call={call} onError={setError} onBusy={setBusy} />
+      <SezioneIscritti edizioni={edizioni} iscrittiByEdizione={iscrittiByEdizione} piani={piani} busy={busy} call={call} onBusy={setBusy} />
     </>
   );
 }
@@ -189,6 +210,7 @@ function SezioneDati({
   onBusy: BusyFn;
 }) {
   const [salvando, setSalvando] = useState(false);
+  const [errTitolo, setErrTitolo] = useState<string | null>(null);
   const router = useRouter();
   const [titolo, setTitolo] = useState(corso.titolo);
   const [categoria, setCategoria] = useState(corso.categoria ?? '');
@@ -219,6 +241,8 @@ function SezioneDati({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!dirty) return;
+    if (!frozen && !titolo.trim()) { setErrTitolo('Il titolo è obbligatorio.'); return; }
+    setErrTitolo(null);
     const body = frozen
       ? { descrizione: descrizione.trim() || null }
       : {
@@ -272,22 +296,18 @@ function SezioneDati({
       <div className="card__body">
         <div className="grid-2-380">
           <div>
-            <div className="field">
-              <label>Titolo</label>
-              <input className="input" value={titolo} onChange={(e) => setTitolo(e.target.value)} disabled={busy || frozen} />
-            </div>
-            <div className="field">
-              <label>Categoria</label>
-              <select className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={busy || frozen}>
+            <Field id="corso-titolo" label="Titolo" required={!frozen} error={errTitolo}>
+              <input id="corso-titolo" className="input" value={titolo} onChange={(e) => { setTitolo(e.target.value); if (errTitolo) setErrTitolo(null); }} disabled={busy || frozen} aria-invalid={Boolean(errTitolo)} />
+            </Field>
+            <Field id="corso-categoria" label="Categoria">
+              <select id="corso-categoria" className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={busy || frozen}>
                 <option value="">— nessuna —</option>
                 {catOptions.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-            </div>
-            <div className="field">
-              <label>Descrizione</label>
-              <textarea className="textarea" rows={3} value={descrizione} onChange={(e) => setDescrizione(e.target.value)} disabled={busy} />
-              <div className="field__hint">È il testo che il discente legge nella pagina del corso. Si può aggiornare anche a corso congelato.</div>
-            </div>
+            </Field>
+            <Field id="corso-descrizione" label="Descrizione" hint="È il testo che il discente legge nella pagina del corso. Si può aggiornare anche a corso congelato.">
+              <textarea id="corso-descrizione" className="textarea" rows={3} value={descrizione} onChange={(e) => setDescrizione(e.target.value)} disabled={busy} />
+            </Field>
             <div className="row between" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: '12px 14px', background: 'var(--bg)' }}>
               <div>
                 <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: 13 }}>Sblocco sequenziale</div>
@@ -400,13 +420,25 @@ function SezioneStruttura({
 
   function onDrop(targetId: string) {
     if (!drag || drag === targetId) { setDrag(null); setTarget(null); return; }
-    const cur = [...order];
+    const cur = list.map((s) => s.id);
     const from = cur.indexOf(drag);
     const to = cur.indexOf(targetId);
     cur.splice(from, 1);
     cur.splice(to, 0, drag);
     setDrag(null);
     setTarget(null);
+    commitOrder(cur);
+  }
+
+  // Riordino senza mouse: pulsanti su/giù e frecce da tastiera sulla maniglia.
+  function sposta(id: string, dir: -1 | 1) {
+    if (frozen || busy) return;
+    const cur = list.map((s) => s.id);
+    const i = cur.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= cur.length) return;
+    cur.splice(i, 1);
+    cur.splice(j, 0, id);
     commitOrder(cur);
   }
 
@@ -429,7 +461,7 @@ function SezioneStruttura({
       <SectionHead
         n={2}
         title="Struttura del corso"
-        sub={frozen ? 'Sequenza in sola lettura (corso congelato).' : 'Trascina le righe per riordinare la sequenza degli oggetti didattici.'}
+        sub={frozen ? 'Sequenza in sola lettura (corso congelato).' : 'Riordina trascinando le righe, con i pulsanti su/giù o con le frecce da tastiera sulla maniglia.'}
       />
       <div className="card__body">
         {list.length === 0 ? (
@@ -453,7 +485,19 @@ function SezioneStruttura({
                 onDragOver={(e) => { if (!frozen && drag) { e.preventDefault(); setTarget(s.id); } }}
                 onDrop={() => onDrop(s.id)}
               >
-                <span className="lo-grip"><Icon name="grip" /></span>
+                <button
+                  type="button"
+                  className="lo-grip"
+                  aria-label={`Sposta "${lo?.titolo ?? 'lezione'}": frecce su e giù`}
+                  title="Trascina, oppure usa le frecce ↑ ↓ da tastiera"
+                  disabled={frozen || busy}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowUp') { e.preventDefault(); sposta(s.id, -1); }
+                    else if (e.key === 'ArrowDown') { e.preventDefault(); sposta(s.id, 1); }
+                  }}
+                >
+                  <Icon name="grip" />
+                </button>
                 <span className="lo-idx">{String(i + 1).padStart(2, '0')}</span>
                 <div className="row" style={{ minWidth: 0 }}>
                   <span className={`type-ico type-ico--${tipo}`}><Icon name={tipo === 'video' ? 'video' : 'documento'} /></span>
@@ -473,9 +517,15 @@ function SezioneStruttura({
                     <span className="switch__label">{s.obbligatorio ? 'Obbligatorio' : 'Facoltativo'}</span>
                   </label>
                   {!frozen && (
-                    <button type="button" className="icon-btn" title="Rimuovi" disabled={busy} onClick={() => remove(s)}>
-                      <Icon name="trash" />
-                    </button>
+                    <>
+                      <span className="order-btns">
+                        <button type="button" className="icon-btn" aria-label="Sposta su" title="Sposta su" disabled={busy || i === 0} onClick={() => sposta(s.id, -1)}><Icon name="chevronUp" /></button>
+                        <button type="button" className="icon-btn" aria-label="Sposta giù" title="Sposta giù" disabled={busy || i === list.length - 1} onClick={() => sposta(s.id, 1)}><Icon name="chevronDown" /></button>
+                      </span>
+                      <button type="button" className="icon-btn" title="Togli dal corso" aria-label="Togli dal corso" disabled={busy} onClick={() => remove(s)}>
+                        <Icon name="trash" />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -570,6 +620,7 @@ function AggiungiManuale({
   const [vimeo, setVimeo] = useState('');
   const [durata, setDurata] = useState('');
   const [pdf, setPdf] = useState<File | null>(null);
+  const [errs, setErrs] = useState<Errori>({});
   const [q, setQ] = useState('');
   const pdfRef = useRef<HTMLInputElement>(null);
 
@@ -578,27 +629,42 @@ function AggiungiManuale({
     return availableLo.filter((lo) => !n || lo.titolo.toLowerCase().includes(n));
   }, [availableLo, q]);
 
+  function valida(): Errori {
+    const e: Errori = {};
+    if (!titolo.trim()) e.titolo = 'Indica il titolo della lezione.';
+    if (newType === 'video') {
+      if (!vimeo.trim()) e.vimeo = 'Incolla l\'ID numerico o il link del video Vimeo.';
+      const sec = parseMmSs(durata);
+      if (!durata.trim()) e.durata = 'Indica la durata, es. 12:40.';
+      else if (sec == null || sec <= 0) e.durata = 'Formato non valido: usa mm:ss (es. 12:40) o i secondi.';
+    } else if (!pdf) {
+      e.pdf = 'Seleziona il file PDF da caricare.';
+    } else if (pdf.type !== 'application/pdf') {
+      e.pdf = 'Il file deve essere un PDF.';
+    }
+    return e;
+  }
+
   async function createAndAdd(e: React.FormEvent) {
     e.preventDefault();
     onError(null);
-    if (!titolo.trim()) { onError('Titolo del contenuto mancante.'); return; }
+    const ve = valida();
+    setErrs(ve);
+    if (Object.keys(ve).length) return;
     try {
       let config: Record<string, unknown>;
       if (newType === 'video') {
-        const sec = parseMmSs(durata);
-        if (!vimeo.trim()) { onError('ID Vimeo mancante.'); return; }
-        if (sec == null || sec <= 0) { onError('Durata non valida (usa mm:ss).'); return; }
-        config = { vimeo_id: vimeo.trim(), durata_secondi: sec };
+        config = { vimeo_id: vimeo.trim(), durata_secondi: parseMmSs(durata) };
       } else {
-        if (!pdf) { onError('Seleziona un file PDF.'); return; }
+        const file = pdf as File; // validato sopra
         onBusy(true);
         const supabase = createSupabaseBrowserClient();
         const loId = crypto.randomUUID();
         const key = `${corso.tenant_id}/${loId}.pdf`;
-        const { error: upErr } = await supabase.storage.from('documenti').upload(key, pdf, { upsert: true, contentType: 'application/pdf' });
+        const { error: upErr } = await supabase.storage.from('documenti').upload(key, file, { upsert: true, contentType: 'application/pdf' });
         onBusy(false);
-        if (upErr) { onError(upErr.message); return; }
-        config = { storage_key: key, mime: 'application/pdf', size: pdf.size, filename: pdf.name };
+        if (upErr) { setErrs({ pdf: `Caricamento non riuscito: ${upErr.message}` }); return; }
+        config = { storage_key: key, mime: 'application/pdf', size: file.size, filename: file.name };
       }
       const created = (await call('POST', '/api/admin/learning-objects', { type: newType, titolo: titolo.trim(), config })) as { learning_object: { id: string } };
       await call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: created.learning_object.id }, { successo: 'Contenuto creato e aggiunto al corso.', busy: setAggiungendo });
@@ -616,30 +682,28 @@ function AggiungiManuale({
           <button type="button" className={newType === 'video' ? 'is-active' : ''} onClick={() => setNewType('video')}>Video</button>
           <button type="button" className={newType === 'documento' ? 'is-active' : ''} onClick={() => setNewType('documento')}>Documento</button>
         </div>
-        <form onSubmit={createAndAdd}>
-          <div className="field">
-            <label>Titolo</label>
-            <input className="input" value={titolo} onChange={(e) => setTitolo(e.target.value)} disabled={busy} placeholder="es. Concetti di rischio" />
-          </div>
+        <form onSubmit={createAndAdd} noValidate>
+          <Field id="nuovo-titolo" label="Titolo" required error={errs.titolo}>
+            <input id="nuovo-titolo" className="input" value={titolo} onChange={(e) => { setTitolo(e.target.value); if (errs.titolo) setErrs({ ...errs, titolo: '' }); }} disabled={busy} placeholder="es. Concetti di rischio" aria-invalid={Boolean(errs.titolo)} />
+          </Field>
           {newType === 'video' ? (
             <div className="grid-2">
-              <div className="field">
-                <label>ID o link Vimeo</label>
-                <input className="input" value={vimeo} onChange={(e) => setVimeo(e.target.value)} disabled={busy} placeholder="es. 824601551 oppure https://vimeo.com/824601551/abc123" />
-              </div>
-              <div className="field">
-                <label>Durata (mm:ss)</label>
-                <input className="input" value={durata} onChange={(e) => setDurata(e.target.value)} disabled={busy} placeholder="es. 12:40" />
-              </div>
+              <Field id="nuovo-vimeo" label="ID o link Vimeo" required error={errs.vimeo}>
+                <input id="nuovo-vimeo" className="input" value={vimeo} onChange={(e) => { setVimeo(e.target.value); if (errs.vimeo) setErrs({ ...errs, vimeo: '' }); }} disabled={busy} placeholder="es. 824601551 oppure https://vimeo.com/824601551/abc123" aria-invalid={Boolean(errs.vimeo)} />
+              </Field>
+              <Field id="nuovo-durata" label="Durata" required error={errs.durata} hint="mm:ss, es. 12:40">
+                <input id="nuovo-durata" className="input" value={durata} onChange={(e) => { setDurata(e.target.value); if (errs.durata) setErrs({ ...errs, durata: '' }); }} disabled={busy} placeholder="12:40" inputMode="numeric" aria-invalid={Boolean(errs.durata)} />
+              </Field>
             </div>
           ) : (
-            <div className="field">
-              <label>File PDF</label>
-              <button type="button" className="btn btn--secondary btn--sm" onClick={() => pdfRef.current?.click()} disabled={busy}>
-                <Icon name="upload" /> {pdf ? pdf.name : 'Seleziona PDF'}
-              </button>
-              <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={(e) => setPdf(e.target.files?.[0] ?? null)} />
-            </div>
+            <Field id="nuovo-pdf" label="File PDF" required error={errs.pdf}>
+              <div>
+                <button id="nuovo-pdf" type="button" className="btn btn--secondary btn--sm" onClick={() => pdfRef.current?.click()} disabled={busy}>
+                  <Icon name="upload" /> {pdf ? pdf.name : 'Seleziona PDF'}
+                </button>
+              </div>
+              <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={(e) => { setPdf(e.target.files?.[0] ?? null); if (errs.pdf) setErrs({ ...errs, pdf: '' }); }} />
+            </Field>
           )}
           <button type="submit" className="btn" disabled={busy}>{aggiungendo ? 'Aggiungo…' : 'Crea e aggiungi'}</button>
         </form>
@@ -795,13 +859,47 @@ function AggiungiCsv({
 }
 
 // ── Sezione 4 — Edizioni ────────────────────────────────────────────────
+type EdizioneForm = { codice: string; data_inizio: string; data_fine: string; fad_apertura: string; fad_chiusura: string };
+const EDIZIONE_VUOTA: EdizioneForm = { codice: '', data_inizio: '', data_fine: '', fad_apertura: '', fad_chiusura: '' };
+
+function validaEdizione(v: EdizioneForm, edizioni: EdizioneRow[], skipId?: string): Errori {
+  const e: Errori = {};
+  const codice = v.codice.trim();
+  if (!codice) e.codice = 'Indica un codice, es. ED-2026-01.';
+  else if (edizioni.some((x) => x.id !== skipId && x.codice.toLowerCase() === codice.toLowerCase())) e.codice = 'Esiste già un\'edizione con questo codice.';
+  if (dataDopo(v.data_inizio, v.data_fine)) e.data_fine = 'La fine non può precedere l\'inizio.';
+  if (dataDopo(v.fad_apertura, v.fad_chiusura)) e.fad_chiusura = 'La chiusura non può precedere l\'apertura.';
+  return e;
+}
+
+function EdizioneCampi({ v, errs, onChange, busy, prefix }: { v: EdizioneForm; errs: Errori; onChange: (v: EdizioneForm) => void; busy: boolean; prefix: string }) {
+  const set = (k: keyof EdizioneForm) => (e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...v, [k]: e.target.value });
+  return (
+    <>
+      <Field id={`${prefix}-codice`} label="Codice" required error={errs.codice}>
+        <input id={`${prefix}-codice`} className="input mono" value={v.codice} onChange={set('codice')} disabled={busy} placeholder="es. ED-2026-01" aria-invalid={Boolean(errs.codice)} />
+      </Field>
+      <Field id={`${prefix}-di`} label="Inizio corso">
+        <input id={`${prefix}-di`} className="input" type="date" value={v.data_inizio} onChange={set('data_inizio')} disabled={busy} />
+      </Field>
+      <Field id={`${prefix}-df`} label="Fine corso" error={errs.data_fine}>
+        <input id={`${prefix}-df`} className="input" type="date" value={v.data_fine} onChange={set('data_fine')} disabled={busy} aria-invalid={Boolean(errs.data_fine)} />
+      </Field>
+      <Field id={`${prefix}-fa`} label="Apertura FAD" hint="Da quando le lezioni online sono fruibili.">
+        <input id={`${prefix}-fa`} className="input" type="date" value={v.fad_apertura} onChange={set('fad_apertura')} disabled={busy} />
+      </Field>
+      <Field id={`${prefix}-fc`} label="Chiusura FAD" error={errs.fad_chiusura}>
+        <input id={`${prefix}-fc`} className="input" type="date" value={v.fad_chiusura} onChange={set('fad_chiusura')} disabled={busy} aria-invalid={Boolean(errs.fad_chiusura)} />
+      </Field>
+    </>
+  );
+}
+
 function SezioneEdizioni({
   corsoId,
   edizioni,
   busy,
   call,
-  onError,
-  onBusy,
 }: {
   corsoId: string;
   edizioni: EdizioneRow[];
@@ -812,17 +910,28 @@ function SezioneEdizioni({
 }) {
   const { confirm } = useFeedback();
   const [creando, setCreando] = useState(false);
-  const [codice, setCodice] = useState('');
-  const [di, setDi] = useState('');
-  const [df, setDf] = useState('');
+  const [nuova, setNuova] = useState<EdizioneForm>(EDIZIONE_VUOTA);
+  const [errs, setErrs] = useState<Errori>({});
+  const [mostraForm, setMostraForm] = useState(edizioni.length === 0);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [edit, setEdit] = useState<EdizioneForm>(EDIZIONE_VUOTA);
+  const [editErrs, setEditErrs] = useState<Errori>({});
+  const [salvando, setSalvando] = useState(false);
+  const [soloAttive, setSoloAttive] = useState(true);
+
+  const nonAttive = edizioni.filter((e) => edizioneStato(e) !== 'attiva').length;
+  const visibili = soloAttive && nonAttive > 0 ? edizioni.filter((e) => edizioneStato(e) === 'attiva') : edizioni;
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    const ve = validaEdizione(nuova, edizioni);
+    setErrs(ve);
+    if (Object.keys(ve).length) return;
     // La prima edizione congela il corso (D22): è irreversibile, va detto prima.
     if (edizioni.length === 0) {
       const ok = await confirm({
         titolo: 'Creare la prima edizione e congelare il corso?',
-        messaggio: <>Da questo momento <strong>titolo, descrizione, categoria, impostazioni e struttura</strong> non saranno più modificabili, perché le persone iscritte devono seguire sempre lo stesso percorso. Restano modificabili la copertina e i contenuti delle singole lezioni. Non si può tornare indietro.</>,
+        messaggio: <>Da questo momento <strong>titolo, categoria, impostazioni e struttura</strong> non saranno più modificabili, perché le persone iscritte devono seguire sempre lo stesso percorso. Restano modificabili la descrizione, la copertina e i contenuti delle singole lezioni. Non si può tornare indietro.</>,
         conferma: 'Crea edizione e congela',
       });
       if (!ok) return;
@@ -831,26 +940,84 @@ function SezioneEdizioni({
     // l'edizione creata non compariva e un secondo clic ne creava un doppione.
     try {
       await call('POST', `/api/admin/corsi/${corsoId}/edizioni`, {
-        codice, data_inizio: di || null, data_fine: df || null,
-      }, { successo: `Edizione ${codice} creata.`, busy: setCreando });
-      setCodice(''); setDi(''); setDf('');
+        codice: nuova.codice.trim(),
+        data_inizio: nuova.data_inizio || null, data_fine: nuova.data_fine || null,
+        fad_apertura: nuova.fad_apertura || null, fad_chiusura: nuova.fad_chiusura || null,
+      }, { successo: `Edizione ${nuova.codice.trim()} creata.`, busy: setCreando });
+      setNuova(EDIZIONE_VUOTA);
+      setMostraForm(false);
     } catch {
       // errore già mostrato dal banner
     }
   }
 
+  function apriModifica(e: EdizioneRow) {
+    setEditId(e.id);
+    setEditErrs({});
+    setEdit({ codice: e.codice, data_inizio: e.data_inizio ?? '', data_fine: e.data_fine ?? '', fad_apertura: e.fad_apertura ?? '', fad_chiusura: e.fad_chiusura ?? '' });
+  }
+
+  async function salvaModifica(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editId) return;
+    const ve = validaEdizione(edit, edizioni, editId);
+    setEditErrs(ve);
+    if (Object.keys(ve).length) return;
+    try {
+      await call('PATCH', `/api/admin/edizioni/${editId}`, {
+        codice: edit.codice.trim(),
+        data_inizio: edit.data_inizio || null, data_fine: edit.data_fine || null,
+        fad_apertura: edit.fad_apertura || null, fad_chiusura: edit.fad_chiusura || null,
+      }, { successo: `Edizione ${edit.codice.trim()} aggiornata.`, busy: setSalvando });
+      setEditId(null);
+    } catch {
+      /* mostrato */
+    }
+  }
+
   return (
     <div className="card">
-      <SectionHead n={4} title="Edizioni" sub="La creazione della prima edizione congela il corso e la sua struttura." />
+      <SectionHead
+        n={4}
+        title="Edizioni"
+        sub="Ogni erogazione del corso è un'edizione con il suo codice, le date e la finestra in cui le lezioni online sono fruibili. La prima edizione congela il corso."
+        right={
+          <div className="row">
+            {nonAttive > 0 && (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSoloAttive((v) => !v)}>
+                {soloAttive ? `Mostra anche ${nonAttive} concluse/annullate` : 'Solo attive'}
+              </button>
+            )}
+            {!mostraForm && (
+              <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => setMostraForm(true)}><Icon name="plus" /> Nuova edizione</button>
+            )}
+          </div>
+        }
+      />
       <div className="card__body">
         {edizioni.length === 0 ? (
-          <div className="muted" style={{ marginBottom: 14, fontSize: 13 }}>Nessuna edizione ancora creata.</div>
+          <div className="muted" style={{ marginBottom: 14, fontSize: 13 }}>Nessuna edizione ancora creata: il corso resta in bozza e modificabile.</div>
         ) : (
           <div className="tbl-wrap"><table className="tbl" style={{ marginBottom: 16 }}>
-            <thead><tr><th>Codice</th><th>Stato</th><th>Date operative</th><th>Finestra FAD</th><th></th></tr></thead>
+            <thead><tr><th>Codice</th><th>Stato</th><th>Date del corso</th><th>Finestra FAD</th><th></th></tr></thead>
             <tbody>
-              {edizioni.map((e) => {
+              {visibili.map((e) => {
                 const stato = edizioneStato(e);
+                if (editId === e.id) {
+                  return (
+                    <tr key={e.id} className="is-editing">
+                      <td colSpan={5}>
+                        <form className="edit-form" onSubmit={salvaModifica} noValidate>
+                          <EdizioneCampi v={edit} errs={editErrs} onChange={setEdit} busy={busy} prefix={`ed-${e.id}`} />
+                          <div className="edit-form__actions">
+                            <button type="submit" className="btn btn--sm" disabled={busy}>{salvando ? 'Salvo…' : 'Salva modifiche'}</button>
+                            <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => setEditId(null)}>Annulla</button>
+                          </div>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                }
                 return (
                   <tr key={e.id}>
                     <td className="mono">{e.codice}</td>
@@ -859,10 +1026,11 @@ function SezioneEdizioni({
                         {stato === 'attiva' && <span className="dot" />}{stato}
                       </span>
                     </td>
-                    <td className="muted">{fmtData(e.data_inizio)} → {fmtData(e.data_fine)}</td>
-                    <td className="muted">{fmtData(e.fad_apertura)} → {fmtData(e.fad_chiusura)}</td>
+                    <td className="muted">{e.data_inizio || e.data_fine ? `${fmtData(e.data_inizio)} → ${fmtData(e.data_fine)}` : '—'}</td>
+                    <td className="muted">{e.fad_apertura || e.fad_chiusura ? `${fmtData(e.fad_apertura)} → ${fmtData(e.fad_chiusura)}` : 'sempre aperta'}</td>
                     <td>
-                      <div className="row">
+                      <div className="row" style={{ justifyContent: 'flex-end' }}>
+                        <button type="button" className="btn btn--ghost btn--xs" disabled={busy || stato === 'annullata'} onClick={() => apriModifica(e)}><Icon name="edit" /> Modifica</button>
                         <button type="button" className="btn btn--ghost btn--xs" disabled={busy || stato !== 'attiva'} onClick={async () => { if (await confirm({ titolo: `Concludere l'edizione ${e.codice}?`, messaggio: 'Gli iscritti non potranno più fruire dei contenuti. Lo stato finale di ciascuno resta registrato.', conferma: 'Concludi' })) call('POST', `/api/admin/edizioni/${e.id}/concludi`, undefined, { successo: `Edizione ${e.codice} conclusa.` }); }}>Concludi</button>
                         <button type="button" className="btn btn--danger btn--xs" disabled={busy || stato === 'annullata'} onClick={async () => { if (await confirm({ titolo: `Annullare l'edizione ${e.codice}?`, messaggio: 'L\'edizione resta nel registro come annullata e non sarà più fruibile. L\'operazione non si può annullare.', conferma: 'Annulla edizione', pericolosa: true })) call('POST', `/api/admin/edizioni/${e.id}/annulla`, undefined, { successo: `Edizione ${e.codice} annullata.` }); }}>Annulla edizione</button>
                       </div>
@@ -870,28 +1038,25 @@ function SezioneEdizioni({
                   </tr>
                 );
               })}
+              {visibili.length === 0 && (
+                <tr><td colSpan={5} className="muted">Nessuna edizione attiva.</td></tr>
+              )}
             </tbody>
           </table></div>
         )}
 
-        <form onSubmit={create} style={{ borderTop: '1px dashed var(--line)', paddingTop: 14 }}>
-          <h4 style={{ margin: '0 0 12px' }}>Nuova edizione</h4>
-          <div className="grid-3">
-            <div className="field">
-              <label>Codice</label>
-              <input className="input" value={codice} onChange={(e) => setCodice(e.target.value)} disabled={busy} placeholder="es. ED-2026-01" required />
+        {mostraForm && (
+          <form onSubmit={create} noValidate style={{ borderTop: edizioni.length ? '1px dashed var(--line)' : 0, paddingTop: edizioni.length ? 14 : 0 }}>
+            <h4 style={{ margin: '0 0 12px' }}>Nuova edizione</h4>
+            <div className="grid-3">
+              <EdizioneCampi v={nuova} errs={errs} onChange={(v) => { setNuova(v); if (Object.keys(errs).length) setErrs({}); }} busy={busy} prefix="nuova" />
             </div>
-            <div className="field">
-              <label>Inizio</label>
-              <input className="input" type="date" value={di} onChange={(e) => setDi(e.target.value)} disabled={busy} />
+            <div className="row">
+              <button type="submit" className="btn" disabled={busy}>{creando ? 'Creo…' : edizioni.length === 0 ? 'Crea edizione e congela il corso' : 'Crea edizione'}</button>
+              {edizioni.length > 0 && <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => { setMostraForm(false); setErrs({}); }}>Annulla</button>}
             </div>
-            <div className="field">
-              <label>Fine</label>
-              <input className="input" type="date" value={df} onChange={(e) => setDf(e.target.value)} disabled={busy} />
-            </div>
-          </div>
-          <button type="submit" className="btn" disabled={busy}>{creando ? 'Creo…' : 'Crea edizione'}</button>
-        </form>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -909,28 +1074,58 @@ type ImportIscrittoRow = {
   motivo?: string;
 };
 
+const ISCRITTI_PER_PAGINA = 25;
+
 function SezioneIscritti({
   edizioni,
   iscrittiByEdizione,
+  piani,
   busy,
   call,
-  onError,
   onBusy,
 }: {
   edizioni: EdizioneRow[];
   iscrittiByEdizione: Record<string, IscrittoRow[]>;
+  piani: PianoMini[];
   busy: boolean;
   call: CallFn;
-  onError: ErrFn;
   onBusy: BusyFn;
 }) {
   const { confirm } = useFeedback();
-  const attive = edizioni;
+  // Di default si lavora sulle edizioni attive; le concluse/annullate si mostrano a richiesta.
+  const attiveSolo = edizioni.filter((e) => edizioneStato(e) === 'attiva');
+  const [tutteLeEdizioni, setTutteLeEdizioni] = useState(attiveSolo.length === 0);
+  const attive = tutteLeEdizioni ? edizioni : attiveSolo;
   const [selId, setSelId] = useState<string>(attive[0]?.id ?? '');
   const sel = attive.find((e) => e.id === selId) ?? attive[0];
   const iscritti = sel ? iscrittiByEdizione[sel.id] ?? [] : [];
+  const selAttiva = sel ? edizioneStato(sel) === 'attiva' : false;
 
   const [mode, setMode] = useState<'manuale' | 'csv'>('manuale');
+  const [q, setQ] = useState('');
+  const [pagina, setPagina] = useState(1);
+
+  const filtrati = useMemo(() => {
+    const n = q.trim().toLowerCase();
+    if (!n) return iscritti;
+    return iscritti.filter((i) => `${i.cognome} ${i.nome} ${i.email} ${i.codice_fiscale ?? ''} ${i.azienda ?? ''} ${i.piano_titolo ?? ''}`.toLowerCase().includes(n));
+  }, [iscritti, q]);
+  const pagine = Math.max(1, Math.ceil(filtrati.length / ISCRITTI_PER_PAGINA));
+  const paginaCorrente = Math.min(pagina, pagine);
+  const visibili = filtrati.slice((paginaCorrente - 1) * ISCRITTI_PER_PAGINA, paginaCorrente * ISCRITTI_PER_PAGINA);
+
+  function scegliEdizione(id: string) {
+    setSelId(id);
+    setQ('');
+    setPagina(1);
+  }
+
+  async function assegnaPiano(i: IscrittoRow, pianoId: string) {
+    const piano = piani.find((p) => p.id === pianoId);
+    await call('PATCH', `/api/admin/iscrizioni/${i.iscrizione_id}`, { piano_id: pianoId || null }, {
+      successo: piano ? `${i.cognome} ${i.nome}: piano "${piano.titolo}" assegnato.` : `${i.cognome} ${i.nome}: nessun piano finanziato.`,
+    });
+  }
 
   if (edizioni.length === 0) {
     return (
@@ -956,53 +1151,92 @@ function SezioneIscritti({
         right={sel ? <span className="chip chip--muted">{iscritti.length} su {sel.codice}</span> : null}
       />
       <div className="card__body">
-        {attive.length > 1 && (
-          <div className="row" style={{ marginBottom: 14 }}>
+        {(attive.length > 1 || attiveSolo.length !== edizioni.length) && (
+          <div className="row row--wrap" style={{ marginBottom: 14 }}>
             <span className="filterset__label">Edizione</span>
             <div className="seg seg--mono">
               {attive.map((e) => (
-                <button key={e.id} type="button" className={e.id === selId ? 'is-active' : ''} onClick={() => setSelId(e.id)}>{e.codice}</button>
+                <button key={e.id} type="button" className={e.id === sel?.id ? 'is-active' : ''} onClick={() => scegliEdizione(e.id)}>
+                  {e.codice}{edizioneStato(e) !== 'attiva' ? ` · ${edizioneStato(e)}` : ''}
+                </button>
               ))}
             </div>
+            {attiveSolo.length !== edizioni.length && attiveSolo.length > 0 && (
+              <button type="button" className="btn btn--ghost btn--xs" onClick={() => setTutteLeEdizioni((v) => !v)}>
+                {tutteLeEdizioni ? 'Solo attive' : `Anche ${edizioni.length - attiveSolo.length} concluse/annullate`}
+              </button>
+            )}
           </div>
         )}
 
         {iscritti.length === 0 ? (
           <div className="muted" style={{ marginBottom: 16, fontSize: 13 }}>Nessun iscritto su questa edizione.</div>
         ) : (
-          <div className="tbl-wrap"><table className="tbl tbl--zebra" style={{ marginBottom: 16 }}>
-            <thead><tr><th>Cognome e nome</th><th>Email</th><th>Codice fiscale</th><th>Azienda</th><th></th></tr></thead>
-            <tbody>
-              {iscritti.map((i) => (
-                <tr key={i.iscrizione_id}>
-                  <td className="t-title">{i.cognome} {i.nome}</td>
-                  <td className="muted">{i.email}</td>
-                  <td className="mono">{i.codice_fiscale ?? <span className="chip chip--err">assente</span>}</td>
-                  <td>{i.azienda ?? <span className="muted">—</span>}</td>
-                  <td>
-                    <button type="button" className="icon-btn" title="Rimuovi iscritto" disabled={busy} onClick={async () => { if (await confirm({ titolo: `Rimuovere ${i.cognome} ${i.nome} dall'edizione?`, messaggio: 'La persona resta in anagrafica; viene tolta solo l\'iscrizione a questa edizione.', conferma: 'Rimuovi', pericolosa: true })) call('DELETE', `/api/admin/iscrizioni/${i.iscrizione_id}`, undefined, { successo: `${i.cognome} ${i.nome} rimosso dall'edizione.` }); }}>
-                      <Icon name="trash" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table></div>
+          <>
+            {iscritti.length > 8 && (
+              <div className="toolbar" style={{ marginBottom: 12 }}>
+                <div className="search">
+                  <Icon name="search" />
+                  <input value={q} onChange={(e) => { setQ(e.target.value); setPagina(1); }} placeholder="Cerca per nome, email, codice fiscale, azienda…" aria-label="Cerca tra gli iscritti" />
+                </div>
+              </div>
+            )}
+            <div className="tbl-wrap"><table className="tbl tbl--zebra">
+              <thead><tr><th>Cognome e nome</th><th>Email</th><th>Codice fiscale</th><th>Azienda</th><th>Piano finanziato</th><th></th></tr></thead>
+              <tbody>
+                {visibili.map((i) => (
+                  <tr key={i.iscrizione_id}>
+                    <td className="t-title">{i.cognome} {i.nome}</td>
+                    <td className="muted">{i.email}</td>
+                    <td className="mono">{i.codice_fiscale ?? <span className="chip chip--err">assente</span>}</td>
+                    <td>{i.azienda ?? <span className="muted">—</span>}</td>
+                    <td>
+                      {piani.length === 0 ? (
+                        <span className="muted" title="Crea un piano nella sezione Report fondi">—</span>
+                      ) : (
+                        <select className="select select--sm" value={i.piano_id ?? ''} disabled={busy} aria-label={`Piano finanziato di ${i.cognome} ${i.nome}`} onChange={(e) => assegnaPiano(i, e.target.value)}>
+                          <option value="">— nessuno —</option>
+                          {piani.map((p) => <option key={p.id} value={p.id}>{p.titolo}{p.fondo ? ` (${p.fondo})` : ''}</option>)}
+                        </select>
+                      )}
+                    </td>
+                    <td>
+                      <button type="button" className="icon-btn" title="Rimuovi iscritto" aria-label={`Rimuovi ${i.cognome} ${i.nome}`} disabled={busy} onClick={async () => { if (await confirm({ titolo: `Rimuovere ${i.cognome} ${i.nome} dall'edizione?`, messaggio: 'La persona resta in anagrafica; viene tolta solo l\'iscrizione a questa edizione.', conferma: 'Rimuovi', pericolosa: true })) call('DELETE', `/api/admin/iscrizioni/${i.iscrizione_id}`, undefined, { successo: `${i.cognome} ${i.nome} rimosso dall'edizione.` }); }}>
+                        <Icon name="trash" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {visibili.length === 0 && (
+                  <tr><td colSpan={6} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
+                )}
+              </tbody>
+            </table></div>
+            <Pager page={paginaCorrente} pages={pagine} total={filtrati.length} perPage={ISCRITTI_PER_PAGINA} onChange={setPagina} cosa="iscritti" />
+            <div style={{ marginBottom: 16 }} />
+          </>
         )}
 
-        <div className="between row" style={{ borderTop: '1px dashed var(--line)', paddingTop: 14, marginBottom: 12 }}>
-          <h4 style={{ margin: 0 }}>Aggiungi iscritti{sel ? ` a ${sel.codice}` : ''}</h4>
-          <div className="seg">
-            <button type="button" className={mode === 'manuale' ? 'is-active' : ''} onClick={() => setMode('manuale')}>Manuale</button>
-            <button type="button" className={mode === 'csv' ? 'is-active' : ''} onClick={() => setMode('csv')}>Da Excel/CSV</button>
+        {sel && selAttiva ? (
+          <>
+            <div className="between row" style={{ borderTop: '1px dashed var(--line)', paddingTop: 14, marginBottom: 12 }}>
+              <h4 style={{ margin: 0 }}>Aggiungi iscritti a {sel.codice}</h4>
+              <div className="seg">
+                <button type="button" className={mode === 'manuale' ? 'is-active' : ''} onClick={() => setMode('manuale')}>Manuale</button>
+                <button type="button" className={mode === 'csv' ? 'is-active' : ''} onClick={() => setMode('csv')}>Da Excel/CSV</button>
+              </div>
+            </div>
+            {mode === 'manuale' ? (
+              <IscrittoManuale edizioneId={sel.id} piani={piani} busy={busy} call={call} />
+            ) : (
+              <IscrittiCsv edizioneId={sel.id} esistenti={iscritti} busy={busy} call={call} onBusy={onBusy} />
+            )}
+          </>
+        ) : sel ? (
+          <div className="muted" style={{ fontSize: 13, borderTop: '1px dashed var(--line)', paddingTop: 14 }}>
+            L&apos;edizione {sel.codice} è {edizioneStato(sel)}: non si aggiungono iscritti.
           </div>
-        </div>
-
-        {sel && (mode === 'manuale' ? (
-          <IscrittoManuale edizioneId={sel.id} busy={busy} call={call} onError={onError} />
-        ) : (
-          <IscrittiCsv edizioneId={sel.id} esistenti={iscritti} busy={busy} call={call} onBusy={onBusy} />
-        ))}
+        ) : null}
       </div>
     </div>
   );
@@ -1010,46 +1244,79 @@ function SezioneIscritti({
 
 function IscrittoManuale({
   edizioneId,
+  piani,
   busy,
   call,
-  onError,
 }: {
   edizioneId: string;
+  piani: PianoMini[];
   busy: boolean;
   call: CallFn;
-  onError: ErrFn;
 }) {
   const [cognome, setCognome] = useState('');
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [cf, setCf] = useState('');
   const [azienda, setAzienda] = useState('');
+  const [pianoId, setPianoId] = useState('');
+  const [errs, setErrs] = useState<Errori>({});
+  const [aggiungendo, setAggiungendo] = useState(false);
+
+  function valida(): Errori {
+    const e: Errori = {};
+    if (!cognome.trim()) e.cognome = 'Il cognome è obbligatorio.';
+    if (!nome.trim()) e.nome = 'Il nome è obbligatorio.';
+    if (!email.trim()) e.email = 'L\'email è obbligatoria: serve per l\'accesso.';
+    else if (!isEmail(email)) e.email = 'Controlla l\'indirizzo: non sembra un\'email valida.';
+    if (cf.trim() && !isCodiceFiscale(cf)) e.cf = 'Il codice fiscale deve avere 16 caratteri nel formato previsto.';
+    return e;
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    onError(null);
-    if (!cognome.trim() || !nome.trim() || !email.trim()) { onError('Cognome, nome ed email sono obbligatori.'); return; }
+    const ve = valida();
+    setErrs(ve);
+    if (Object.keys(ve).length) return;
     try {
       await call('POST', `/api/admin/edizioni/${edizioneId}/iscritti`, {
         cognome: cognome.trim(), nome: nome.trim(), email: email.trim(),
-        codice_fiscale: cf.trim() || null, azienda: azienda.trim() || null,
-      }, { successo: `${cognome.trim()} ${nome.trim()} iscritto all'edizione.` });
+        codice_fiscale: cf.trim().toUpperCase() || null, azienda: azienda.trim() || null,
+        piano_id: pianoId || null,
+      }, { successo: `${cognome.trim()} ${nome.trim()} iscritto all'edizione.`, busy: setAggiungendo });
       setCognome(''); setNome(''); setEmail(''); setCf(''); setAzienda('');
     } catch { /* mostrato da call */ }
   }
 
+  const clear = (k: string) => { if (errs[k]) setErrs({ ...errs, [k]: '' }); };
+
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} noValidate>
       <div className="grid-3">
-        <div className="field"><label>Cognome</label><input className="input" value={cognome} onChange={(e) => setCognome(e.target.value)} disabled={busy} placeholder="es. Bianchi" /></div>
-        <div className="field"><label>Nome</label><input className="input" value={nome} onChange={(e) => setNome(e.target.value)} disabled={busy} placeholder="es. Marco" /></div>
-        <div className="field"><label>Email</label><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy} placeholder="nome@azienda.it" /></div>
+        <Field id="isc-cognome" label="Cognome" required error={errs.cognome}>
+          <input id="isc-cognome" className="input" value={cognome} onChange={(e) => { setCognome(e.target.value); clear('cognome'); }} disabled={busy} placeholder="es. Bianchi" autoComplete="off" aria-invalid={Boolean(errs.cognome)} />
+        </Field>
+        <Field id="isc-nome" label="Nome" required error={errs.nome}>
+          <input id="isc-nome" className="input" value={nome} onChange={(e) => { setNome(e.target.value); clear('nome'); }} disabled={busy} placeholder="es. Marco" autoComplete="off" aria-invalid={Boolean(errs.nome)} />
+        </Field>
+        <Field id="isc-email" label="Email" required error={errs.email}>
+          <input id="isc-email" className="input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); clear('email'); }} disabled={busy} placeholder="nome@azienda.it" autoComplete="off" aria-invalid={Boolean(errs.email)} />
+        </Field>
       </div>
-      <div className="grid-2">
-        <div className="field"><label>Codice fiscale</label><input className="input mono" value={cf} onChange={(e) => setCf(e.target.value)} disabled={busy} placeholder="RSSMRC80A01H501X" /></div>
-        <div className="field"><label>Azienda</label><input className="input" value={azienda} onChange={(e) => setAzienda(e.target.value)} disabled={busy} placeholder="Ragione sociale" /></div>
+      <div className="grid-3">
+        <Field id="isc-cf" label="Codice fiscale" error={errs.cf} hint="Richiesto per la rendicontazione dei corsi finanziati.">
+          <input id="isc-cf" className="input mono" value={cf} onChange={(e) => { setCf(e.target.value); clear('cf'); }} disabled={busy} placeholder="RSSMRC80A01H501X" autoComplete="off" aria-invalid={Boolean(errs.cf)} />
+        </Field>
+        <Field id="isc-azienda" label="Azienda">
+          <input id="isc-azienda" className="input" value={azienda} onChange={(e) => setAzienda(e.target.value)} disabled={busy} placeholder="Ragione sociale" autoComplete="off" />
+        </Field>
+        <Field id="isc-piano" label="Piano finanziato" hint={piani.length === 0 ? 'Nessun piano: si crea nella sezione Report fondi.' : undefined}>
+          <select id="isc-piano" className="select" value={pianoId} onChange={(e) => setPianoId(e.target.value)} disabled={busy || piani.length === 0}>
+            <option value="">— nessuno —</option>
+            {piani.map((p) => <option key={p.id} value={p.id}>{p.titolo}{p.fondo ? ` (${p.fondo})` : ''}</option>)}
+          </select>
+        </Field>
       </div>
-      <button type="submit" className="btn" disabled={busy}><Icon name="plus" /> Aggiungi iscritto</button>
+      <button type="submit" className="btn" disabled={busy}><Icon name="plus" /> {aggiungendo ? 'Aggiungo…' : 'Aggiungi iscritto'}</button>
     </form>
   );
 }

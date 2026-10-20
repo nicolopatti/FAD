@@ -19,14 +19,22 @@ export type CorsoCard = {
   congelato: boolean;
 };
 
-type StatoF = 'tutti' | 'bozza' | 'congelati';
-type EdiF = 'tutte' | 'con' | 'senza';
+export type StatoF = 'tutti' | 'bozza' | 'congelati';
+export type EdiF = 'tutte' | 'con' | 'senza';
 type SortF = 'recenti' | 'titolo' | 'oggetti';
 
-export function CorsiCatalog({ corsi }: { corsi: CorsoCard[] }) {
+export function CorsiCatalog({
+  corsi,
+  statoIniziale = 'tutti',
+  edizioniIniziali = 'tutte',
+}: {
+  corsi: CorsoCard[];
+  statoIniziale?: StatoF;
+  edizioniIniziali?: EdiF;
+}) {
   const [q, setQ] = useState('');
-  const [stato, setStato] = useState<StatoF>('tutti');
-  const [edi, setEdi] = useState<EdiF>('tutte');
+  const [stato, setStato] = useState<StatoF>(statoIniziale);
+  const [edi, setEdi] = useState<EdiF>(edizioniIniziali);
   const [sort, setSort] = useState<SortF>('recenti');
 
   const filtered = useMemo(() => {
@@ -78,7 +86,7 @@ export function CorsiCatalog({ corsi }: { corsi: CorsoCard[] }) {
           <div className="toolbar">
             <div className="search">
               <Icon name="search" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca per titolo o descrizione" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca per titolo o descrizione" aria-label="Cerca un corso" />
             </div>
             <div className="toolbar__spacer" />
             <div className="filterset">

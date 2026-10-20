@@ -3,6 +3,47 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 
+type UpdateBody = {
+  piano_id?: string | null;
+};
+
+// Assegnazione (o rimozione) del Piano finanziato a un'iscrizione. Il Piano
+// deve esistere nel tenant (RLS `piano_read`). Evento senza PII: solo UUID.
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  const session = await requireAdmin();
+  const body = (await request.json().catch(() => null)) as UpdateBody | null;
+  if (!body || body.piano_id === undefined) {
+    return NextResponse.json({ ok: false, error: 'piano_id mancante' }, { status: 400 });
+  }
+  const supabase = createSupabaseServerClient();
+
+  const pianoId = typeof body.piano_id === 'string' && body.piano_id ? body.piano_id : null;
+  if (pianoId) {
+    const { data: piano } = await supabase.from('piano_formativo_finanziato').select('id').eq('id', pianoId).maybeSingle();
+    if (!piano) return NextResponse.json({ ok: false, error: 'piano non trovato' }, { status: 404 });
+  }
+
+  const { data, error } = await supabase
+    .from('iscrizione')
+    .update({ piano_id: pianoId })
+    .eq('id', params.id)
+    .select('id, edizione_id, piano_id')
+    .maybeSingle();
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  if (!data) return NextResponse.json({ ok: false, error: 'iscrizione non trovata' }, { status: 404 });
+
+  await appendEvent({
+    tenantId: session.tenantId,
+    eventType: 'iscrizione.updated',
+    actor: { persona_id: session.personaId, type: 'persona' },
+    subjectType: 'iscrizione',
+    subjectId: data.id,
+    payload: { edizione_id: data.edizione_id, piano_id: data.piano_id },
+  });
+
+  return NextResponse.json({ ok: true, iscrizione: data });
+}
+
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   const session = await requireAdmin();
   const supabase = createSupabaseServerClient();

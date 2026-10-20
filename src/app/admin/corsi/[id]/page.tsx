@@ -8,15 +8,17 @@ import type {
   LearningObjectRow,
   StrutturaCorsoConLO,
 } from '@/lib/db-types';
-import { CorsoEditor, type IscrittoRow } from './CorsoEditor';
+import { CorsoEditor, type IscrittoRow, type PianoMini } from './CorsoEditor';
 
 export const dynamic = 'force-dynamic';
 
 type IscrizioneJoin = {
   id: string;
   edizione_id: string;
+  piano_id: string | null;
   persona: { id: string; nome: string; cognome: string; email: string; codice_fiscale: string | null } | null;
   azienda: { ragione_sociale: string } | null;
+  piano: { titolo: string } | null;
 };
 
 export default async function CorsoDetailPage({ params }: { params: { id: string } }) {
@@ -61,20 +63,28 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
     .returns<LearningObjectRow[]>(), 'i contenuti disponibili');
   const availableLo = allLo.filter((lo) => !usedLoIds.has(lo.id));
 
-  // Iscritti per ogni edizione del corso (persona + azienda).
+  // Piani finanziati del tenant (per assegnarli agli iscritti).
+  const piani = unwrap(await supabase
+    .from('piano_formativo_finanziato')
+    .select('id, titolo, codice, fondo')
+    .order('titolo', { ascending: true })
+    .returns<PianoMini[]>(), 'i piani finanziati');
+
+  // Iscritti per ogni edizione del corso (persona + azienda + piano).
   const edizioneIds = edizioni.map((e) => e.id);
   let iscrittiByEdizione: Record<string, IscrittoRow[]> = {};
   if (edizioneIds.length) {
-    const { data: iscrizioni } = await supabase
+    const iscrizioni = unwrap(await supabase
       .from('iscrizione')
       .select(`
-        id, edizione_id,
+        id, edizione_id, piano_id,
         persona:persona_id ( id, nome, cognome, email, codice_fiscale ),
-        azienda:azienda_id ( ragione_sociale )
+        azienda:azienda_id ( ragione_sociale ),
+        piano:piano_id ( titolo )
       `)
       .in('edizione_id', edizioneIds)
-      .returns<IscrizioneJoin[]>();
-    iscrittiByEdizione = (iscrizioni ?? []).reduce<Record<string, IscrittoRow[]>>((acc, r) => {
+      .returns<IscrizioneJoin[]>(), 'gli iscritti');
+    iscrittiByEdizione = iscrizioni.reduce<Record<string, IscrittoRow[]>>((acc, r) => {
       const arr = acc[r.edizione_id] ?? (acc[r.edizione_id] = []);
       arr.push({
         iscrizione_id: r.id,
@@ -83,6 +93,8 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
         email: r.persona?.email ?? '',
         codice_fiscale: r.persona?.codice_fiscale ?? null,
         azienda: r.azienda?.ragione_sociale ?? null,
+        piano_id: r.piano_id,
+        piano_titolo: r.piano?.titolo ?? null,
       });
       return acc;
     }, {});
@@ -98,6 +110,7 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
       edizioni={edizioni}
       availableLo={availableLo}
       iscrittiByEdizione={iscrittiByEdizione}
+      piani={piani}
     />
   );
 }

@@ -130,6 +130,42 @@ attiva e a corso congelato il pulsante diventa "Salva descrizione" (PATCH con la
 `descrizione`; l'Evento `corso.updated` non porta il testo). pgTAP
 `supabase/tests/corso_descrizione_modificabile.sql` (6, verificato sul live in rollback).
 
+**Ondata 3 fatta (admin, "meno attrito", 2026-10-20):**
+- *Backend*: migration `20261020000003_iscrizione_update_admin.sql` (**applicata sul
+  live**, policy UPDATE admin su `iscrizione`: prima mancava e l'assegnazione del
+  piano non toccava righe; scritta senza `drop policy` perché l'MCP si blocca sui
+  DROP, #13). Route nuove: `PATCH /api/admin/iscrizioni/[id]` (`piano_id`, Evento
+  `iscrizione.updated` solo UUID), `POST /api/admin/piani` (titolo/codice/fondo/
+  CUP/avviso/canale, Evento `piano.created`), `POST /api/admin/corsi/[id]/duplica`
+  (nuovo corso in bozza "(copia)" con stessi dati e struttura verso gli stessi
+  contenuti, copertina copiata nello Storage; Eventi `corso.created` con
+  `duplicato_da` + `struttura.imported` con `origine: 'duplicazione'`).
+  `addIscritto` accetta `piano_id` (verifica esistenza nel tenant).
+- *Primitive*: `src/components/admin/Form.tsx` (`Field` con etichetta, asterisco
+  `.req`, errore `.field__error` accanto al campo e `htmlFor`; `Pager`),
+  `src/lib/validazione.ts` (`isEmail`, `isCodiceFiscale`, `parseMmSs`, `dataDopo`,
+  tipo `Errori`). Tutti i form admin usano `noValidate` + errori per campo (prima
+  solo banner in cima). Icone nuove in Atlante: chevron*, copy, edit, euroCircle.
+- *Course Builder*: pulsante **Duplica corso** (conferma → redirect alla copia);
+  struttura riordinabile anche con **pulsanti su/giù e frecce ↑↓** sulla maniglia
+  (ora un `<button>`); edizioni: form "Nuova edizione" a comparsa con **finestra
+  FAD** (apertura/chiusura) e controlli date, **Modifica** inline di codice/date/
+  finestra (PATCH esistente), filtro "solo attive"; iscritti: ricerca (se > 8),
+  paginazione 25, colonna **Piano finanziato** con select (PATCH), selettore
+  edizioni solo attive di default, form manuale con validazione (email, CF 16
+  caratteri) e piano; niente aggiunta iscritti su edizioni concluse/annullate.
+- *Altre pagine*: dashboard con **striscia KPI cliccabile** `.kpi-strip` (→
+  `/admin/corsi`, `/admin/corsi?edizioni=con`, `/admin/sessioni?quando=prossime`)
+  e attività per i nuovi eventi; catalogo corsi legge `?stato=`/`?edizioni=`;
+  `/admin/sessioni` → `SessioniTable` (ricerca, Tutte/Prossime/Passate/Annullate,
+  paginazione 20, solo edizioni attive nel form); `/admin/report-fondo` →
+  `PianiPanel` (elenco piani con n. iscritti + "Nuovo piano", CUP 15 caratteri).
+- Verifiche: typecheck 0, build 29 route, unit 20/20, fase4 15/15, schermate
+  Playwright admin a 1440/390 (`scratchpad/pw/shots3.mjs`, lanciare con
+  `NODE_USE_ENV_PROXY=1 node ./shots3.mjs`): 0 overflow, 0 errori JS. **Da provare
+  nel browser dall'utente**: Duplica corso, modifica edizione, assegnazione piano,
+  nuovo piano, riordino da tastiera.
+
 **Prossime ondate** (vedi artifact revisione, sezione "Piano per ondate"):
 2 discente (login nuovo, fine lezione/corso, nav mobile A, testi senza gergo,
 movimento) → 3 admin → 4 auditor + tema scuro. Per far girare l'app in

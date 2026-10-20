@@ -2,7 +2,7 @@ import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { durataVideoSecondi } from '@/components/admin/Atlante';
-import { CorsiCatalog, type CorsoCard } from './CorsiCatalog';
+import { CorsiCatalog, type CorsoCard, type StatoF, type EdiF } from './CorsiCatalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +11,11 @@ type StrutturaJoin = {
   learning_object: { type: string; config: Record<string, unknown> } | null;
 };
 
-export default async function CorsiListPage() {
+export default async function CorsiListPage({ searchParams }: { searchParams?: { stato?: string; edizioni?: string } }) {
   await requireAdmin();
+  // Filtri iniziali da URL (i KPI della dashboard rimandano qui già filtrati).
+  const stato: StatoF = searchParams?.stato === 'bozza' || searchParams?.stato === 'congelati' ? searchParams.stato : 'tutti';
+  const edizioniF: EdiF = searchParams?.edizioni === 'con' || searchParams?.edizioni === 'senza' ? searchParams.edizioni : 'tutte';
   const supabase = createSupabaseServerClient();
 
   const [corsiR, strutturaR, edizioniR] = await Promise.all([
@@ -59,5 +62,5 @@ export default async function CorsiListPage() {
     };
   });
 
-  return <CorsiCatalog corsi={cards} />;
+  return <CorsiCatalog corsi={cards} statoIniziale={stato} edizioniIniziali={edizioniF} />;
 }

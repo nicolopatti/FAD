@@ -23,9 +23,17 @@ function activityView(ev: EventoMini): { ico: string; node: React.ReactNode } | 
 
   switch (ev.event_type) {
     case 'corso.created':
-      return { ico: 'plus', node: <>Creato il corso {strong(titolo)}</> };
+      return p.duplicato_da
+        ? { ico: 'copy', node: <>Duplicato un corso: {strong(titolo)}</> }
+        : { ico: 'plus', node: <>Creato il corso {strong(titolo)}</> };
     case 'corso.updated':
       return { ico: 'corsi', node: <>Aggiornato il corso {strong(titolo)}</> };
+    case 'edizione.updated':
+      return { ico: 'edit', node: <>Modificata l&apos;edizione <span className="mono">{codice}</span></> };
+    case 'iscrizione.updated':
+      return { ico: 'euro', node: <>{p.piano_id ? 'Assegnato un piano finanziato a un iscritto' : 'Tolto il piano finanziato a un iscritto'}</> };
+    case 'piano.created':
+      return { ico: 'euro', node: <>Nuovo piano finanziato: {strong(titolo)}</> };
     case 'corso.cover_updated':
       return { ico: 'image', node: <>Aggiornata la copertina del corso</> };
     case 'learning_object.created':
@@ -136,18 +144,20 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      <div className="kpi-grid" style={{ marginBottom: 18 }}>
-        <Kpi label="Corsi totali" value={corsi.length} icon="corsi"
-          sub={`${bozze} in bozza · ${congelati} congelati`} />
-        <Kpi label="Edizioni attive" value={edizioniAttive} icon="layers" sub="Aperte alla fruizione" />
-        <Kpi label="Iscritti" value={personeIscritte} icon="users" sub="Persone iscritte sul tenant" />
+      {/* Una striscia di indicatori, ciascuno porta alla vista filtrata. */}
+      <nav className="kpi-strip" aria-label="Indicatori">
+        <Kpi label="Corsi" value={corsi.length} icon="corsi" href="/admin/corsi"
+          sub={`${bozze} in bozza · ${congelati} congelat${congelati === 1 ? 'o' : 'i'}`} />
+        <Kpi label="Edizioni attive" value={edizioniAttive} icon="layers" href="/admin/corsi?edizioni=con" sub="Aperte alla fruizione" />
+        <Kpi label="Iscritti" value={personeIscritte} icon="users" href="/admin/corsi?edizioni=con" sub="Persone con almeno un'iscrizione" />
         <Kpi
           label="Sessioni imminenti"
           value={imminenti.length}
           icon="calendar"
-          sub={imminenti[0]?.data_ora ? `Prossima · ${fmtData(imminenti[0].data_ora)}` : 'Nessuna in programma'}
+          href="/admin/sessioni?quando=prossime"
+          sub={imminenti[0]?.data_ora ? `Prossima il ${fmtData(imminenti[0].data_ora)}` : 'Nessuna in programma'}
         />
-      </div>
+      </nav>
 
       <div className="grid-2-380">
         <div className="card">
@@ -223,20 +233,19 @@ function Kpi({
   value,
   icon,
   sub,
+  href,
 }: {
   label: string;
   value: number;
   icon: string;
   sub?: string;
+  href: '/admin/corsi' | '/admin/corsi?edizioni=con' | '/admin/sessioni?quando=prossime';
 }) {
   return (
-    <div className="kpi">
-      <div className="kpi__top">
-        <span className="kpi__label">{label}</span>
-        <Icon name={icon} className="kpi__icon" />
-      </div>
-      <div className="kpi__value">{value}</div>
-      {sub && <div className="kpi__sub">{sub}</div>}
-    </div>
+    <Link href={href} className="kpi-strip__item">
+      <span className="kpi-strip__label"><Icon name={icon} /> {label}</span>
+      <span className="kpi-strip__value">{value}</span>
+      {sub && <span className="kpi-strip__sub">{sub}</span>}
+    </Link>
   );
 }

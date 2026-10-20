@@ -6,6 +6,7 @@ import { validateReportFondo, contaSeverita } from '@/lib/report-fondo-validazio
 import { formatiDisponibili, getAdapter } from '@/lib/report-fondo-formati';
 import { Icon, fmtDataOra } from '@/components/admin/Atlante';
 import { DepositaPanel, type SnapshotRow } from './DepositaPanel';
+import { PianiPanel, type PianoRow } from './PianiPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,10 +41,19 @@ export default async function ReportFondoPage({
 
   const seen = new Set<string>();
   const combos: ComboRow[] = [];
+  const iscrittiPerPiano = new Map<string, number>();
   for (const c of combosRaw ?? []) {
+    iscrittiPerPiano.set(c.piano_id, (iscrittiPerPiano.get(c.piano_id) ?? 0) + 1);
     const k = `${c.edizione_id}|${c.piano_id}`;
     if (!seen.has(k)) { seen.add(k); combos.push(c); }
   }
+
+  const { data: pianiRaw } = await supabase
+    .from('piano_formativo_finanziato')
+    .select('id, titolo, codice, fondo, cup, avviso, canale')
+    .order('titolo', { ascending: true })
+    .returns<Omit<PianoRow, 'n_iscritti'>[]>();
+  const piani: PianoRow[] = (pianiRaw ?? []).map((p) => ({ ...p, n_iscritti: iscrittiPerPiano.get(p.id) ?? 0 }));
 
   const dataset = edizioneId && pianoId ? await computeReportFondoDataset(supabase, edizioneId, pianoId) : null;
   const warnings = dataset ? validateReportFondo(dataset) : [];
@@ -90,6 +100,8 @@ export default async function ReportFondoPage({
         </div>
       </div>
 
+      <PianiPanel piani={piani} />
+
       <div className="card">
         <div className="card__head">
           <h3>Edizioni finanziate</h3>
@@ -97,7 +109,7 @@ export default async function ReportFondoPage({
         </div>
         <div className="card__body card__body--flush">
           {combos.length === 0 ? (
-            <div className="card__body"><div className="muted">Nessuna iscrizione con piano finanziato.</div></div>
+            <div className="card__body"><div className="muted">Nessun iscritto ha ancora un piano finanziato: assegnalo dal corso, sezione Iscritti.</div></div>
           ) : (
             <div className="tbl-wrap"><table className="tbl tbl--zebra">
               <thead>

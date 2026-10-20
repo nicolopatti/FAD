@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/admin/Atlante';
+import { Field } from '@/components/admin/Form';
+import { useFeedback } from '@/components/ui/Feedback';
 
 const CATEGORIE = ['Sicurezza', 'Privacy', 'Antincendio', 'Primo soccorso', 'Formazione'];
 
 export function NewCorsoForm() {
   const router = useRouter();
+  const { toast } = useFeedback();
   const [titolo, setTitolo] = useState('');
   const [categoria, setCategoria] = useState('');
   const [descrizione, setDescrizione] = useState('');
@@ -16,9 +19,12 @@ export function NewCorsoForm() {
   const [integrale, setIntegrale] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errTitolo, setErrTitolo] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!titolo.trim()) { setErrTitolo('Il titolo è obbligatorio: è quello che vedranno i discenti.'); return; }
+    setErrTitolo(null);
     setBusy(true);
     setError(null);
     try {
@@ -26,8 +32,8 @@ export function NewCorsoForm() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          titolo,
-          descrizione: descrizione || null,
+          titolo: titolo.trim(),
+          descrizione: descrizione.trim() || null,
           categoria: categoria || null,
           sblocco_sequenziale: sblocco,
           visione_integrale: integrale,
@@ -35,11 +41,11 @@ export function NewCorsoForm() {
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      toast('Corso creato: ora componi la struttura.');
       router.push(`/admin/corsi/${json.corso.id}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
       setBusy(false);
     }
   }
@@ -53,41 +59,38 @@ export function NewCorsoForm() {
           <p>Definisci i dati di base. Comporrai la struttura e aprirai le edizioni nel passo successivo.</p>
         </div>
         <div className="page-head__actions">
-          <Link className="btn btn--secondary" href="/admin/corsi"><Icon name="arrowLeft" /> Tutti i corsi</Link>
+          <Link className="btn btn--ghost" href="/admin/corsi"><Icon name="arrowLeft" /> Tutti i corsi</Link>
         </div>
       </div>
 
-      <form className="card" onSubmit={submit} style={{ maxWidth: 640 }}>
+      <form className="card" onSubmit={submit} noValidate style={{ maxWidth: 640 }}>
         <div className="card__body">
           {error && (
             <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>
           )}
-          <div className="field">
-            <label>Titolo</label>
-            <input className="input" value={titolo} onChange={(e) => setTitolo(e.target.value)} disabled={busy} placeholder="es. Sicurezza sul lavoro — Formazione generale" required />
-          </div>
-          <div className="field">
-            <label>Categoria</label>
-            <select className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={busy}>
+          <Field id="nc-titolo" label="Titolo" required error={errTitolo}>
+            <input id="nc-titolo" className="input" value={titolo} onChange={(e) => { setTitolo(e.target.value); if (errTitolo) setErrTitolo(null); }} disabled={busy} placeholder="es. Sicurezza sul lavoro — Formazione generale" autoFocus aria-invalid={Boolean(errTitolo)} />
+          </Field>
+          <Field id="nc-categoria" label="Categoria" hint="Serve per il segnaposto della copertina e per ritrovare il corso nel catalogo.">
+            <select id="nc-categoria" className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={busy}>
               <option value="">— nessuna —</option>
               {CATEGORIE.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-          </div>
-          <div className="field">
-            <label>Descrizione</label>
-            <textarea className="textarea" rows={3} value={descrizione} onChange={(e) => setDescrizione(e.target.value)} disabled={busy} />
-          </div>
-          <div className="row between" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: '12px 14px', background: 'var(--bg)', marginBottom: 16 }}>
+          </Field>
+          <Field id="nc-descrizione" label="Descrizione" hint="È il testo che il discente legge nella pagina del corso. Resta modificabile anche dopo.">
+            <textarea id="nc-descrizione" className="textarea" rows={3} value={descrizione} onChange={(e) => setDescrizione(e.target.value)} disabled={busy} />
+          </Field>
+          <div className="row between" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: '12px 14px', background: 'var(--bg)', marginBottom: 10 }}>
             <div>
               <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: 13 }}>Sblocco sequenziale</div>
-              <div className="muted" style={{ fontSize: 12 }}>Gli oggetti si abilitano uno dopo l&apos;altro, solo a completamento del precedente.</div>
+              <div className="muted" style={{ fontSize: 12 }}>Le lezioni si aprono una dopo l&apos;altra, solo a completamento della precedente.</div>
             </div>
             <label className="switch">
               <input type="checkbox" checked={sblocco} onChange={(e) => setSblocco(e.target.checked)} disabled={busy} />
               <span className="switch__track" />
             </label>
           </div>
-          <div className="row between" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: '12px 14px', background: 'var(--bg)' }}>
+          <div className="row between" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: '12px 14px', background: 'var(--bg)', marginBottom: 16 }}>
             <div>
               <div style={{ fontWeight: 600, color: 'var(--ink)', fontSize: 13 }}>Visione integrale dei video</div>
               <div className="muted" style={{ fontSize: 12 }}>Per i corsi finanziati: un video conta come completato solo se riprodotto davvero (almeno il 95%) e il discente non può saltare avanti. Spento = fruizione libera.</div>
@@ -97,6 +100,7 @@ export function NewCorsoForm() {
               <span className="switch__track" />
             </label>
           </div>
+          <div className="field__hint" style={{ marginBottom: 14 }}>Sblocco e visione integrale si congelano alla prima edizione: scegli adesso con attenzione.</div>
           <button type="submit" className="btn" disabled={busy}>{busy ? 'Creo…' : 'Crea corso'}</button>
         </div>
       </form>
