@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
+import { normalizzaParziale } from '@/lib/attestato-modello';
 
 type UpdateBody = {
   titolo?: string;
@@ -13,6 +14,7 @@ type UpdateBody = {
   ore_totali?: number | string | null;
   riferimento_normativo?: string | null;
   politica_attestato?: string;
+  attestato_modello?: unknown;   // modello parziale del corso; null = usa quello dell'ente
 };
 
 const POLITICHE = new Set(['automatica', 'manuale', 'nessuna']);
@@ -62,6 +64,11 @@ export async function PATCH(
     if (!POLITICHE.has(body.politica_attestato)) return NextResponse.json({ ok: false, error: 'politica attestato non valida' }, { status: 400 });
     updates.politica_attestato = body.politica_attestato;
   }
+  // Modello dell'attestato del corso: editoriale, non congelato (vale per le
+  // emissioni future). null = torna al modello dell'ente.
+  if (body.attestato_modello !== undefined) {
+    updates.attestato_modello = body.attestato_modello === null ? null : normalizzaParziale(body.attestato_modello);
+  }
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ ok: false, error: 'nessun campo da aggiornare' }, { status: 400 });
   }
@@ -78,18 +85,21 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: msg }, { status: 400 });
   }
 
-  // Se l'unico cambiamento è la copertina, è un evento dedicato (avviene anche
-  // a corso congelato: la copertina non è un campo strutturale).
+  // Se l'unico cambiamento è la copertina (o il modello dell'attestato), è un
+  // evento dedicato (avviene anche a corso congelato: non sono campi strutturali).
   const onlyCover = Object.keys(updates).length === 1 && 'cover_path' in updates;
+  const onlyModello = Object.keys(updates).length === 1 && 'attestato_modello' in updates;
   await appendEvent({
     tenantId: session.tenantId,
-    eventType: onlyCover ? 'corso.cover_updated' : 'corso.updated',
+    eventType: onlyCover ? 'corso.cover_updated' : onlyModello ? 'corso.attestato_modello_updated' : 'corso.updated',
     actor: { persona_id: session.personaId, type: 'persona' },
     subjectType: 'corso',
     subjectId: data.id,
     payload: onlyCover
       ? { has_cover: data.cover_path !== null }
-      : { titolo: data.titolo, sblocco_sequenziale: data.sblocco_sequenziale, visione_integrale: data.visione_integrale },
+      : onlyModello
+        ? { personalizzato: updates.attestato_modello !== null }
+        : { titolo: data.titolo, sblocco_sequenziale: data.sblocco_sequenziale, visione_integrale: data.visione_integrale },
   });
 
   return NextResponse.json({ ok: true, corso: data });

@@ -24,6 +24,8 @@ import {
   regolaLabel,
 } from '@/components/admin/Atlante';
 import { Field, Pager } from '@/components/admin/Form';
+import { ModelloEditor } from '@/components/admin/ModelloEditor';
+import type { ModelloAttestato, ModelloParziale } from '@/lib/attestato-modello';
 import { isEmail, isCodiceFiscale, parseMmSs, dataDopo, type Errori } from '@/lib/validazione';
 
 export type IscrittoRow = {
@@ -59,6 +61,8 @@ export function CorsoEditor({
   availableLo,
   iscrittiByEdizione,
   piani,
+  modelloEnte,
+  modelloCorso,
 }: {
   corso: CorsoRow;
   struttura: StrutturaCorsoConLO[];
@@ -66,6 +70,8 @@ export function CorsoEditor({
   availableLo: LearningObjectRow[];
   iscrittiByEdizione: Record<string, IscrittoRow[]>;
   piani: PianoMini[];
+  modelloEnte: ModelloAttestato;
+  modelloCorso: ModelloParziale | null;
 }) {
   const router = useRouter();
   const { toast, confirm } = useFeedback();
@@ -182,6 +188,14 @@ export function CorsoEditor({
       <SezioneEdizioni corsoId={corso.id} edizioni={edizioni} busy={busy} call={call} onError={setError} onBusy={setBusy} />
 
       <SezioneIscritti edizioni={edizioni} iscrittiByEdizione={iscrittiByEdizione} piani={piani} politicaAttestato={corso.politica_attestato ?? 'automatica'} busy={busy} call={call} onBusy={setBusy} />
+      {(corso.politica_attestato ?? 'automatica') !== 'nessuna' && (
+        <div className="card">
+          <SectionHead n={6} title="Attestato" sub="Come appare l'attestato di questo corso: modello grafico, testi, loghi e firme. Si può cambiare anche a corso congelato; vale per gli attestati emessi da quel momento." />
+          <div className="card__body">
+            <ModelloEditor ambito="corso" tenantId={corso.tenant_id} corsoId={corso.id} valore={modelloCorso} ereditato={modelloEnte} />
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1290,7 +1304,8 @@ function SezioneIscritti({
                       {politicaAttestato === 'nessuna' ? <span className="muted">—</span> : i.attestato ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                           <a className="mono" href={`/api/attestati/${i.attestato.id}/pdf`} target="_blank" rel="noreferrer" title="Apri il PDF">n. {i.attestato.numero}</a>
-                          <span className="muted" style={{ fontSize: 11 }}>{fmtData(i.attestato.emesso_at)} · <button type="button" className="link-btn" disabled={busy} onClick={() => emettiAttestato(i)}>riemetti</button></span>
+                          <span className="muted" style={{ fontSize: 11 }}>{fmtData(i.attestato.emesso_at)}</span>
+                          <button type="button" className="btn btn--ghost btn--xs" disabled={busy} onClick={() => emettiAttestato(i)} title="Emette un nuovo attestato con i dati di adesso; il precedente resta come sostituito"><Icon name="edit" /> Riemetti</button>
                         </div>
                       ) : (
                         <button type="button" className="btn btn--ghost btn--xs" disabled={busy} onClick={() => emettiAttestato(i)}>Emetti</button>

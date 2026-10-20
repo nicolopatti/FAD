@@ -71,6 +71,7 @@ export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[]
   { tipo: 'attestato.emesso', etichetta: 'Attestato emesso', gruppo: 'attestati' },
   { tipo: 'attestato.sostituito', etichetta: 'Attestato sostituito', gruppo: 'attestati' },
   { tipo: 'ente.updated', etichetta: 'Dati dell’ente aggiornati', gruppo: 'catalogo' },
+  { tipo: 'corso.attestato_modello_updated', etichetta: 'Modello attestato del corso aggiornato', gruppo: 'catalogo' },
 ];
 
 const BY_TIPO = new Map(EVENTI.map((e) => [e.tipo, e]));

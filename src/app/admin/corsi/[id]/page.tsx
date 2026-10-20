@@ -8,6 +8,7 @@ import type {
   LearningObjectRow,
   StrutturaCorsoConLO,
 } from '@/lib/db-types';
+import { normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
 import { CorsoEditor, type IscrittoRow, type PianoMini } from './CorsoEditor';
 
 export const dynamic = 'force-dynamic';
@@ -27,10 +28,23 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
 
   const { data: corso } = await supabase
     .from('corso')
-    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, creato_il')
+    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, attestato_modello, creato_il')
     .eq('id', params.id)
     .maybeSingle<CorsoRow>();
   if (!corso) notFound();
+
+  // Modello dell'attestato ereditato dall'ente (per l'editor del corso).
+  const { data: ente } = await supabase
+    .from('tenant')
+    .select('nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, attestato_modello')
+    .eq('id', corso.tenant_id)
+    .maybeSingle<{ nome: string; ragione_sociale: string | null; citta: string | null; firmatario_nome: string | null; firmatario_ruolo: string | null; logo_path: string | null; firma_path: string | null; attestato_modello: unknown }>();
+  const modelloEnte = risolviModello(
+    { ragione_sociale: ente?.ragione_sociale?.trim() || ente?.nome || 'Ente di formazione', citta: ente?.citta ?? null, firmatario_nome: ente?.firmatario_nome ?? null, firmatario_ruolo: ente?.firmatario_ruolo ?? null, logo_path: ente?.logo_path ?? null, firma_path: ente?.firma_path ?? null },
+    ente?.attestato_modello ?? null,
+    null,
+  );
+  const modelloCorso = corso.attestato_modello ? normalizzaParziale(corso.attestato_modello) : null;
 
   const struttura = unwrap(await supabase
     .from('struttura_corso')
@@ -120,6 +134,8 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
       availableLo={availableLo}
       iscrittiByEdizione={iscrittiByEdizione}
       piani={piani}
+      modelloEnte={modelloEnte}
+      modelloCorso={modelloCorso}
     />
   );
 }

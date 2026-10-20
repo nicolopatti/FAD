@@ -1,19 +1,27 @@
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { EnteRow } from '@/lib/db-types';
+import { normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
+import { ModelloEditor } from '@/components/admin/ModelloEditor';
 import { EnteForm } from './EnteForm';
 
 export const dynamic = 'force-dynamic';
 
-// Dati dell'ente emittente: intestazione, firmatario, logo e firma degli attestati.
+// Dati dell'ente emittente e modello predefinito degli attestati.
 export default async function EntePage() {
   const session = await requireAdmin();
   const supabase = createSupabaseServerClient();
   const { data: ente } = await supabase
     .from('tenant')
-    .select('id, nome, ragione_sociale, logo_path, firmatario_nome, firmatario_ruolo, firma_path, citta, linkedin_organization_id')
+    .select('id, nome, ragione_sociale, logo_path, firmatario_nome, firmatario_ruolo, firma_path, citta, linkedin_organization_id, attestato_modello')
     .eq('id', session.tenantId)
-    .maybeSingle<EnteRow>();
+    .maybeSingle<EnteRow & { attestato_modello: unknown }>();
+
+  if (!ente) {
+    return <div className="banner banner--err"><div className="banner__body">Dati dell&apos;ente non leggibili.</div></div>;
+  }
+  const datiEnte = { ragione_sociale: ente.ragione_sociale?.trim() || ente.nome, citta: ente.citta, firmatario_nome: ente.firmatario_nome, firmatario_ruolo: ente.firmatario_ruolo, logo_path: ente.logo_path, firma_path: ente.firma_path };
+  const salvato = ente.attestato_modello ? normalizzaParziale(ente.attestato_modello) : null;
 
   return (
     <>
@@ -21,10 +29,16 @@ export default async function EntePage() {
         <div className="page-head__lead">
           <span className="eyebrow">Amministrazione</span>
           <h1>Ente</h1>
-          <p>Intestazione, firmatario e logo che compaiono sugli attestati. Valgono per gli attestati emessi da qui in poi: quelli già emessi restano come sono.</p>
+          <p>Intestazione, firmatario e logo dell&apos;ente, e il modello predefinito degli attestati. Ogni corso può avere un modello suo (sezione &quot;Attestato&quot; del corso). Le modifiche valgono per gli attestati emessi da qui in poi.</p>
         </div>
       </div>
-      {ente ? <EnteForm ente={ente} /> : <div className="banner banner--err"><div className="banner__body">Dati dell&apos;ente non leggibili.</div></div>}
+      <EnteForm ente={ente} />
+      <div className="card" style={{ maxWidth: 980, marginTop: 18 }}>
+        <div className="card__head"><div><h3>Modello predefinito dell&apos;attestato</h3><div className="sub">Layout, testi, loghi, firme e campi che usano tutti i corsi, salvo quelli con un modello proprio. Intestazione, luogo, logo e firmatario vuoti prendono i dati dell&apos;ente qui sopra.</div></div></div>
+        <div className="card__body">
+          <ModelloEditor ambito="ente" tenantId={ente.id} valore={salvato} ereditato={risolviModello(datiEnte, null, null)} />
+        </div>
+      </div>
     </>
   );
 }

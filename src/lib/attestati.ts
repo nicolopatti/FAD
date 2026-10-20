@@ -3,6 +3,7 @@ import { createSupabaseServiceClient } from './supabase/service';
 import { computeProgressoForIscrizione, computeFrequenzaForIscrizione } from './compliance';
 import { deriveIdoneita } from './report-fondo';
 import { bytesToHex } from './audit-filtri';
+import { risolviModello, type ModelloAttestato } from './attestato-modello';
 import type { AttestatoRow, PoliticaAttestato } from './db-types';
 
 /**
@@ -43,6 +44,8 @@ export type AttestatoContenuto = {
   criterio_idoneita: 'frequenza' | 'completamento' | 'misto' | 'nessuno';
   completato_il: string | null;
   registro: { seq: number | null; hash: string | null };
+  /** Modello risolto (layout, testi, loghi, firmatari, campi) al momento dell'emissione. */
+  modello?: ModelloAttestato;
   // aggiunti dalla RPC:
   attestato_id?: string;
   numero?: string;
@@ -60,7 +63,7 @@ type IscrizioneCompleta = {
   persona: { nome: string; cognome: string; data_nascita: string | null; luogo_nascita: string | null } | null;
   edizione: {
     id: string; codice: string; data_inizio: string | null; data_fine: string | null;
-    corso: { id: string; titolo: string; categoria: string | null; ore_totali: number | string | null; riferimento_normativo: string | null; politica_attestato: PoliticaAttestato; soglia_frequenza_percentuale: number | string | null } | null;
+    corso: { id: string; titolo: string; categoria: string | null; ore_totali: number | string | null; riferimento_normativo: string | null; politica_attestato: PoliticaAttestato; soglia_frequenza_percentuale: number | string | null; attestato_modello: unknown } | null;
   } | null;
 };
 
@@ -71,7 +74,7 @@ async function caricaIscrizione(service: SupabaseClient, iscrizioneId: string): 
       id, tenant_id, persona_id, edizione_id,
       persona:persona_id ( nome, cognome, data_nascita, luogo_nascita ),
       edizione:edizione_id ( id, codice, data_inizio, data_fine,
-        corso:corso_id ( id, titolo, categoria, ore_totali, riferimento_normativo, politica_attestato, soglia_frequenza_percentuale ) )
+        corso:corso_id ( id, titolo, categoria, ore_totali, riferimento_normativo, politica_attestato, soglia_frequenza_percentuale, attestato_modello ) )
     `)
     .eq('id', iscrizioneId)
     .returns<IscrizioneCompleta[]>()
@@ -94,10 +97,10 @@ export async function costruisciSnapshot(
   const [prog, freq, enteRes, testaRes] = await Promise.all([
     computeProgressoForIscrizione(service, iscrizioneId),
     computeFrequenzaForIscrizione(service, iscrizioneId),
-    service.from('tenant').select('nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, linkedin_organization_id').eq('id', iscr.tenant_id).maybeSingle(),
+    service.from('tenant').select('nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, linkedin_organization_id, attestato_modello').eq('id', iscr.tenant_id).maybeSingle(),
     service.from('evento').select('seq, hash').eq('tenant_id', iscr.tenant_id).order('seq', { ascending: false }).limit(1).maybeSingle(),
   ]);
-  const ente = (enteRes.data ?? null) as { nome: string; ragione_sociale: string | null; citta: string | null; firmatario_nome: string | null; firmatario_ruolo: string | null; logo_path: string | null; firma_path: string | null; linkedin_organization_id: string | null } | null;
+  const ente = (enteRes.data ?? null) as { nome: string; ragione_sociale: string | null; citta: string | null; firmatario_nome: string | null; firmatario_ruolo: string | null; logo_path: string | null; firma_path: string | null; linkedin_organization_id: string | null; attestato_modello: unknown } | null;
   const testa = (testaRes.data ?? null) as { seq: number; hash: unknown } | null;
 
   const obbligatoriTot = prog?.obbligatori_totale ?? 0;
@@ -108,17 +111,19 @@ export async function costruisciSnapshot(
   const soglie = quizItem ? Number((quizItem.lo_config as { soglia_percentuale?: unknown }).soglia_percentuale) : NaN;
   const completatoIl = prog?.items.filter((i) => i.obbligatorio && i.completato_il).map((i) => i.completato_il!).sort().at(-1) ?? null;
 
+  const datiEnte = {
+    ragione_sociale: ente?.ragione_sociale?.trim() || ente?.nome || 'Ente di formazione',
+    citta: ente?.citta ?? null,
+    firmatario_nome: ente?.firmatario_nome ?? null,
+    firmatario_ruolo: ente?.firmatario_ruolo ?? null,
+    logo_path: ente?.logo_path ?? null,
+    firma_path: ente?.firma_path ?? null,
+    linkedin_organization_id: ente?.linkedin_organization_id ?? null,
+  };
   const contenuto: AttestatoContenuto = {
     versione: SNAPSHOT_VERSIONE,
-    ente: {
-      ragione_sociale: ente?.ragione_sociale?.trim() || ente?.nome || 'Ente di formazione',
-      citta: ente?.citta ?? null,
-      firmatario_nome: ente?.firmatario_nome ?? null,
-      firmatario_ruolo: ente?.firmatario_ruolo ?? null,
-      logo_path: ente?.logo_path ?? null,
-      firma_path: ente?.firma_path ?? null,
-      linkedin_organization_id: ente?.linkedin_organization_id ?? null,
-    },
+    ente: datiEnte,
+    modello: risolviModello(datiEnte, ente?.attestato_modello ?? null, corso.attestato_modello ?? null),
     discente: {
       nome: iscr.persona.nome,
       cognome: iscr.persona.cognome,

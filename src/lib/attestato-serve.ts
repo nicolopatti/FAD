@@ -1,5 +1,5 @@
 import { createSupabaseServiceClient } from './supabase/service';
-import { generaAttestatoPdf } from './attestato-pdf';
+import { generaAttestatoPdf, pathImmagini, type Immagini } from './attestato-pdf';
 import type { AttestatoContenuto } from './attestati';
 import type { AttestatoRow } from './db-types';
 
@@ -9,17 +9,23 @@ function servizio(): Service | null {
   try { return createSupabaseServiceClient(); } catch { return null; }
 }
 
-/** Logo e firma dell'ente dal bucket pubblico `loghi` (se impostati). */
-export async function immaginiEnte(service: Service | null, c: AttestatoContenuto) {
-  const out: { logo?: Uint8Array | null; firma?: Uint8Array | null } = {};
-  if (!service) return out;
-  const prendi = async (path: string | null) => {
-    if (!path) return null;
-    const { data } = await service.storage.from('loghi').download(path);
-    return data ? new Uint8Array(await data.arrayBuffer()) : null;
-  };
-  out.logo = await prendi(c.ente.logo_path).catch(() => null);
-  out.firma = await prendi(c.ente.firma_path).catch(() => null);
+/** Un'immagine dal bucket pubblico `loghi` (URL pubblico: nessuna chiave richiesta). */
+export async function immagineLoghi(path: string): Promise<Uint8Array | null> {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!base) return null;
+  try {
+    const r = await fetch(`${base}/storage/v1/object/public/loghi/${path}`, { cache: 'no-store' });
+    if (!r.ok) return null;
+    return new Uint8Array(await r.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/** Tutte le immagini che il modello dello snapshot richiede (logo, loghi secondari, firme). */
+export async function immaginiPer(c: AttestatoContenuto): Promise<Immagini> {
+  const out: Immagini = {};
+  await Promise.all(Array.from(new Set(pathImmagini(c))).map(async (p) => { out[p] = await immagineLoghi(p); }));
   return out;
 }
 
@@ -38,7 +44,7 @@ export async function rispostaPdf(att: AttestatoRow): Promise<Response> {
     if (data) return new Response(Buffer.from(await data.arrayBuffer()), { headers });
   }
   const c = att.contenuto as unknown as AttestatoContenuto;
-  const bytes = await generaAttestatoPdf(c, await immaginiEnte(service, c));
+  const bytes = await generaAttestatoPdf(c, await immaginiPer(c));
   if (service) {
     await service.storage.from('attestati').upload(att.pdf_path, Buffer.from(bytes), { contentType: 'application/pdf', upsert: true }).catch(() => null);
   }

@@ -159,6 +159,7 @@ export type CorsoRow = {
   ore_totali?: number | string | null;
   riferimento_normativo?: string | null;
   politica_attestato?: PoliticaAttestato;
+  attestato_modello?: unknown;   // modello parziale del corso (lib/attestato-modello.ts), null = ente
   creato_il: string;
 };
 
