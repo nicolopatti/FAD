@@ -9,7 +9,7 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Area admin — ondate A e B (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **NON ancora su `main`**: da provare nel browser, poi merge solo con autorizzazione)
+## Area admin — ondate A, B e C (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` dal 2026-10-20 sera** con il via libera dell'utente "Vai": fast-forward `e855143..4385cf9`, 9 commit; scritture verificate sul deploy, vedi in fondo all'ondata C)
 
 Richiesta dell'utente: "contenuti" come lista piatta non ha senso, i webinar stanno allo
 stesso livello dei corsi; serviva un'analisi obiettiva e proposte per un'area admin usabile
