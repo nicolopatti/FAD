@@ -199,6 +199,39 @@ report fondi tengono "idoneo" (termine tecnico).
   con PDF/badge/LinkedIn, pagina Attestati. Dopo il via libera: **merge su `main`
   solo con autorizzazione esplicita.**
 
+**Debito tecnico chiuso nella stessa sessione (l'utente: "procedi con i piani",
+senza merge):**
+- *Blocco B #2* — `compliance.ts` ha un nucleo puro (`calcolaProgresso`,
+  `calcolaFrequenza`) e le versioni **in blocco** `computeProgressoPerIscrizioni` /
+  `computeFrequenzaPerIscrizioni` (query: iscrizioni, strutture dei corsi, eventi a
+  lotti di 200 per `payload->>iscrizione_id`, sessioni) usate da
+  `/audit/completamento` e da `report-fondo.ts`; le funzioni per singola iscrizione
+  restano (il player le usa) e danno lo stesso risultato (confronto sul live come
+  auditor: 8 iscrizioni, 0 differenze, `scratchpad/confronto.ts`). Non è una funzione
+  SQL: la ricostruzione dei tratti video (`lib/visione.ts`) resta in TS.
+- *Fail-fast* — `src/middleware.ts`: POST/PATCH/PUT/DELETE su `/api/admin/*`,
+  `/api/events/*`, `/api/profilo/*` rispondono **503** se manca
+  `SUPABASE_SERVICE_ROLE_KEY` (prima: modifica al DB fatta, Evento non scritto);
+  `/api/admin/attestati/anteprima` (sola lettura) è esclusa. `/api/auth/*` non è
+  toccata (il login nel container deve funzionare).
+- *Blocco E* — `tests/e2e/lib.mjs` + `tests/e2e/smoke.mjs` (`npm run test:e2e`,
+  Playwright puro senza runner, **sola lettura**, 51 controlli: pubblico, discente
+  1440/390, auditor con export CSV e sigillo della catena, admin 1440/390 con anteprima
+  PDF e 503 controllato); `playwright` devDependency (senza browser:
+  `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, usare `PLAYWRIGHT_CHROMIUM=/opt/pw-browsers/
+  chromium-1194/chrome-linux/chrome` nel container, `E2E_PROXY_SUPABASE=1 E2E_DEV=1
+  NODE_USE_ENV_PROXY=1`). Non è in CI (serve un deploy raggiungibile e un browser):
+  ricetta nel README. Gli script dello scratchpad restano la fonte dei controlli
+  funzionali più specifici (fixture con ID).
+- `tests/unit/attestato.test.ts` (7) → unit **39/39**; CI esegue `test:unit` e
+  `test:fase4` nel job principale.
+- `NEXT_PUBLIC_TENANT_ID` non è più usato da `src/` (Blocco B #8 di fatto chiuso:
+  resta solo nel bootstrap e nei workflow).
+**Restano** del piano: Blocco B #5 (RPC unica eventi video) e #7 (unione policy RLS
+multiple), test di carico; Blocco C (staging, monitoraggio, SMTP/inviti/reset
+password); Blocco D (tracciati ufficiali fondi, Teams); E2E in CI con deploy di
+anteprima e secrets.
+
 ## UX — revisione, mockup e ondata 1 (2026-10-20, branch `claude/affectionate-hawking-03ev7i`)
 
 Richiesta dell'utente: il portale è "grezzo" e "uguale ai portali generati con
