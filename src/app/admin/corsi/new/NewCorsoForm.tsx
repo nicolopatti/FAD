@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Icon } from '@/components/admin/Atlante';
 
 const CATEGORIE = ['Sicurezza', 'Privacy', 'Antincendio', 'Primo soccorso', 'Formazione'];
@@ -52,7 +53,7 @@ export function NewCorsoForm() {
           <p>Definisci i dati di base. Comporrai la struttura e aprirai le edizioni nel passo successivo.</p>
         </div>
         <div className="page-head__actions">
-          <a className="btn btn--secondary" href="/admin/corsi"><Icon name="arrowLeft" /> Tutti i corsi</a>
+          <Link className="btn btn--secondary" href="/admin/corsi"><Icon name="arrowLeft" /> Tutti i corsi</Link>
         </div>
       </div>
 

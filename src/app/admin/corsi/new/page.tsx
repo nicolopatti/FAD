@@ -3,10 +3,6 @@ import { NewCorsoForm } from './NewCorsoForm';
 
 export default async function NewCorsoPage() {
   await requireAdmin();
-  return (
-    <>
-      <h1>Nuovo Corso</h1>
-      <NewCorsoForm />
-    </>
-  );
+  // L'H1 della pagina è nel form (page-head): qui non va duplicato.
+  return <NewCorsoForm />;
 }

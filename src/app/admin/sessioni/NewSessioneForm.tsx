@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { EdizioneConCorso, SessioneModalita, VcsPiattaforma } from '@/lib/db-types';
 import { Icon } from '@/components/admin/Atlante';
 
@@ -61,7 +62,7 @@ export function NewSessioneForm({ edizioni }: { edizioni: EdizioneConCorso[] }) 
             <Icon name="calendar" className="empty__icon" />
             <div className="empty__t">Nessuna edizione disponibile</div>
             <div className="empty__s">Crea prima un corso con un&apos;edizione per poter pianificare una sessione.</div>
-            <div className="empty__action"><a className="btn" href="/admin/corsi">Vai ai corsi</a></div>
+            <div className="empty__action"><Link className="btn" href="/admin/corsi">Vai ai corsi</Link></div>
           </div>
         ) : (
           <>

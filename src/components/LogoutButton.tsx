@@ -9,10 +9,16 @@ export function LogoutButton({ iconOnly = false }: { iconOnly?: boolean }) {
   const [busy, setBusy] = useState(false);
   async function handleClick() {
     setBusy(true);
-    await fetch('/api/auth/logout', { method: 'POST' });
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
-    router.replace('/login');
+    try {
+      // L'evento auth.logout è best-effort: se la rete manca si esce comunque.
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.signOut();
+      router.replace('/login');
+    } catch {
+      setBusy(false);
+      window.alert('Non è stato possibile uscire. Controlla la connessione e riprova.');
+    }
   }
 
   if (iconOnly) {
@@ -27,8 +33,8 @@ export function LogoutButton({ iconOnly = false }: { iconOnly?: boolean }) {
   }
 
   return (
-    <button onClick={handleClick} className="btn secondary" disabled={busy}>
-      {busy ? '…' : 'Esci'}
+    <button onClick={handleClick} className="btn btn--secondary" disabled={busy}>
+      {busy ? 'Esco…' : 'Esci'}
     </button>
   );
 }

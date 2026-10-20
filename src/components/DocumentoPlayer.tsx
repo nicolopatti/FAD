@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Props = {
   iscrizioneId: string;
@@ -15,6 +16,7 @@ export function DocumentoPlayer({
   filename,
   alreadyCompleted,
 }: Props) {
+  const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completedClient, setCompletedClient] = useState(false);
@@ -72,8 +74,13 @@ export function DocumentoPlayer({
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       setCompletedClient(true);
+      // Il server ricalcola il completamento dal log: aggiorna chip, barra e
+      // lista delle lezioni (prima restavano fermi fino a un ricaricamento).
+      router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(
+        `Non siamo riusciti a registrare la lettura (${err instanceof Error ? err.message : String(err)}). Riprova.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -83,7 +90,7 @@ export function DocumentoPlayer({
 
   return (
     <div>
-      {error && <div className="alert">{error}</div>}
+      {error && <div className="alert bad" role="alert">{error}</div>}
 
       {signedUrl ? (
         <iframe

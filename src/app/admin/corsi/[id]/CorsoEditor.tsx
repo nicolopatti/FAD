@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   edizioneStato,
   type CorsoRow,
@@ -98,7 +99,7 @@ export function CorsoEditor({
           </div>
         </div>
         <div className="page-head__actions">
-          <a className="btn btn--secondary" href="/admin/corsi"><Icon name="arrowLeft" /> Tutti i corsi</a>
+          <Link className="btn btn--secondary" href="/admin/corsi"><Icon name="arrowLeft" /> Tutti i corsi</Link>
         </div>
       </div>
 
@@ -217,7 +218,7 @@ function SezioneDati({
 
   async function uploadCover(file: File) {
     if (!file.type.startsWith('image/')) {
-      onError('La copertina deve essere un&apos;immagine (JPG o PNG).');
+      onError("La copertina deve essere un'immagine (JPG o PNG).");
       return;
     }
     setUploading(true);
@@ -787,21 +788,15 @@ function SezioneEdizioni({
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    onError(null);
-    onBusy(true);
+    // `call` gestisce busy, errore e `router.refresh()`: senza il refresh
+    // l'edizione creata non compariva e un secondo clic ne creava un doppione.
     try {
-      const res = await fetch(`/api/admin/corsi/${corsoId}/edizioni`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ codice, data_inizio: di || null, data_fine: df || null }),
+      await call('POST', `/api/admin/corsi/${corsoId}/edizioni`, {
+        codice, data_inizio: di || null, data_fine: df || null,
       });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       setCodice(''); setDi(''); setDf('');
-    } catch (err) {
-      onError(err instanceof Error ? err.message : String(err));
-    } finally {
-      onBusy(false);
+    } catch {
+      // errore già mostrato dal banner
     }
   }
 

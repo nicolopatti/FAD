@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { LearningObjectRow } from '@/lib/db-types';
@@ -31,7 +32,7 @@ export default async function EditLearningObjectPage({ params }: { params: { id:
           </div>
         </div>
         <div className="page-head__actions">
-          <a className="btn btn--secondary" href="/admin/learning-objects"><Icon name="arrowLeft" /> Contenuti</a>
+          <Link className="btn btn--secondary" href="/admin/learning-objects"><Icon name="arrowLeft" /> Contenuti</Link>
         </div>
       </div>
 

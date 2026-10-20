@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import type { Route } from 'next';
 import { vimeoEmbedUrl } from '@/lib/vimeo';
 import { coperturaPercentuale, unisciSegmenti, type Segmento } from '@/lib/visione';
 
@@ -56,6 +58,9 @@ export function VimeoPlayer({
   const [avviso, setAvviso] = useState<string | null>(null);
   // Schermata finale nostra: copre quella di Vimeo ("More from …", Follow).
   const [finito, setFinito] = useState(false);
+  // Esito dell'invio di `video.ended` al server.
+  const [registrazione, setRegistrazione] = useState<'in_corso' | 'ok' | 'errore'>('in_corso');
+  const inviaEndedRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let player: VimeoPlayerInstance | null = null;
@@ -93,7 +98,9 @@ export function VimeoPlayer({
       playerRef.current = player;
       // Il tracciamento è silenzioso: gli eventi vanno al log del tenant via API,
       // ma non sono mostrati al discente (la vista grezza è dell'auditor).
-      const send = (eventType: string, payload: Record<string, unknown>) => {
+      // Ritorna true se il server ha accettato l'evento: per `ended` l'esito
+      // decide cosa dice la schermata finale (mai "registrata" senza conferma).
+      const send = (eventType: string, payload: Record<string, unknown>): Promise<boolean> =>
         fetch('/api/events/video', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -104,8 +111,9 @@ export function VimeoPlayer({
             payload,
           }),
           keepalive: true,
-        }).catch(() => undefined);
-      };
+        })
+          .then((r) => r.ok)
+          .catch(() => false);
       // Payload comune a pause/seek/ended: tratti visti finora + durata reale.
       const conTratti = (extra: Record<string, unknown>) => ({
         ...extra,
@@ -190,12 +198,20 @@ export function VimeoPlayer({
         if (Number.isFinite(d?.duration) && d.duration > 0) durata = d.duration;
         inRiproduzione = false;
         stopCheckpoint();
-        send('video.ended', conTratti({}));
         if (durata > 0) setCopertura(coperturaPercentuale(snapshot(), durata));
         setFinito(true);
-        // Il server ricalcola il completamento dal log: aggiorna chip e lista.
-        setTimeout(() => router.refresh(), 1200);
+        inviaEnded();
       });
+      // L'invio di `ended` è riprovabile dalla schermata finale.
+      inviaEndedRef.current = inviaEnded;
+      function inviaEnded() {
+        setRegistrazione('in_corso');
+        send('video.ended', conTratti({})).then((ok) => {
+          setRegistrazione(ok ? 'ok' : 'errore');
+          // Il server ricalcola il completamento dal log: aggiorna chip e lista.
+          if (ok) setTimeout(() => router.refresh(), 800);
+        });
+      }
     }
     window.addEventListener('pagehide', onPageHide);
     document.addEventListener('visibilitychange', onVisibility);
@@ -223,7 +239,7 @@ export function VimeoPlayer({
     };
   }, [vimeoId, vimeoHash, visioneIntegrale, trattiIniziali, iscrizioneId, learningObjectId, router]);
 
-  const sendRef = useRef<((eventType: string, payload: Record<string, unknown>) => void) | null>(null);
+  const sendRef = useRef<((eventType: string, payload: Record<string, unknown>) => Promise<boolean>) | null>(null);
   const conTrattiRef = useRef<((extra: Record<string, unknown>) => Record<string, unknown>) | null>(null);
 
   const rivedi = () => {
@@ -260,16 +276,22 @@ export function VimeoPlayer({
               background: 'rgba(26, 24, 20, 0.96)', color: '#f4efe6',
             }}
           >
-            <div style={{ fontSize: 22, fontWeight: 600 }}>Lezione terminata</div>
+            <div style={{ fontSize: 22, fontWeight: 600 }} aria-live="polite">
+              {registrazione === 'ok' ? 'Lezione completata' : registrazione === 'errore' ? 'Lezione terminata, ma non registrata' : 'Lezione terminata'}
+            </div>
             <div style={{ fontSize: 14, opacity: 0.85, maxWidth: 420 }}>
-              {visioneIntegrale
-                ? 'La visione è stata registrata. Il completamento viene verificato sul log in base al tempo reale di riproduzione.'
-                : 'La visione è stata registrata nel log.'}
-              {copertura != null ? ` Riprodotto: ${copertura}%.` : ''}
+              {registrazione === 'in_corso' && 'Registrazione in corso…'}
+              {registrazione === 'ok' && (visioneIntegrale
+                ? `La visione è stata registrata.${copertura != null ? ` Riprodotto: ${copertura}%.` : ''} Il completamento è calcolato sul tempo reale di riproduzione.`
+                : 'La visione è stata registrata.')}
+              {registrazione === 'errore' && 'Non siamo riusciti a registrare la fine della lezione (connessione assente o errore del server). Non chiudere la pagina: riprova.'}
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
-              <button type="button" className="btn" onClick={rivedi}>Rivedi</button>
-              {corsoHref && <a className="btn" href={corsoHref}>Torna al corso</a>}
+              {registrazione === 'errore' && (
+                <button type="button" className="btn" onClick={() => inviaEndedRef.current?.()}>Riprova ora</button>
+              )}
+              <button type="button" className="btn btn--secondary" onClick={rivedi}>Rivedi</button>
+              {corsoHref && <Link className="btn btn--secondary" href={corsoHref as Route}>Torna al corso</Link>}
             </div>
           </div>
         )}
