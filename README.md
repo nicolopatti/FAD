@@ -61,13 +61,26 @@ del set richiesto.
      - `NEXT_PUBLIC_SUPABASE_URL`
      - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
      - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-     - `NEXT_PUBLIC_TENANT_ID` (default `00000000-0000-0000-0000-000000000001`)
+     - `NEXT_PUBLIC_APP_URL` (URL pubblico, per QR e LinkedIn degli attestati)
+     - nessun tenant da env: l'app lo deriva dalla persona autenticata
    - Aggiungi l'URL di Vercel all'allowlist di Supabase Auth (`Site URL` +
      `Redirect URLs`).
    - Configura il **domain restriction su Vimeo** (Settings → Privacy del video)
      aggiungendo il dominio Vercel di produzione e quelli di preview.
 
 5. **Deploy** — push su `main` → Vercel deploya automaticamente.
+
+6. **Nuovo ente (tenant)** — ogni ente nasce con la RPC `tenant_crea` (solo
+   service role) tramite lo script, da un ambiente che ha
+   `NEXT_PUBLIC_SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`:
+   ```bash
+   npm run nuovo-ente -- --nome "Ente Alfa" --ragione-sociale "Ente Alfa S.r.l." \
+     --citta Bergamo --admin-email admin@entealfa.it --admin-nome Giulia --admin-cognome Neri
+   ```
+   Crea l'utente Auth dell'admin (ruolo `admin`), poi in una transazione tenant,
+   stream del registro, Persona e gli Eventi `tenant.created`/`persona.created`.
+   La password, se non passata con `--admin-password`, è generata e stampata una
+   volta. Logo, firma e modello dell'attestato si completano da `/admin/ente`.
 
 Utenze demo create da `npm run bootstrap`:
 - Discente — `discente@fad.local` / `discente-pass-123`

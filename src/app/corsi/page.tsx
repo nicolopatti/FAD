@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { requireSession } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
-import { computeProgressoForIscrizione } from '@/lib/compliance';
+import { computeProgressoPerIscrizioni } from '@/lib/compliance';
 import { AppShell, StatusChip, Ico } from '@/components/AppShell';
 import { Cover, coverUrl } from '@/components/admin/Atlante';
 import type { IscrizioneListaRow } from '@/lib/db-types';
@@ -25,12 +25,9 @@ export default async function MieiCorsiPage({ searchParams }: { searchParams?: {
     .eq('persona_id', session.personaId)
     .returns<IscrizioneListaRow[]>(), 'i tuoi corsi');
 
-  const tutti = await Promise.all(
-    iscrizioni.map(async (i) => {
-      const prog = await computeProgressoForIscrizione(supabase, i.id);
-      return { iscrizione: i, prog };
-    }),
-  );
+  // Progresso di tutte le iscrizioni con un numero fisso di query (Blocco B #2).
+  const progressi = await computeProgressoPerIscrizioni(supabase, iscrizioni.map((i) => i.id));
+  const tutti = iscrizioni.map((i) => ({ iscrizione: i, prog: progressi.get(i.id) ?? null }));
 
   const inCorso = tutti.filter((r) => r.prog && !r.prog.idonea).length;
   const idonei = tutti.filter((r) => r.prog?.idonea).length;

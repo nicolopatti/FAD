@@ -227,10 +227,9 @@ senza merge):**
   `test:fase4` nel job principale.
 - `NEXT_PUBLIC_TENANT_ID` non è più usato da `src/` (Blocco B #8 di fatto chiuso:
   resta solo nel bootstrap e nei workflow).
-**Restano** del piano: Blocco B #5 (RPC unica eventi video) e #7 (unione policy RLS
-multiple), test di carico; Blocco C (staging, monitoraggio, SMTP/inviti/reset
-password); Blocco D (tracciati ufficiali fondi, Teams); E2E in CI con deploy di
-anteprima e secrets.
+**Restano** del piano (Blocco B chiuso, vedi le due sezioni in testa): test di carico
+k6; Blocco C (staging, monitoraggio, SMTP/inviti/reset password); Blocco D (tracciati
+ufficiali fondi, Teams); E2E in CI con deploy di anteprima e secrets.
 
 ## UX — revisione, mockup e ondata 1 (2026-10-20, branch `claude/affectionate-hawking-03ev7i`)
 
@@ -424,7 +423,7 @@ attiva e a corso congelato il pulsante diventa "Salva descrizione" (PATCH con la
 **Le 4 ondate sono chiuse e su `main` (2026-10-20).** Ricetta per far girare
 l'app in locale/crawler: ambiente con `*.supabase.co` consentito (fatto),
 `NODE_USE_ENV_PROXY=1 NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=…
-NEXT_PUBLIC_TENANT_ID=… setsid nohup npx next dev -p 3100 &` (fermarlo prima di
+NEXT_PUBLIC_APP_URL=http://localhost:3100 setsid nohup npx next dev -p 3100 &` (fermarlo prima di
 `npm run build`: condividono `.next`; per fermarlo `pkill -f "next-serve[r]"`, il
 pattern con le parentesi quadre evita che `pkill` uccida la propria shell);
 Chromium non passa dal proxy → nei crawler le richieste a supabase.co sono
@@ -433,6 +432,31 @@ inoltrate via `route()` + `fetch` di Node, e **lo script Node va lanciato con
 scratchpad `pw/` (da portare in repo con i test E2E del Blocco E). Senza
 `SUPABASE_SERVICE_ROLE_KEY` nell'ambiente le route di scrittura falliscono dopo la
 modifica DB: dal container si provano solo letture e validazioni.
+
+## Blocco B #2/#8 — report per edizione + onboarding di un ente (2026-10-20)
+
+**Il Blocco B è chiuso** (restano solo i test di carico k6, Blocco E).
+- **#2 report auditor per edizione.** `/audit/completamento` legge `?edizione=<id|tutte>`:
+  il server carica e ricalcola **solo le iscrizioni dell'edizione scelta** (selettore
+  `ScopeEdizione` con codice · corso · n. iscritti, edizioni attive prima). "Tutte" è il
+  default finché il tenant ha ≤ 300 iscrizioni (`SOGLIA_TUTTE`), oltre il default è
+  l'edizione più recente e "Tutte" resta scegliibile con un avviso. Gli attestati validi
+  sono letti con `.in(ids)`. Anche `/corsi` (discente) e `emettiPerEdizioneSeIdonee`
+  (attestati dopo un import presenze) usano le funzioni **in blocco** di `compliance.ts`;
+  `costruisciSnapshot` accetta `{prog, freq}` precalcolati. Non è una funzione SQL (come
+  ipotizzava il piano): la ricostruzione dei tratti video resta in TS, una sola fonte.
+- **#8 tenant mai da env.** `NEXT_PUBLIC_TENANT_ID` è sparita da `src/`, CI, `.env.example`,
+  README (il seed demo usa `BOOTSTRAP_TENANT_ID`, opzionale). **Su Vercel la variabile è
+  ancora definita ma inutilizzata**: si può togliere dal pannello. Onboarding di un ente:
+  migration `20261020000011_tenant_crea.sql` (**applicata sul live**) → RPC `tenant_crea`
+  (solo service role, rifiuta se `auth.uid()` non è nullo) crea in una transazione tenant +
+  `stream_audit` + Persona del primo admin + Eventi `tenant.created`/`persona.created`
+  (payload `{ruolo, origine}`); script **`npm run nuovo-ente -- --nome … --admin-email …
+  --admin-nome … --admin-cognome … [--ragione-sociale … --citta … --admin-password … --tenant-id …]`**
+  (`scripts/nuovo-ente.ts`: crea l'utente Auth con `app_metadata.role=admin`, chiama la
+  RPC, in caso di errore rimuove l'utente Auth). pgTAP `supabase/tests/tenant_crea.sql`
+  (10/10 sul live in rollback, con un utente Auth simulato: isolamento del nuovo admin
+  verificato). Lo script non è eseguibile dal container (manca la chiave di servizio).
 
 ## Blocco B #5/#7 — RPC unica del player + policy RLS unite (2026-10-20)
 

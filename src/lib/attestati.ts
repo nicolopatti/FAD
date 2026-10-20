@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseServiceClient } from './supabase/service';
-import { computeProgressoForIscrizione, computeFrequenzaForIscrizione } from './compliance';
+import {
+  computeProgressoForIscrizione, computeFrequenzaForIscrizione,
+  computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni,
+} from './compliance';
 import { deriveIdoneita } from './report-fondo';
 import { bytesToHex } from './audit-filtri';
 import { risolviModello, type ModelloAttestato } from './attestato-modello';
@@ -86,17 +89,23 @@ async function caricaIscrizione(service: SupabaseClient, iscrizioneId: string): 
  * Snapshot risolto + esito dell'idoneità (ricalcolata adesso dagli Eventi).
  * Ritorna null se l'iscrizione non esiste.
  */
+type Precalcolato = {
+  prog: Awaited<ReturnType<typeof computeProgressoForIscrizione>>;
+  freq: Awaited<ReturnType<typeof computeFrequenzaForIscrizione>>;
+};
+
 export async function costruisciSnapshot(
   service: SupabaseClient,
   iscrizioneId: string,
+  precalcolato?: Precalcolato,
 ): Promise<{ idoneo: boolean; contenuto: AttestatoContenuto } | null> {
   const iscr = await caricaIscrizione(service, iscrizioneId);
   if (!iscr?.edizione?.corso || !iscr.persona) return null;
   const corso = iscr.edizione.corso;
 
   const [prog, freq, enteRes, testaRes] = await Promise.all([
-    computeProgressoForIscrizione(service, iscrizioneId),
-    computeFrequenzaForIscrizione(service, iscrizioneId),
+    precalcolato ? precalcolato.prog : computeProgressoForIscrizione(service, iscrizioneId),
+    precalcolato ? precalcolato.freq : computeFrequenzaForIscrizione(service, iscrizioneId),
     service.from('tenant').select('nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, linkedin_organization_id, attestato_modello').eq('id', iscr.tenant_id).maybeSingle(),
     service.from('evento').select('seq, hash').eq('tenant_id', iscr.tenant_id).order('seq', { ascending: false }).limit(1).maybeSingle(),
   ]);
@@ -229,17 +238,50 @@ export async function emettiAttestatoManuale(
   return data as EsitoEmissione;
 }
 
-/** Dopo un cambio di presenze: prova l'emissione automatica per tutti gli iscritti dell'edizione. */
+/**
+ * Dopo un cambio di presenze: prova l'emissione automatica per tutti gli iscritti
+ * dell'edizione. In blocco (Blocco B #2): politica del corso in una query,
+ * progresso e frequenza di tutte le iscrizioni con le funzioni batch, poi lo
+ * snapshot solo per chi è idoneo e non ha ancora un attestato valido.
+ */
 export async function emettiPerEdizioneSeIdonee(edizioneId: string, attorePersonaId: string): Promise<EsitoEmissione[]> {
   const service = createSupabaseServiceClient();
+  const { data: ed } = await service
+    .from('edizione')
+    .select('id, corso:corso_id ( politica_attestato, soglia_frequenza_percentuale )')
+    .eq('id', edizioneId)
+    .returns<{ id: string; corso: { politica_attestato: PoliticaAttestato; soglia_frequenza_percentuale: number | string | null } | null }[]>()
+    .maybeSingle();
+  if (!ed?.corso || ed.corso.politica_attestato !== 'automatica') return [];
+  const soglia = ed.corso.soglia_frequenza_percentuale != null ? Number(ed.corso.soglia_frequenza_percentuale) : null;
+
   const { data: iscrizioni } = await service.from('iscrizione').select('id').eq('edizione_id', edizioneId).returns<{ id: string }[]>();
+  const ids = (iscrizioni ?? []).map((i) => i.id);
+  if (!ids.length) return [];
+  const [progressi, frequenze, validiRes] = await Promise.all([
+    computeProgressoPerIscrizioni(service, ids),
+    computeFrequenzaPerIscrizioni(service, ids),
+    service.from('attestato').select('iscrizione_id').in('iscrizione_id', ids).is('sostituito_da', null).returns<{ iscrizione_id: string }[]>(),
+  ]);
+  const conAttestato = new Set((validiRes.data ?? []).map((a) => a.iscrizione_id));
+
   const esiti: EsitoEmissione[] = [];
-  for (const i of iscrizioni ?? []) {
+  for (const id of ids) {
+    if (conAttestato.has(id)) continue;
+    const prog = progressi.get(id) ?? null;
+    const freq = frequenze.get(id) ?? null;
+    const { idoneo } = deriveIdoneita(prog?.obbligatori_totale ?? 0, prog?.idonea ?? false, soglia, freq?.idoneo_frequenza ?? false);
+    if (!idoneo) continue;
     try {
-      const e = await emettiAttestatoSeIdonea(i.id, attorePersonaId);
-      if (e) esiti.push(e);
+      const snap = await costruisciSnapshot(service, id, { prog, freq });
+      if (!snap?.idoneo) continue;
+      const { data, error } = await service.rpc('attestato_emetti', {
+        p_iscrizione_id: id, p_contenuto: snap.contenuto, p_attore: attorePersonaId, p_emesso_da: null, p_sostituisce: null, p_motivazione: null,
+      });
+      if (error) throw error;
+      esiti.push(data as EsitoEmissione);
     } catch (err) {
-      console.error('[attestato] emissione automatica fallita per iscrizione', i.id, err);
+      console.error('[attestato] emissione automatica fallita per iscrizione', id, err);
     }
   }
   return esiti;

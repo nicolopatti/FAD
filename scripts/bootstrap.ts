@@ -16,14 +16,18 @@
  * Env richiesti (da impostare nel pannello dell'ambiente, mai in .env locali):
  *   NEXT_PUBLIC_SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY
- *   NEXT_PUBLIC_TENANT_ID   (default: 00000000-0000-0000-0000-000000000001)
+ *   BOOTSTRAP_TENANT_ID     (default: 00000000-0000-0000-0000-000000000001)
+ *
+ * Il tenant è un parametro di QUESTO script di seed, non dell'applicazione: l'app
+ * lo deriva sempre dalla persona autenticata (Blocco B #8). Per un ente nuovo
+ * usare `npm run nuovo-ente` (scripts/nuovo-ente.ts).
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = required('NEXT_PUBLIC_SUPABASE_URL');
 const SERVICE_KEY = required('SUPABASE_SERVICE_ROLE_KEY');
-const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID
+const TENANT_ID = process.env.BOOTSTRAP_TENANT_ID
   ?? '00000000-0000-0000-0000-000000000001';
 
 const DEMO = {

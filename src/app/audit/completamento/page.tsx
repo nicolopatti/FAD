@@ -4,36 +4,73 @@ import { requireAuditor } from '@/lib/auth-context';
 import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni, regolaLabel } from '@/lib/compliance';
 import type { IscrizioneAuditRow } from '@/lib/db-types';
 import { CompletamentoTable, type RigaCompletamento } from './CompletamentoTable';
+import { ScopeEdizione, type EdizioneScope } from './ScopeEdizione';
 
 export const dynamic = 'force-dynamic';
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+/** Sopra questa soglia la vista "tutte le edizioni" non è più il default. */
+const SOGLIA_TUTTE = 300;
 
-export default async function CompletamentoPage() {
+type EdizioneRow = {
+  id: string; codice: string; data_inizio: string | null; concluso_at: string | null; annullato_at: string | null;
+  corso: { titolo: string } | null;
+  iscrizione: { count: number }[] | null;
+};
+
+export default async function CompletamentoPage({ searchParams }: { searchParams?: { edizione?: string } }) {
   await requireAuditor();
   const supabase = createSupabaseServerClient();
 
-  const iscrizioni = unwrap(await supabase
+  // Ambito per edizione (Blocco B #2): il ricalcolo dagli Eventi è proporzionale
+  // alle iscrizioni lette, quindi il server legge solo quelle dell'edizione
+  // scelta. "Tutte" è il default finché il tenant è piccolo.
+  const edizioniRaw = unwrap(await supabase
+    .from('edizione')
+    .select('id, codice, data_inizio, concluso_at, annullato_at, corso:corso_id ( titolo ), iscrizione ( count )')
+    .returns<EdizioneRow[]>(), 'le edizioni');
+  const edizioni: EdizioneScope[] = edizioniRaw
+    .map((e) => ({
+      id: e.id,
+      codice: e.codice,
+      corso: e.corso?.titolo ?? 'Corso',
+      iscritti: e.iscrizione?.[0]?.count ?? 0,
+      attiva: !e.concluso_at && !e.annullato_at,
+      inizio: e.data_inizio ?? '',
+    }))
+    .sort((a, b) => Number(b.attiva) - Number(a.attiva) || b.inizio.localeCompare(a.inizio) || a.codice.localeCompare(b.codice, 'it'))
+    .map(({ inizio: _inizio, ...e }) => e);
+  const totale = edizioni.reduce((s, e) => s + e.iscritti, 0);
+  const richiesta = searchParams?.edizione;
+  const scelta = richiesta === 'tutte' ? 'tutte'
+    : richiesta && edizioni.some((e) => e.id === richiesta) ? richiesta
+      : totale <= SOGLIA_TUTTE || edizioni.length === 0 ? 'tutte' : edizioni[0].id;
+
+  let q = supabase
     .from('iscrizione')
     .select(`
       id, persona_id, edizione_id,
       persona:persona_id ( nome, cognome, email ),
       edizione:edizione_id ( id, codice, corso:corso_id ( id, titolo ) )
-    `)
-    .returns<IscrizioneAuditRow[]>(), 'le iscrizioni');
+    `);
+  if (scelta !== 'tutte') q = q.eq('edizione_id', scelta);
+  const iscrizioni = unwrap(await q.returns<IscrizioneAuditRow[]>(), 'le iscrizioni');
+  const ids = iscrizioni.map((i) => i.id);
 
   // Attestati validi (uno per iscrizione): l'auditor li legge via RLS.
-  const { data: attestati } = await supabase
-    .from('attestato')
-    .select('id, iscrizione_id, numero, emesso_at, emesso_da')
-    .is('sostituito_da', null)
-    .returns<{ id: string; iscrizione_id: string; numero: string; emesso_at: string; emesso_da: string | null }[]>();
+  const { data: attestati } = ids.length
+    ? await supabase
+      .from('attestato')
+      .select('id, iscrizione_id, numero, emesso_at, emesso_da')
+      .in('iscrizione_id', ids)
+      .is('sostituito_da', null)
+      .returns<{ id: string; iscrizione_id: string; numero: string; emesso_at: string; emesso_da: string | null }[]>()
+    : { data: [] };
   const attestatoDi = new Map((attestati ?? []).map((a) => [a.iscrizione_id, a]));
 
   // Ricalcolo dagli Eventi per ogni iscrizione (D8): la verità è il registro,
   // non le colonne-cache. In blocco (Blocco B #2): un numero fisso di query per
-  // tutte le iscrizioni invece di ~6 per ciascuna.
-  const ids = iscrizioni.map((i) => i.id);
+  // tutte le iscrizioni dell'ambito invece di ~6 per ciascuna.
   const [progressi, frequenze] = await Promise.all([
     computeProgressoPerIscrizioni(supabase, ids),
     computeFrequenzaPerIscrizioni(supabase, ids),
@@ -86,6 +123,7 @@ export default async function CompletamentoPage() {
           </p>
         </div>
       </div>
+      <ScopeEdizione edizioni={edizioni} scelta={scelta} totale={totale} soglia={SOGLIA_TUTTE} />
       <CompletamentoTable righe={righe} />
     </>
   );

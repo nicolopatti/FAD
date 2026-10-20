@@ -25,7 +25,6 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
-          NEXT_PUBLIC_TENANT_ID: 00000000-0000-0000-0000-000000000001
         run: npm run build
 
   m1a:

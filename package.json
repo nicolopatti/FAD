@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:push": "supabase db push --linked",
     "bootstrap": "tsx scripts/bootstrap.ts",
+    "nuovo-ente": "tsx scripts/nuovo-ente.ts",
     "test:m1a": "vitest run tests/m1a",
     "test:fase4": "vitest run tests/fase4",
     "test:unit": "vitest run tests/unit",
