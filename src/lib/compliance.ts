@@ -18,6 +18,8 @@ export type ProgressoLO = StrutturaItem & {
   sbloccato: boolean;
   /** Solo video: % della durata effettivamente riprodotta (unione dei tratti visti), se tracciata. */
   copertura_percentuale?: number;
+  /** Solo video: tratti riprodotti [inizio, fine] in secondi, uniti, ricostruiti dal log. */
+  segmenti_visti?: Segmento[];
 };
 
 export type ProgressoIscrizione = {
@@ -163,8 +165,10 @@ export async function computeProgressoForIscrizione(
     const haRuleEvent = Boolean(ruleEvent && seen?.has(ruleEvent));
     let completato = haRuleEvent;
     let copertura: number | undefined;
+    let segmentiVideo: Segmento[] | undefined;
     if (it.lo_type === 'video') {
       const segmenti = unisciSegmenti(segmentiByLo.get(it.learning_object_id) ?? []);
+      segmentiVideo = segmenti;
       // Durata: quella riportata dal player (reale) se c'è, altrimenti quella dichiarata dall'admin.
       const cfgDurata = Number((it.lo_config as { durata_secondi?: unknown }).durata_secondi);
       const durata = durataByLo.get(it.learning_object_id) ?? (Number.isFinite(cfgDurata) ? cfgDurata : 0);
@@ -175,7 +179,10 @@ export async function computeProgressoForIscrizione(
     }
     const sbloccato = corso.sblocco_sequenziale ? allMandatoryPreviousComplete : true;
     if (it.obbligatorio && !completato) allMandatoryPreviousComplete = false;
-    return copertura === undefined ? { ...it, completato, sbloccato } : { ...it, completato, sbloccato, copertura_percentuale: copertura };
+    const out: ProgressoLO = { ...it, completato, sbloccato };
+    if (copertura !== undefined) out.copertura_percentuale = copertura;
+    if (segmentiVideo) out.segmenti_visti = segmentiVideo;
+    return out;
   });
 
   const totale = decorated.length;

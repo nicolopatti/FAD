@@ -21,6 +21,9 @@ type Props = {
   vimeoHash?: string;
   /** Corso con visione integrale: tratti visti tracciati e niente salti in avanti. */
   visioneIntegrale?: boolean;
+  /** Tratti già riprodotti nelle sessioni precedenti (dal log): il player riparte da qui. */
+  trattiIniziali?: Segmento[];
+  coperturaIniziale?: number;
   iscrizioneId: string;
   learningObjectId: string;
 };
@@ -33,22 +36,31 @@ const CONTINUITA_SECONDI = 2;
 // modalità integrale (arrotondamenti del player).
 const TOLLERANZA_SEEK = 1.5;
 
-export function VimeoPlayer({ vimeoId, vimeoHash, visioneIntegrale = false, iscrizioneId, learningObjectId }: Props) {
+export function VimeoPlayer({
+  vimeoId, vimeoHash, visioneIntegrale = false, trattiIniziali, coperturaIniziale, iscrizioneId, learningObjectId,
+}: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [copertura, setCopertura] = useState<number | null>(null);
+  const [copertura, setCopertura] = useState<number | null>(coperturaIniziale ?? null);
   const [avviso, setAvviso] = useState<string | null>(null);
 
   useEffect(() => {
     let player: VimeoPlayerInstance | null = null;
-    // Tratti riprodotti in questa sessione di pagina (uniti al momento dell'invio).
-    // Le sessioni precedenti sono già nel log: la compliance fa l'unione di tutto.
-    const tratti: Segmento[] = [];
+    // Tratti riprodotti: si parte da quelli già nel log (sessioni precedenti) e
+    // si aggiungono quelli di questa sessione; nei payload va sempre l'unione,
+    // e la compliance unisce a sua volta tutto ciò che trova nel log.
+    const tratti: Segmento[] = (trattiIniziali ?? []).map(([a, b]) => [a, b]);
     let ultimo: number | null = null;
     let durata = 0;
-    let maxVisto = 0;
     let ultimoAggiornamentoUi = 0;
 
     const snapshot = () => unisciSegmenti(tratti);
+    // Limite in avanti (modalità integrale): la fine del tratto riprodotto
+    // CONTIGUO dall'inizio. Un buco nel mezzo non si può scavalcare, altrimenti
+    // il video non raggiungerebbe mai il 95% e il discente non capirebbe perché.
+    const limiteAvanzamento = () => {
+      const primo = snapshot()[0];
+      return primo && primo[0] <= 1 ? primo[1] : 0;
+    };
 
     function attach() {
       if (!window.Vimeo || !iframeRef.current) return;
@@ -81,11 +93,14 @@ export function VimeoPlayer({ vimeoId, vimeoHash, visioneIntegrale = false, iscr
         if (Number.isFinite(d?.duration) && d.duration > 0) durata = d.duration;
         // Modalità integrale: un campione oltre il massimo visto (+tolleranza)
         // è un salto non ammesso → si riporta il player indietro e non si registra.
-        if (visioneIntegrale && s > maxVisto + TOLLERANZA_SEEK + CONTINUITA_SECONDI) {
-          player?.setCurrentTime(maxVisto).catch(() => undefined);
-          setAvviso('Questo corso richiede la visione integrale: non è possibile saltare avanti.');
-          ultimo = null;
-          return;
+        if (visioneIntegrale) {
+          const limite = limiteAvanzamento();
+          if (s > limite + TOLLERANZA_SEEK + CONTINUITA_SECONDI) {
+            player?.setCurrentTime(limite).catch(() => undefined);
+            setAvviso('Questo corso richiede la visione integrale: non è possibile saltare avanti.');
+            ultimo = null;
+            return;
+          }
         }
         if (ultimo != null && s >= ultimo && s - ultimo <= CONTINUITA_SECONDI) {
           const cur = tratti[tratti.length - 1];
@@ -94,7 +109,6 @@ export function VimeoPlayer({ vimeoId, vimeoHash, visioneIntegrale = false, iscr
           tratti.push([s, s]);
         }
         ultimo = s;
-        if (s > maxVisto) maxVisto = s;
         const now = Date.now();
         if (durata > 0 && now - ultimoAggiornamentoUi > 1000) {
           ultimoAggiornamentoUi = now;
@@ -108,8 +122,9 @@ export function VimeoPlayer({ vimeoId, vimeoHash, visioneIntegrale = false, iscr
       player.on('pause', (d: any) => send('video.pause', conTratti({ posizione_secondi: d?.seconds ?? 0 })));
       player.on('seeked', (d: any) => {
         const to = Number(d?.seconds ?? 0);
-        if (visioneIntegrale && to > maxVisto + TOLLERANZA_SEEK) {
-          player?.setCurrentTime(maxVisto).catch(() => undefined);
+        const limite = limiteAvanzamento();
+        if (visioneIntegrale && to > limite + TOLLERANZA_SEEK) {
+          player?.setCurrentTime(limite).catch(() => undefined);
           setAvviso('Questo corso richiede la visione integrale: non è possibile saltare avanti.');
         } else {
           setAvviso(null);
@@ -140,7 +155,7 @@ export function VimeoPlayer({ vimeoId, vimeoHash, visioneIntegrale = false, iscr
         document.head.appendChild(s);
       }
     }
-  }, [vimeoId, vimeoHash, visioneIntegrale, iscrizioneId, learningObjectId]);
+  }, [vimeoId, vimeoHash, visioneIntegrale, trattiIniziali, iscrizioneId, learningObjectId]);
 
   return (
     <div>
@@ -165,7 +180,7 @@ export function VimeoPlayer({ vimeoId, vimeoHash, visioneIntegrale = false, iscr
       {visioneIntegrale && (
         <div className="muted" style={{ marginTop: 10, fontSize: 13, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <span>Visione integrale richiesta: il video va riprodotto per intero, senza salti in avanti.</span>
-          {copertura != null && <span>Riprodotto in questa sessione: {copertura}%</span>}
+          {copertura != null && <span>Riprodotto finora: {copertura}%</span>}
           {avviso && <span style={{ color: 'var(--accent)' }}>{avviso}</span>}
         </div>
       )}

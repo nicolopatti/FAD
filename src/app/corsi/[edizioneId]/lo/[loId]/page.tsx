@@ -92,6 +92,8 @@ export default async function LearningObjectPage({
                   vimeoId={String((item.lo_config as { vimeo_id?: string }).vimeo_id ?? '')}
                   vimeoHash={(item.lo_config as { vimeo_hash?: string }).vimeo_hash}
                   visioneIntegrale={prog.visione_integrale}
+                  trattiIniziali={item.segmenti_visti}
+                  coperturaIniziale={item.copertura_percentuale}
                   iscrizioneId={iscrizione.id}
                   learningObjectId={item.learning_object_id}
                 />
