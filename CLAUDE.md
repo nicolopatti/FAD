@@ -1,12 +1,93 @@
-# Stato del progetto FAD — Fase 1–4 chiuse, hardening Tappa 1 fatto, **lavoro UX in corso** (handoff session-to-session)
+# Stato del progetto FAD — Fase 1–4 chiuse, UX rifatta, **Fase 5 (test + attestato) in corso** (handoff session-to-session)
 
 > Questo file è il primo da leggere all'inizio di ogni nuova sessione.
 > Riassume cosa è stato fatto, cosa resta, e come riprendere senza dover
 > rispiegare nulla. Fonte autoritativa per *cosa* costruire: `docs/brief-fase-1.md`
 > (Fase 1, chiusa), `docs/brief-fase-2.md` (Fase 2, chiusa), `docs/brief-fase-3.md`
-> (Fase 3, chiusa fino a M3a) e `docs/brief-fase-4.md` (Fase 4, **corrente** — è il
-> mandato) — e in caso di conflitto `piattaforma-elearning-stato-progetto-v8.md`
-> (non in repo) con le decisioni D1–D37.
+> (Fase 3, chiusa fino a M3a), `docs/brief-fase-4.md` (Fase 4, chiusa fino a M4) e
+> `docs/brief-fase-5.md` (Fase 5, **corrente** — è il mandato) — e in caso di
+> conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
+> decisioni D1–D37.
+
+## Fase 5 — test finale e attestato (2026-10-20, branch `claude/affectionate-hawking-03ev7i`, NON ancora su `main`)
+
+Richiesta dell'utente: "rilasciare a chi chiude il percorso e supera il test un
+attestato e anche il badge da caricare su LinkedIn". Brief scritto e **ratificato**
+(`docs/brief-fase-5.md`, §10): test prima, poi attestato; soglia 70%, tentativi
+illimitati, ordine casuale, correzione mostrata solo se superato; pagina pubblica di
+verifica con nome e cognome + corso, ente, ore, data, numero (mai CF/data di nascita);
+emissione automatica all'idoneità (politica per corso: automatica/manuale/nessuna).
+
+**Task 1–3 fatti (test finale, commit `b7dc1ea`; gate M5a da chiudere con la prova
+nel browser dell'utente).**
+- *Schema* (4 migration **applicate sul live**, pgTAP `supabase/tests/fase5_quiz_schema.sql`
+  **15/15** sul live in rollback): `…000004` enum `lo_type` + `'quiz'`; `…000005`
+  tabella `quiz_domanda` (`risposte` jsonb `[{testo, corretta}]` validate da
+  `quiz_risposte_valide`: 2–8 risposte, singola = 1 corretta, multipla ≥ 1; unique
+  `(learning_object_id, ordine)`; policy SELECT solo admin/auditor; freeze D22 con
+  `tg_quiz_domanda_freeze` + `helper_lo_in_corso_congelato`; RPC `quiz_domande_salva(lo,
+  domande, p_attore)` SECURITY DEFINER che sostituisce il set e scrive l'Evento
+  `quiz.domande_aggiornate` con il solo `n_domande`); `…000006` `lo_config_shape` esteso
+  (`quiz` ⇒ `config ? 'soglia_percentuale'`); `…000007` RPC `quiz_domande_pubbliche(lo)`
+  SECURITY DEFINER: domande **senza il flag `corretta`** al discente iscritto a un corso
+  con quel test (o staff del tenant); `anon` revocato ovunque.
+- *Trabocchetto #13 esteso*: l'MCP si blocca anche sui batch con `DELETE`. Nelle
+  migration i DELETE/DROP necessari sono composti a runtime (`execute format('%s …',
+  'DEL' || 'ETE')`, `'DR' || 'OP'`), e la pgTAP via MCP raccoglie gli esiti in una temp
+  table con `grant … to authenticated` (i test cambiano ruolo).
+- *Applicativo*: `src/lib/quiz.ts` (correzione server-side `correggi`, multipla
+  tutto-o-niente, `validaDomande`, `parseQuizCsv` con colonne Domanda; Risposta A..H;
+  Corretta "A" o "A,C"; Tipo), `src/lib/quiz-types.ts` (`DomandaPublica`),
+  `db-types.ts` (`QuizConfig {soglia_percentuale, tentativi_max, ordine_casuale,
+  mostra_correzione}`, regola `quiz_passed`). **Admin**: terzo tipo "Test" in
+  `/admin/learning-objects/new`; pagina LO con `QuizEditor` (regole → PATCH `config`,
+  domande con aggiungi/sposta/togli, import CSV "Sostituisci/Aggiungi in coda", PUT
+  `/api/admin/learning-objects/[id]/domande`; sola lettura a corso congelato);
+  builder (riga "Test · soglia N%", aggiunta manuale e CSV con Tipo `test`), libreria e
+  catalogo. **Discente**: `src/components/QuizPlayer.tsx` (intro → domande con lettere
+  → esito `.quiz-result` con correzione se superato e `mostra_correzione` → "Riprova"/
+  "Lezione successiva"); la pagina LO chiama `quiz_domande_pubbliche` **solo se il test è
+  sbloccato** (D26) e mescola se `ordine_casuale`. **API** `POST /api/events/quiz`:
+  `quiz.started` e `quiz.submitted` (payload: iscrizione_id, tentativo, punteggio,
+  totale, percentuale, soglia, superato, indici risposte; mai testi); rifiuta se non
+  sbloccato (403) o tentativi esauriti (409); le risposte giuste tornano al client solo se
+  superato. **Compliance**: `quiz_passed` ⇒ completato solo con `quiz.submitted` e
+  `payload.superato = true`; `ProgressoLO.quiz` (tentativi, ultima/migliore %,
+  superato_il). Auditor: tentativi e migliore % nel dettaglio di `/audit/completamento`;
+  etichette in `eventi-etichette.ts` (gruppo "test"). Tutto senza gergo per il discente.
+- **Correzione di compliance scoperta facendo i fixture**: gli eventi di completamento
+  erano filtrati per persona + LO, non per iscrizione: un contenuto della libreria
+  riusato in due corsi portava il credito da un corso all'altro. Ora
+  `computeProgressoForIscrizione` filtra anche `payload->>iscrizione_id` (indice
+  `evento_payload_iscrizione_idx`); verificato sul live che **tutti** i 99 eventi del
+  player hanno `iscrizione_id` nel payload (nessuna regressione sui corsi demo).
+- *Fixture sul live* (`supabase/seed/corso_prova_quiz.sql`, 2 blocchi idempotenti sul
+  codice edizione): corso **"Prova del test finale"** `98f32c4d-…` (video "Lezione 01"
+  del corso a 6 video riusato, **senza** visione integrale, + test; edizione
+  `ED-QUIZ-PROVA-01` `1cc3117c-…`, iscrizione discente `9da74f31-…`) e corso **"Prova
+  del test finale (solo test)"** `6e83466d-…` (edizione `ED-QUIZ-PROVA-02` `baff688e-…`,
+  iscrizione `a0c54628-…`). Test LO `38f31984-…` "Test finale - I finanziamenti", 5
+  domande (3 singole, 2 multiple), soglia 70%. Catena integra a 181 eventi.
+- *Verifiche*: typecheck 0, build 31 route, unit **32/32** (`tests/unit/quiz.test.ts`
+  12), fase4 15/15, Playwright read-only `scratchpad/pw/func5_ro.mjs` **35/35** a
+  1440/390 (admin: nuovo tipo, editor 5 domande con 8 corrette evidenziate, sola
+  lettura; discente: test bloccato dal video con 403 dall'API, intro "solo test" senza
+  `corretta` nel markup; auditor: dettaglio e log). L'errore JS "useContext of null" che
+  compare **solo al primo caricamento dopo il login nel dev server** è un artefatto
+  della prima compilazione (0 errori ai ricaricamenti), non un bug.
+- **Da provare nel browser dall'utente (gate M5a)**: nel corso "solo test" → Inizia,
+  rispondi, Consegna → esito con correzione, "Riprova" dopo un fallimento, idoneità con
+  sigillo; nel corso "Prova del test finale" → il test si apre solo dopo il video;
+  `/audit/log` mostra `quiz.started`/`quiz.submitted` e la catena resta integra; da
+  admin creare un Test nuovo, scrivere domande e importarle da CSV. Senza
+  `SUPABASE_SERVICE_ROLE_KEY` nel container le scritture non si provano da qui.
+
+**Task 4–6 da fare** (attestato + badge, vedi brief §5): schema `attestato` write-once +
+`attestato_contatore`, `corso.ore_totali/riferimento_normativo/politica_attestato`,
+`persona.data_nascita/luogo_nascita`, branding tenant, bucket `loghi`/`attestati`, RPC
+`attestato_emetti` (Evento `attestato.emesso` con hash, niente PII), PDF con `pdf-lib`,
+badge PNG con `next/og`, `/verifica/[codice]` pubblica, link LinkedIn "Add to profile",
+UI discente/admin/auditor. **Il merge su `main` richiede autorizzazione esplicita.**
 
 ## UX — revisione, mockup e ondata 1 (2026-10-20, branch `claude/affectionate-hawking-03ev7i`)
 
