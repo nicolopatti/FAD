@@ -199,6 +199,41 @@ export function edizioneStato(e: Pick<EdizioneRow, 'concluso_at' | 'annullato_at
   return 'attiva';
 }
 
+/**
+ * Stato del corso derivato dalle edizioni (niente colonna): bozza = nessuna
+ * edizione (modificabile), attivo = almeno un'edizione aperta, concluso = solo
+ * edizioni concluse o annullate. "Congelato" (D22) resta il termine tecnico del
+ * registro: in interfaccia si parla di corso attivo o concluso.
+ */
+export type StatoCorso = 'bozza' | 'attivo' | 'concluso';
+export function corsoStato(edizioni: Pick<EdizioneRow, 'concluso_at' | 'annullato_at'>[]): StatoCorso {
+  if (edizioni.length === 0) return 'bozza';
+  return edizioni.some((e) => edizioneStato(e) === 'attiva') ? 'attivo' : 'concluso';
+}
+export const STATO_CORSO_LABEL: Record<StatoCorso, string> = { bozza: 'Bozza', attivo: 'Attivo', concluso: 'Concluso' };
+export const STATO_CORSO_CHIP: Record<StatoCorso, string> = { bozza: 'chip--ocra', attivo: 'chip--ok', concluso: 'chip--muted' };
+
+// --- Fase 3 — Incarichi (docenti e tutor di un'edizione, D30) ----------------
+
+export type IncaricoRuolo = 'docente' | 'tutor_contenuto' | 'tutor_processo' | 'responsabile_progetto';
+export const INCARICO_RUOLI: IncaricoRuolo[] = ['docente', 'tutor_contenuto', 'tutor_processo', 'responsabile_progetto'];
+export const INCARICO_RUOLO_LABEL: Record<IncaricoRuolo, string> = {
+  docente: 'Docente',
+  tutor_contenuto: 'Tutor di contenuto',
+  tutor_processo: 'Tutor di processo',
+  responsabile_progetto: 'Responsabile di progetto',
+};
+/** Ruoli che possono tenere una sessione (trigger D30). */
+export const RUOLI_DIDATTICI: IncaricoRuolo[] = ['docente', 'tutor_contenuto', 'tutor_processo'];
+
+export type IncaricoConPersona = {
+  id: string;
+  edizione_id: string;
+  persona_id: string;
+  ruolo: IncaricoRuolo;
+  persona: PersonaMini | null;
+};
+
 export type StrutturaRow = {
   id: string;
   ordine: number;

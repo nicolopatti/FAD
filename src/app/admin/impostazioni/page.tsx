@@ -27,9 +27,8 @@ export default async function EntePage() {
     <>
       <div className="page-head">
         <div className="page-head__lead">
-          <span className="eyebrow">Amministrazione</span>
-          <h1>Ente</h1>
-          <p>Intestazione, firmatario e logo dell&apos;ente, e il modello predefinito degli attestati. Ogni corso può avere un modello suo (sezione &quot;Attestato&quot; del corso). Le modifiche valgono per gli attestati emessi da qui in poi.</p>
+          <h1>Impostazioni</h1>
+          <p>Dati dell&apos;ente di formazione (intestazione, firmatario, logo) e modello predefinito degli attestati. Ogni corso può avere un modello suo nella sua scheda &quot;Attestato&quot;. Le modifiche valgono per gli attestati emessi da qui in poi.</p>
         </div>
       </div>
       <EnteForm ente={ente} />

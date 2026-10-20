@@ -10,6 +10,21 @@ Decisioni di riferimento: `piattaforma-elearning-stato-progetto-v8.md` (D1–D37
 > Tutto il resto (assemblatore corsi, quiz, attestati, webinar, report fondi…)
 > resta **fuori** dalla Fase 1.
 
+## Area admin (ondata A, 2026-10-21): il corso è l'unità di lavoro
+
+Menu a cinque voci: **Dashboard** (edizioni in corso con prontezza, sessioni della
+settimana, code di riconciliazione aperte), **Corsi** (catalogo con stati Bozza/Attivo/
+Concluso + scheda "Libreria dei contenuti"), **Agenda** (tutte le sessioni, sola lettura),
+**Rendicontazione** (report fondi + attestati), **Impostazioni** (ente e modello attestato).
+Pagina del corso a schede con un indirizzo per scheda: `/admin/corsi/<id>` (Panoramica),
+`/lezioni`, `/edizioni`, `/attestato`, `/impostazioni`. **Pagina dell'edizione**
+`/admin/corsi/<id>/edizioni/<edId>` con schede Iscritti (indice), `/sessioni`
+(+ `/sessioni/<sid>` per import presenze, coda, correzioni), `/docenti` (incarichi),
+`/fondo` (piano per tutta l'edizione), `/stato` (avanzamento ricalcolato dal registro,
+codice e date, concludi/annulla). Gli indirizzi vecchi (`/admin/sessioni`,
+`/admin/report-fondo`, `/admin/attestati`, `/admin/ente`) reindirizzano; `/admin/sessioni/<id>`
+reindirizza alla sessione sotto la sua edizione.
+
 ## Modalità di lavoro — tutto in cloud (ratificata)
 
 Niente ambiente locale. Niente file `.env.local`.
@@ -80,7 +95,7 @@ del set richiesto.
    Crea l'utente Auth dell'admin (ruolo `admin`), poi in una transazione tenant,
    stream del registro, Persona e gli Eventi `tenant.created`/`persona.created`.
    La password, se non passata con `--admin-password`, è generata e stampata una
-   volta. Logo, firma e modello dell'attestato si completano da `/admin/ente`.
+   volta. Logo, firma e modello dell'attestato si completano da `/admin/impostazioni`.
 
 Utenze demo create da `npm run bootstrap`:
 - Discente — `discente@fad.local` / `discente-pass-123`
@@ -117,7 +132,7 @@ Teams) rinviati al setup Azure/segreti (runbook esterno).
 |---|---|---|
 | 1 — Schema Gruppo 3 + grezzo write-once | azienda/piano/incarico/sessione + `report_partecipazione_grezzo` (write-once, D20), estensioni iscrizione/corso, `grezzo_content_hash` | ✅ `supabase/migrations/20260527000001_fase3_gruppo3_grezzo.sql` (applicata sul live) + seed `supabase/seed/fase3_webinar_demo.sql` |
 | 2 — Pipeline unica | `pipeline_ingest_grezzo()` SECURITY DEFINER: (a) scrive il grezzo write-once + (b) Evento `report_grezzo_importato` con `payload.hash` via `audit_append`, atomici; (c) riconciliazione = seam del Task 4 | ✅ `supabase/migrations/20260529000001_fase3_pipeline_ingest.sql` (applicata sul live) + test `supabase/tests/m3a_pipeline_ingest.sql` 17/17 |
-| 3 — Adattatore CSV | parser CSV/TSV senza dipendenze + alias intestazioni Teams/Zoom (IT/EN) + mappatura colonne configurabile → array normalizzato → `pipeline_ingest_grezzo(fonte='csv')`; errore esplicito se manca una colonna chiave PRIMA del grezzo | ✅ `src/lib/csv.ts`, `src/lib/pipeline.ts`, `src/app/api/admin/sessioni/[id]/import-csv/route.ts`, UI `src/app/admin/sessioni/*` (lista + pianifica + dettaglio/import) |
+| 3 — Adattatore CSV | parser CSV/TSV senza dipendenze + alias intestazioni Teams/Zoom (IT/EN) + mappatura colonne configurabile → array normalizzato → `pipeline_ingest_grezzo(fonte='csv')`; errore esplicito se manca una colonna chiave PRIMA del grezzo | ✅ `src/lib/csv.ts`, `src/lib/pipeline.ts`, `src/app/api/admin/sessioni/[id]/import-csv/route.ts`, UI sotto l'edizione del corso `src/app/admin/corsi/[id]/edizioni/[edizioneId]/…/sessioni/*` (lista + pianifica + dettaglio/import; vista trasversale in `/admin/agenda`) |
 | 4 — Riconciliazione + coda ambigui (→ M3a) | `pipeline_riconcilia_grezzo` (match `email_riconciliazione` → fallback `persona.email`; ambiguo/assente → coda; anonimo → Evento) + RPC risolvi/ignora + `compliance.ts` frequenza/idoneità a soglia (#9) | ✅ `supabase/migrations/20260529000002_fase3_riconciliazione.sql`, `src/lib/compliance.ts`, UI `CodaResolver` + `/audit/completamento`; test `m3a_riconciliazione.sql` 20/20 |
 | 5 — Inserimento/correzione manuale presenze | RPC `presenza_inserisci_manuale`/`presenza_correggi_manuale` (motivazione obbligatoria; correzione = nuovo Evento che referenzia il precedente, mai UPDATE) | ✅ `supabase/migrations/20260529000003_fase3_presenza_manuale.sql`, UI `PresenzeManager`; test `m3a_presenza_manuale.sql` 9/9 |
 | 6 — Adattatore API Teams (→ M3) | ⛔ rinviato: setup Azure AD + segreti + egress Graph (runbook esterno) | ⛔ rinviato |
@@ -134,7 +149,7 @@ il tracciato ufficiale per-avviso resta un runbook esterno (§10).
 | 1 — Schema snapshot + testata Piano | `report_fondo_depositato` write-once (REVOKE+trigger, D20) + `Piano` (cup/avviso/canale/date) + hash canonico | ✅ `supabase/migrations/20260529000004_fase4_report_fondo_schema.sql` (applicata) + seed `supabase/seed/fase4_fondo_demo.sql` |
 | 2 — Motore aggregazione | `computeReportFondoDataset` (dataset neutro dagli Eventi, riusa `compliance.ts`) + `persona.codice_fiscale` + RLS admin completamenti | ✅ `src/lib/report-fondo.ts`, `…20260529000005_…` (applicata) |
 | 3 — Validazioni conformità (D33) | warning bloccanti (CUP/CF mancanti) vs avvisi | ✅ `src/lib/report-fondo-validazioni.ts`, test `tests/fase4/validazioni.test.ts` 7/7 |
-| 4 — Adattatore Fondimpresa (→ M4a) | export CSV interim + UI anteprima/genera | ✅ `src/lib/report-fondo-formati.ts`, `src/app/admin/report-fondo/*`, route `.../genera` |
+| 4 — Adattatore Fondimpresa (→ M4a) | export CSV interim + UI anteprima/genera | ✅ `src/lib/report-fondo-formati.ts`, `src/app/admin/rendicontazione/*`, route `.../genera` |
 | 5 — Adattatore FonCoop/GIFCOOP | secondo adattatore sullo stesso motore | ✅ `src/lib/report-fondo-formati.ts`, test `tests/fase4/formati.test.ts` 8/8 |
 | 6 — Deposito write-once (→ M4) | RPC `report_fondo_deposita`/`report_fondo_verifica`, UI `DepositaPanel`, route deposita/verifica/snapshot | ✅ `…20260529000006_…` + `…0007_…` (applicate), test `supabase/tests/m4_report_fondo.sql` 10/10 |
 
@@ -373,7 +388,7 @@ senza, il workflow le salta con un avviso e controlla solo la produzione.
 
 ### Inviti, password dimenticata, cambio password
 
-- Le Persone importate come iscritti nascono **senza utente**: dal Course Builder,
+- Le Persone importate come iscritti nascono **senza utente**: dalla scheda Iscritti dell'edizione,
   sezione Iscritti, colonna **Accesso** → "Invita" (o "Invita tutti"). L'admin
   crea l'utente Supabase Auth e manda l'email con il link; il discente atterra su
   `/auth/reimposta`, sceglie la password e al primo accesso accetta l'informativa

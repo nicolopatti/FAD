@@ -76,21 +76,36 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   const tag = vp.width;
   const { ctx, page } = await nuovaPagina(browser, vp);
   await accedi(page, 'admin');
-  await paginaOk(page, '/admin', `admin@${tag}: dashboard`, 'Dashboard');
-  await paginaOk(page, '/admin/corsi', `admin@${tag}: catalogo corsi`, 'Corsi');
-  const primo = page.locator('.course-card a, a.course-card').first();
+  await paginaOk(page, '/admin', `admin@${tag}: dashboard`, 'Edizioni in corso');
+  await paginaOk(page, '/admin/corsi', `admin@${tag}: catalogo corsi`, 'Catalogo');
+  const primo = page.locator('a.course-card').first();
   const hrefCorso = (await primo.count()) ? await primo.getAttribute('href') : null;
   if (hrefCorso) {
-    await paginaOk(page, hrefCorso, `admin@${tag}: course builder`, 'Dati del corso');
-    check(`admin@${tag}: sezione Attestato nel builder`, (await page.locator('#corso-ore').count()) === 1);
+    await paginaOk(page, hrefCorso, `admin@${tag}: corso, panoramica`, 'In sintesi');
+    await paginaOk(page, `${hrefCorso}/lezioni`, `admin@${tag}: corso, lezioni`, 'Sequenza delle lezioni');
+    await paginaOk(page, `${hrefCorso}/edizioni`, `admin@${tag}: corso, edizioni`, 'Edizioni');
+    await paginaOk(page, `${hrefCorso}/impostazioni`, `admin@${tag}: corso, impostazioni`, 'Regole di fruizione');
+    const ed = page.locator('a.t-link[href*="/edizioni/"]').first();
+    await vai(page, `${hrefCorso}/edizioni`);
+    const hrefEd = (await ed.count()) ? await ed.getAttribute('href') : null;
+    if (hrefEd) {
+      await paginaOk(page, hrefEd, `admin@${tag}: edizione, iscritti`, 'Iscritti');
+      await paginaOk(page, `${hrefEd}/sessioni`, `admin@${tag}: edizione, sessioni`, 'Sessioni');
+      await paginaOk(page, `${hrefEd}/docenti`, `admin@${tag}: edizione, docenti`, 'Docenti e tutor');
+      await paginaOk(page, `${hrefEd}/fondo`, `admin@${tag}: edizione, fondo`, 'Piano finanziato');
+      await paginaOk(page, `${hrefEd}/stato`, `admin@${tag}: edizione, stato`, 'Chiusura');
+    }
   }
   await paginaOk(page, '/admin/corsi/new', `admin@${tag}: nuovo corso`, 'Crea un corso');
-  await paginaOk(page, '/admin/learning-objects', `admin@${tag}: contenuti`, 'Contenuti');
+  await paginaOk(page, '/admin/learning-objects', `admin@${tag}: libreria`, 'Libreria dei contenuti');
   await paginaOk(page, '/admin/learning-objects/new', `admin@${tag}: nuovo contenuto`, /Test/);
-  await paginaOk(page, '/admin/sessioni', `admin@${tag}: sessioni`, 'Sessioni');
-  await paginaOk(page, '/admin/report-fondo', `admin@${tag}: report fondi`, 'Report');
-  await paginaOk(page, '/admin/attestati', `admin@${tag}: attestati`, 'Attestati');
-  await paginaOk(page, '/admin/ente', `admin@${tag}: ente`, 'Modello predefinito');
+  await paginaOk(page, '/admin/agenda', `admin@${tag}: agenda`, 'Agenda');
+  await paginaOk(page, '/admin/rendicontazione', `admin@${tag}: rendicontazione`, 'Report fondi');
+  await paginaOk(page, '/admin/rendicontazione/attestati', `admin@${tag}: attestati`, 'Attestati');
+  await paginaOk(page, '/admin/impostazioni', `admin@${tag}: impostazioni`, 'Modello predefinito');
+  // Indirizzi vecchi: reindirizzati, non rotti.
+  await vai(page, '/admin/sessioni');
+  check(`admin@${tag}: /admin/sessioni reindirizza all'agenda`, page.url().includes('/admin/agenda'), page.url());
   if (tag === 1440) {
     const pdf = await page.request.post(`${BASE}/api/admin/attestati/anteprima`, { data: { ambito: 'ente', modello: { layout: 'classico' } } });
     check('admin: anteprima PDF del modello', pdf.status() === 200 && (pdf.headers()['content-type'] ?? '').includes('application/pdf'), String(pdf.status()));

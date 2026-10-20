@@ -50,7 +50,7 @@ function durataCol(r: ContenutoRow): string {
   return kb != null ? `${kb} KB` : '—';
 }
 
-export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
+export function ContenutiTable({ rows, tabs }: { rows: ContenutoRow[]; tabs?: React.ReactNode }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
   const [q, setQ] = useState('');
@@ -106,15 +106,16 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
     <>
       <div className="page-head">
         <div className="page-head__lead">
-          <h1>Contenuti</h1>
-          <p>Libreria dei contenuti riutilizzabili nei corsi: video, documenti e test finali.</p>
+          <h1>Corsi</h1>
+          <p>La libreria dei contenuti: video, documenti e test che i corsi usano come lezioni. Un contenuto usato in più corsi si corregge una volta sola. Le lezioni si aggiungono di solito dal corso.</p>
         </div>
         <div className="page-head__actions">
-          <Link className="btn" href="/admin/learning-objects/new">
+          <Link className="btn btn--secondary" href="/admin/learning-objects/new">
             <Icon name="plus" /> Nuovo contenuto
           </Link>
         </div>
       </div>
+      {tabs}
 
       {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
 
@@ -139,7 +140,7 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
         <div className="empty">
           <Icon name="libreria" className="empty__icon" />
           <div className="empty__t">Nessun contenuto</div>
-          <div className="empty__s">Nessun oggetto didattico corrisponde ai filtri correnti.</div>
+          <div className="empty__s">Nessun contenuto corrisponde ai filtri correnti.</div>
         </div>
       ) : (
         <div className="card">
@@ -172,9 +173,9 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
                   <td className="mono">{durataCol(r)}</td>
                   <td>
                     {r.usato_in > 0 ? (
-                      <span className="chip chip--muted">Usato in {r.usato_in} {r.usato_in === 1 ? 'corso' : 'corsi'}</span>
+                      <span className="chip chip--muted">Lezione in {r.usato_in} {r.usato_in === 1 ? 'corso' : 'corsi'}</span>
                     ) : (
-                      <span className="muted" style={{ fontSize: 12 }}>Non utilizzato</span>
+                      <span className="muted" style={{ fontSize: 12 }}>In nessun corso</span>
                     )}
                   </td>
                   <td>

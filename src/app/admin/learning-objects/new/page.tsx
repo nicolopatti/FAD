@@ -11,10 +11,10 @@ export default async function NewLearningObjectPage() {
         <div className="page-head__lead">
           <span className="eyebrow">Nuovo contenuto</span>
           <h1>Crea un contenuto</h1>
-          <p>Aggiungi un oggetto didattico (video Vimeo o documento PDF) alla libreria del tenant.</p>
+          <p>Un video Vimeo, un documento PDF o un test da usare come lezione nei corsi. Dal corso si aggiunge direttamente nella scheda Lezioni.</p>
         </div>
         <div className="page-head__actions">
-          <Link className="btn btn--secondary" href="/admin/learning-objects"><Icon name="arrowLeft" /> Contenuti</Link>
+          <Link className="btn btn--secondary" href="/admin/learning-objects"><Icon name="arrowLeft" /> Libreria</Link>
         </div>
       </div>
       <NewLearningObjectForm tenantId={session.tenantId} />

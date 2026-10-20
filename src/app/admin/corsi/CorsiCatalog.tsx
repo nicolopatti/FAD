@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { STATO_CORSO_CHIP, STATO_CORSO_LABEL, type StatoCorso } from '@/lib/db-types';
 import { Icon, Cover, coverUrl, fmtMinuti } from '@/components/admin/Atlante';
 
 export type CorsoCard = {
@@ -13,70 +14,46 @@ export type CorsoCard = {
   sblocco_sequenziale: boolean;
   visione_integrale: boolean;
   creato_il: string;
-  n_oggetti: number;
+  n_lezioni: number;
   n_edizioni: number;
+  n_edizioni_attive: number;
+  n_iscritti: number;
   durata_sec: number;
-  congelato: boolean;
+  stato: StatoCorso;
 };
 
-export type StatoF = 'tutti' | 'bozza' | 'congelati';
-export type EdiF = 'tutte' | 'con' | 'senza';
-type SortF = 'recenti' | 'titolo' | 'oggetti';
+export type StatoF = 'tutti' | StatoCorso;
+type SortF = 'recenti' | 'titolo' | 'iscritti';
 
-export function CorsiCatalog({
-  corsi,
-  statoIniziale = 'tutti',
-  edizioniIniziali = 'tutte',
-}: {
-  corsi: CorsoCard[];
-  statoIniziale?: StatoF;
-  edizioniIniziali?: EdiF;
-}) {
+export function CorsiCatalog({ corsi, statoIniziale = 'tutti' }: { corsi: CorsoCard[]; statoIniziale?: StatoF }) {
   const [q, setQ] = useState('');
   const [stato, setStato] = useState<StatoF>(statoIniziale);
-  const [edi, setEdi] = useState<EdiF>(edizioniIniziali);
   const [sort, setSort] = useState<SortF>('recenti');
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const out = corsi.filter((c) => {
-      if (needle && !`${c.titolo} ${c.descrizione ?? ''}`.toLowerCase().includes(needle)) return false;
-      if (stato === 'bozza' && c.congelato) return false;
-      if (stato === 'congelati' && !c.congelato) return false;
-      if (edi === 'con' && c.n_edizioni === 0) return false;
-      if (edi === 'senza' && c.n_edizioni > 0) return false;
+      if (needle && !`${c.titolo} ${c.descrizione ?? ''} ${c.categoria ?? ''}`.toLowerCase().includes(needle)) return false;
+      if (stato !== 'tutti' && c.stato !== stato) return false;
       return true;
     });
     out.sort((a, b) => {
       if (sort === 'titolo') return a.titolo.localeCompare(b.titolo, 'it');
-      if (sort === 'oggetti') return b.n_oggetti - a.n_oggetti;
+      if (sort === 'iscritti') return b.n_iscritti - a.n_iscritti;
       return new Date(b.creato_il).getTime() - new Date(a.creato_il).getTime();
     });
     return out;
-  }, [corsi, q, stato, edi, sort]);
+  }, [corsi, q, stato, sort]);
+
+  const conta = (s: StatoCorso) => corsi.filter((c) => c.stato === s).length;
 
   return (
     <>
-      <div className="page-head">
-        <div className="page-head__lead">
-          <h1>Corsi</h1>
-          <p>
-            Catalogo dei percorsi formativi. Ogni corso raccoglie oggetti didattici e può essere
-            erogato in più edizioni.
-          </p>
-        </div>
-        <div className="page-head__actions">
-          <Link className="btn" href="/admin/corsi/new">
-            <Icon name="plus" /> Nuovo corso
-          </Link>
-        </div>
-      </div>
-
       {corsi.length === 0 ? (
         <div className="empty">
           <Icon name="corsi" className="empty__icon" />
           <div className="empty__t">Nessun corso ancora</div>
-          <div className="empty__s">Crea il primo corso per comporre la struttura didattica e aprirne le edizioni.</div>
+          <div className="empty__s">Crea il primo corso: lezioni, poi la prima edizione con gli iscritti.</div>
           <div className="empty__action">
             <Link className="btn" href="/admin/corsi/new"><Icon name="plus" /> Nuovo corso</Link>
           </div>
@@ -86,30 +63,21 @@ export function CorsiCatalog({
           <div className="toolbar">
             <div className="search">
               <Icon name="search" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca per titolo o descrizione" aria-label="Cerca un corso" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca per titolo, descrizione o categoria" aria-label="Cerca un corso" />
             </div>
             <div className="toolbar__spacer" />
             <div className="filterset">
-              <Seg
-                value={stato}
-                onChange={(v) => setStato(v as StatoF)}
-                options={[['tutti', 'Tutti'], ['bozza', 'Bozza'], ['congelati', 'Congelati']]}
-              />
-              <Seg
-                value={edi}
-                onChange={(v) => setEdi(v as EdiF)}
-                options={[['tutte', 'Edizioni'], ['con', 'Con'], ['senza', 'Senza']]}
-              />
-              <select className="select" style={{ width: 'auto' }} value={sort} onChange={(e) => setSort(e.target.value as SortF)}>
+              <div className="seg seg--mono" role="group" aria-label="Stato">
+                {([['tutti', `Tutti (${corsi.length})`], ['attivo', `Attivi (${conta('attivo')})`], ['bozza', `Bozze (${conta('bozza')})`], ['concluso', `Conclusi (${conta('concluso')})`]] as [StatoF, string][]).map(([v, label]) => (
+                  <button key={v} type="button" className={stato === v ? 'is-active' : ''} onClick={() => setStato(v)}>{label}</button>
+                ))}
+              </div>
+              <select className="select" style={{ width: 'auto' }} value={sort} onChange={(e) => setSort(e.target.value as SortF)} aria-label="Ordina">
                 <option value="recenti">Più recenti</option>
                 <option value="titolo">Titolo A–Z</option>
-                <option value="oggetti">Più oggetti</option>
+                <option value="iscritti">Più iscritti</option>
               </select>
             </div>
-          </div>
-
-          <div className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
-            {filtered.length} {filtered.length === 1 ? 'corso' : 'corsi'}
           </div>
 
           {filtered.length === 0 ? (
@@ -126,20 +94,17 @@ export function CorsiCatalog({
                   <div className="course-card__body">
                     <div className="course-card__head">
                       <h3 className="course-card__title">{c.titolo}</h3>
-                      <span className={`chip ${c.congelato ? 'chip--freeze' : 'chip--ocra'}`}>
-                        <span className="dot" />
-                        {c.congelato ? 'Congelato' : 'Bozza'}
+                      <span className={`chip ${STATO_CORSO_CHIP[c.stato]}`}>
+                        {c.stato === 'attivo' && <span className="dot" />}
+                        {STATO_CORSO_LABEL[c.stato]}
                       </span>
                     </div>
                     {c.descrizione && <div className="course-card__desc">{c.descrizione}</div>}
                     <div className="course-card__foot">
-                      <span className="metaline"><Icon name="layers" /> <span className="num">{c.n_oggetti}</span> oggetti</span>
-                      <span className="metaline"><Icon name="calendar" /> <span className="num">{c.n_edizioni}</span> edizioni</span>
-                      {c.durata_sec > 0 && (
-                        <span className="metaline"><Icon name="clock" /> {fmtMinuti(c.durata_sec)}</span>
-                      )}
-                      {c.sblocco_sequenziale && <span className="chip chip--muted">Sblocco sequenziale</span>}
-                      {c.visione_integrale && <span className="chip chip--muted">Visione integrale</span>}
+                      <span className="metaline"><Icon name="layers" /> <span className="num">{c.n_lezioni}</span> lezioni</span>
+                      <span className="metaline"><Icon name="calendar" /> <span className="num">{c.n_edizioni_attive}</span> {c.n_edizioni_attive === 1 ? 'edizione attiva' : 'edizioni attive'}</span>
+                      <span className="metaline"><Icon name="users" /> <span className="num">{c.n_iscritti}</span> iscritti</span>
+                      {c.durata_sec > 0 && <span className="metaline"><Icon name="clock" /> {fmtMinuti(c.durata_sec)}</span>}
                     </div>
                   </div>
                 </Link>
@@ -149,25 +114,5 @@ export function CorsiCatalog({
         </>
       )}
     </>
-  );
-}
-
-function Seg({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: [string, string][];
-}) {
-  return (
-    <div className="seg seg--mono">
-      {options.map(([v, label]) => (
-        <button key={v} type="button" className={value === v ? 'is-active' : ''} onClick={() => onChange(v)}>
-          {label}
-        </button>
-      ))}
-    </div>
   );
 }

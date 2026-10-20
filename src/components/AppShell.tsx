@@ -46,13 +46,11 @@ const NAV_BY_ROLE: Record<Role, { section: string; items: NavItem[] }> = {
   admin: {
     section: 'Amministrazione',
     items: [
-      { key: 'dashboard', label: 'Dashboard', href: '/admin', ico: 'dashboard' },
+      { key: 'dashboard', label: 'Dashboard', href: '/admin', ico: 'dashboard', exact: true },
       { key: 'corsi', label: 'Corsi', href: '/admin/corsi', ico: 'corsi' },
-      { key: 'contenuti', label: 'Contenuti', href: '/admin/learning-objects', ico: 'libreria' },
-      { key: 'sessioni', label: 'Sessioni', href: '/admin/sessioni', ico: 'sessioni' },
-      { key: 'report', label: 'Report fondi', href: '/admin/report-fondo', ico: 'report' },
-      { key: 'attestati', label: 'Attestati', href: '/admin/attestati', ico: 'shield' },
-      { key: 'ente', label: 'Ente', href: '/admin/ente', ico: 'users' },
+      { key: 'agenda', label: 'Agenda', href: '/admin/agenda', ico: 'sessioni' },
+      { key: 'rendicontazione', label: 'Rendicontazione', href: '/admin/rendicontazione', ico: 'report' },
+      { key: 'impostazioni', label: 'Impostazioni', href: '/admin/impostazioni', ico: 'users' },
     ],
   },
 };

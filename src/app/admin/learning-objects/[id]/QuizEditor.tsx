@@ -115,7 +115,7 @@ export function QuizEditor({ loId, config, domandeIniziali, congelato }: { loId:
     <>
       <form className="card" onSubmit={salvaRegole} noValidate>
         <div className="card__head">
-          <div><h3>Regole del test</h3><div className="sub">Soglia di superamento e tentativi. {congelato ? 'In sola lettura: il test è usato in un corso congelato.' : 'Si congelano con la prima edizione del corso che usa il test.'}</div></div>
+          <div><h3>Regole del test</h3><div className="sub">Soglia di superamento e tentativi. {congelato ? 'In sola lettura: il test è una lezione di un corso attivo.' : 'Si fissano con la prima edizione del corso che usa il test.'}</div></div>
         </div>
         <div className="card__body">
           <div className="grid-2">
@@ -199,7 +199,7 @@ export function QuizEditor({ loId, config, domandeIniziali, congelato }: { loId:
               {dirty && <span className="muted" style={{ fontSize: 13 }}>Modifiche non salvate</span>}
             </div>
           )}
-          {congelato && <div className="field__hint">Per cambiare il test di un corso congelato: <Link href="/admin/learning-objects/new">crea un nuovo test</Link> e usalo in un nuovo corso (o in una copia del corso).</div>}
+          {congelato && <div className="field__hint">Per cambiare il test di un corso attivo: <Link href="/admin/learning-objects/new">crea un nuovo test</Link> e usalo in un nuovo corso (o in una copia del corso).</div>}
         </div>
       </div>
     </>

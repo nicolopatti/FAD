@@ -1532,3 +1532,44 @@ h2 { font-weight: 700; letter-spacing: -.015em; }
 :root[data-theme="dark"] .dialog::backdrop { background: rgba(0,0,0,.6); }
 :root[data-theme="dark"] .cover__cat { background: rgba(22,30,51,.85); color: var(--ink-2); }
 :root[data-theme="dark"] .input:focus, :root[data-theme="dark"] .select:focus, :root[data-theme="dark"] .textarea:focus { background: var(--surface-2); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Area admin — ondata A: schede di pagina, testata con briciole, prontezza
+   ────────────────────────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; width: max-content; max-width: 100%; margin: 0 0 22px; padding: 3px; background: var(--surface-2); border-radius: var(--r-pill); }
+.tabs a { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: var(--r-pill); font-size: 13.5px; font-weight: 500; color: var(--ink-2); text-decoration: none; white-space: nowrap; transition: background var(--dur-1), color var(--dur-1); }
+.tabs a:hover { color: var(--ink); text-decoration: none; }
+.tabs a.is-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+.tabs__count { font-size: 11.5px; font-weight: 600; color: var(--muted); background: var(--bg); border-radius: var(--r-pill); padding: 1px 7px; }
+.tabs a.is-active .tabs__count { color: var(--accent-deep); background: var(--accent-soft); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tabs a.is-active { background: var(--surface-sunken); } }
+:root[data-theme="dark"] .tabs a.is-active { background: var(--surface-sunken); }
+@media (max-width: 640px) { .tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; } }
+
+.page-head .crumb { margin-bottom: 6px; }
+.head-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: var(--muted); }
+
+/* lista di prontezza (panoramica del corso, dashboard) */
+.ready { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ready li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.ready__dot { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; background: var(--surface-2); color: var(--muted); }
+.ready__dot svg { width: 12px; height: 12px; }
+.ready li.is-ok .ready__dot { background: var(--ok-soft); color: var(--ok); }
+.ready li.is-todo .ready__dot { background: var(--warn-soft); color: var(--warn); }
+.ready li a { color: var(--accent-deep); }
+
+/* riga cliccabile in tabella (edizioni, agenda) */
+.tbl tr.is-link { cursor: pointer; }
+.tbl tr.is-link:hover td { background: var(--bg); }
+.tbl td .t-link { color: var(--ink); font-weight: 600; text-decoration: none; }
+.tbl td .t-link:hover { color: var(--accent-deep); }
+
+/* agenda: giorni */
+.agenda-day { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 18px 0 8px; text-transform: none; }
+.agenda-day:first-child { margin-top: 0; }
+
+/* panoramica del corso: copertina + descrizione */
+.corso-intro { display: grid; grid-template-columns: 220px 1fr; gap: 18px; align-items: start; }
+@media (max-width: 640px) { .corso-intro { grid-template-columns: 1fr; } }
+/* le colonne delle griglie non devono allargarsi al contenuto (tabelle in tbl-wrap) */
+.grid-2-380 > *, .grid-2 > *, .grid-3 > * { min-width: 0; }

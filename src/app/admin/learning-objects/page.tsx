@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import type { LearningObjectRow } from '@/lib/db-types';
 import { ContenutiTable, type ContenutoRow } from './ContenutiTable';
+import { CorsiTabs } from '@/components/admin/SezioneTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,5 +36,5 @@ export default async function LearningObjectsListPage() {
     usato_in: usage.get(lo.id) ?? 0,
   }));
 
-  return <ContenutiTable rows={rows} />;
+  return <ContenutiTable rows={rows} tabs={<CorsiTabs nLibreria={rows.filter((r) => !r.archiviato).length} />} />;
 }

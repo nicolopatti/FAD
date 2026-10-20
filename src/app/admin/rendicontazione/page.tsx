@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { Route } from 'next';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { computeReportFondoDataset } from '@/lib/report-fondo';
@@ -7,6 +8,7 @@ import { formatiDisponibili, getAdapter } from '@/lib/report-fondo-formati';
 import { Icon, fmtDataOra } from '@/components/admin/Atlante';
 import { DepositaPanel, type SnapshotRow } from './DepositaPanel';
 import { PianiPanel, type PianoRow } from './PianiPanel';
+import { RendicontazioneTabs } from '@/components/admin/SezioneTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +49,8 @@ export default async function ReportFondoPage({
     const k = `${c.edizione_id}|${c.piano_id}`;
     if (!seen.has(k)) { seen.add(k); combos.push(c); }
   }
+
+  const { count: nAttestati } = await supabase.from('attestato').select('id', { count: 'exact', head: true }).is('sostituito_da', null);
 
   const { data: pianiRaw } = await supabase
     .from('piano_formativo_finanziato')
@@ -89,16 +93,15 @@ export default async function ReportFondoPage({
     <>
       <div className="page-head">
         <div className="page-head__lead">
-          <span className="eyebrow">Report fondi</span>
           <h1>Rendicontazione</h1>
           <p>
-            Genera la rendicontazione per una coppia <strong>(edizione, piano)</strong> finanziata. I
-            dati (ore, frequenza, completamento, idoneità) sono <em>ricalcolati adesso dagli Eventi</em>,
-            l&apos;anagrafica risolta al momento. La generazione non scrive nel log: il deposito
-            write-once con Evento e hash è un&apos;azione separata.
+            Piani finanziati e report per i fondi. Il report si genera per una coppia edizione e piano: ore, frequenza,
+            completamento e idoneità sono ricalcolati adesso dal registro. La generazione non scrive nulla: il deposito,
+            che congela la prova consegnata al fondo, è un&apos;azione separata.
           </p>
         </div>
       </div>
+      <RendicontazioneTabs nAttestati={nAttestati ?? 0} />
 
       <PianiPanel piani={piani} />
 
@@ -109,7 +112,7 @@ export default async function ReportFondoPage({
         </div>
         <div className="card__body card__body--flush">
           {combos.length === 0 ? (
-            <div className="card__body"><div className="muted">Nessun iscritto ha ancora un piano finanziato: assegnalo dal corso, sezione Iscritti.</div></div>
+            <div className="card__body"><div className="muted">Nessun iscritto ha ancora un piano finanziato: si assegna dalla scheda Fondo dell&apos;edizione.</div></div>
           ) : (
             <div className="tbl-wrap"><table className="tbl tbl--zebra">
               <thead>
@@ -128,7 +131,7 @@ export default async function ReportFondoPage({
                       <td>{c.piano?.fondo ?? <span className="muted">—</span>}</td>
                       <td>{c.piano?.cup ? <span className="mono">{c.piano.cup}</span> : <span className="chip chip--err">assente</span>}</td>
                       <td>
-                        <Link className="linklike" href={`/admin/report-fondo?edizione=${c.edizione_id}&piano=${c.piano_id}&formato=${formato}`}>
+                        <Link className="linklike" href={`/admin/rendicontazione?edizione=${c.edizione_id}&piano=${c.piano_id}&formato=${formato}` as Route}>
                           {selected ? 'Selezionata' : 'Anteprima →'}
                         </Link>
                       </td>
@@ -249,7 +252,7 @@ export default async function ReportFondoPage({
                   {formatiDisponibili().map((a) => (
                     <Link
                       key={a.fondo}
-                      href={`/admin/report-fondo?edizione=${edizioneId}&piano=${pianoId}&formato=${a.fondo}`}
+                      href={`/admin/rendicontazione?edizione=${edizioneId}&piano=${pianoId}&formato=${a.fondo}` as Route}
                       className={a.fondo === formato ? 'is-active' : ''}
                     >
                       {a.etichetta}

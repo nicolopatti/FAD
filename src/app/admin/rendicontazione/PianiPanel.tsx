@@ -21,7 +21,7 @@ export type PianoRow = {
 const FONDI: [string, string][] = [['fondimpresa', 'Fondimpresa'], ['foncoop', 'FonCoop']];
 
 // Piani formativi finanziati del tenant: elenco + creazione. L'assegnazione
-// agli iscritti si fa nel Course Builder (sezione Iscritti).
+// agli iscritti si fa dalla scheda Fondo dell'edizione.
 export function PianiPanel({ piani }: { piani: PianoRow[] }) {
   const router = useRouter();
   const { toast } = useFeedback();
@@ -74,7 +74,7 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
       <div className="card__head">
         <div>
           <h3>Piani finanziati</h3>
-          <div className="sub">Il piano (fondo, avviso, CUP) si assegna agli iscritti nel corso, sezione Iscritti.</div>
+          <div className="sub">Il piano (fondo, avviso, CUP) si assegna agli iscritti dalla scheda Fondo dell&apos;edizione.</div>
         </div>
         {!aperto && (
           <button type="button" className="btn btn--secondary btn--sm" onClick={() => setAperto(true)}><Icon name="plus" /> Nuovo piano</button>

@@ -48,17 +48,17 @@ export default async function EditLearningObjectPage({ params }: { params: { id:
     <>
       <div className="page-head">
         <div className="page-head__lead">
-          <span className="eyebrow">Contenuto</span>
+          <span className="eyebrow">Libreria dei contenuti</span>
           <h1>{lo.titolo}</h1>
           <div className="row row--wrap" style={{ marginTop: 8 }}>
             <span className={`chip ${chipClass}`}>{LO_TYPE_LABEL[lo.type]}</span>
-            {usi && usi.length > 0 && <span className="chip chip--muted">usato in {usi.length} cors{usi.length === 1 ? 'o' : 'i'}</span>}
-            {congelato && <span className="chip chip--freeze"><span className="dot" />congelato</span>}
+            {usi && usi.length > 0 && <span className="chip chip--muted">lezione in {usi.length} cors{usi.length === 1 ? 'o' : 'i'}</span>}
+            {congelato && <span className="chip chip--freeze"><span className="dot" />in un corso attivo</span>}
             {lo.archiviato_at && <span className="chip chip--muted">archiviato · {fmtDataOra(lo.archiviato_at)}</span>}
           </div>
         </div>
         <div className="page-head__actions">
-          <Link className="btn btn--ghost" href="/admin/learning-objects"><Icon name="arrowLeft" /> Contenuti</Link>
+          <Link className="btn btn--ghost" href="/admin/learning-objects"><Icon name="arrowLeft" /> Libreria</Link>
         </div>
       </div>
 

@@ -7,6 +7,6 @@ export default async function HomePage() {
   if (!user) redirect('/login');
   const role = (user.app_metadata as { role?: string })?.role;
   if (role === 'auditor') redirect('/audit/log');
-  if (role === 'admin') redirect('/admin/learning-objects');
+  if (role === 'admin') redirect('/admin');
   redirect('/corsi');
 }

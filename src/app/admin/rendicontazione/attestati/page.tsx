@@ -2,6 +2,7 @@ import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { AttestatiTable, type AttestatoLista } from './AttestatiTable';
+import { RendicontazioneTabs } from '@/components/admin/SezioneTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,11 +37,11 @@ export default async function AttestatiPage() {
     <>
       <div className="page-head">
         <div className="page-head__lead">
-          <span className="eyebrow">Amministrazione</span>
-          <h1>Attestati</h1>
-          <p>Ogni attestato è un documento numerato e congelato al momento dell&apos;emissione: si verifica dalla pagina pubblica con il codice stampato sopra. Per correggerne uno si riemette dalla sezione Iscritti del corso.</p>
+          <h1>Rendicontazione</h1>
+          <p>Ogni attestato è un documento numerato e congelato al momento dell&apos;emissione: si verifica dalla pagina pubblica con il codice stampato sopra. Per correggerne uno si riemette dalla scheda Iscritti dell&apos;edizione.</p>
         </div>
       </div>
+      <RendicontazioneTabs nAttestati={lista.filter((a) => a.stato === 'valido').length} />
       <AttestatiTable righe={lista} />
     </>
   );

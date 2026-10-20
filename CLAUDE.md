@@ -9,6 +9,96 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
+## Area admin — ondata A (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **NON ancora su `main`**: da provare nel browser, poi merge solo con autorizzazione)
+
+Richiesta dell'utente: "contenuti" come lista piatta non ha senso, i webinar stanno allo
+stesso livello dei corsi; serviva un'analisi obiettiva e proposte per un'area admin usabile
+e scalabile. Analisi e proposte nel doc Claude **"Analisi area admin FAD"**
+(`https://claude.ai/code/artifact/0d109b23-69d9-4a19-b25f-b5ca8186ad20`): diagnosi (menu
+per tabella e non per lavoro, docenti/persone senza interfaccia, liste non scalabili),
+principio **"il corso è l'unità di lavoro, l'edizione l'unità di erogazione"**, 5 proposte,
+piano in 3 ondate (A orientamento, B libreria, C scala). L'utente ha **approvato il piano**;
+decisioni prese con i default proposti: pagina dell'edizione di primo piano, Attestati sotto
+Rendicontazione, docenti subito, Persone/Aziende/archiviazione/categorie nell'ondata C,
+codice senza tavole intermedie.
+
+**Ondata A fatta (questa sessione):**
+- *Menu a 5 voci* (`AppShell`): Dashboard, Corsi, Agenda, Rendicontazione, Impostazioni.
+  Conteggi: corsi, sessioni future. "Corsi" resta attiva anche su `/admin/learning-objects`.
+- *Route* (gruppi `(corso)` e `(edizione)` per non annidare le testate):
+  `/admin/corsi/[id]` → `(corso)/layout.tsx` (testata: briciole, stato Bozza/Attivo/Concluso
+  da `corsoStato(edizioni)` in `db-types.ts`, Duplica, Nuova edizione) + schede con
+  indirizzo: Panoramica (`(corso)/page.tsx`: copertina, descrizione, edizioni attive con
+  **prontezza** iscritti/sessioni/piano/attestati, "In sintesi", "Prossimi passi" in bozza),
+  `/lezioni` (`_components/Lezioni.tsx`: sequenza + pannello Aggiungi lezione a 3 scelte:
+  Nuova / Dalla libreria con ricerca e filtro tipo / Da CSV; la libreria viene caricata solo a
+  corso in bozza, max 500), `/edizioni` (`EdizioniPanel`: tabella con iscritti/sessioni/
+  attestati, ogni riga apre l'edizione; `?nuova=1` apre il form; dopo la creazione
+  reindirizza all'edizione), `/attestato` (`FormAttestato` + `ModelloEditor`),
+  `/impostazioni` (`FormImpostazioni`: dati, copertina, regole di fruizione; niente più
+  "congelato" in interfaccia: "il corso ha edizioni, titolo/categoria/regole sono fissati").
+  `/admin/corsi/[id]/edizioni/[edizioneId]` → `(edizione)/layout.tsx` (briciole Corsi →
+  corso → codice, schede) + Iscritti (indice, `_components/Iscritti.tsx`: tabella, Invita,
+  piano, attestato Emetti/Riemetti, rimuovi, aggiunta manuale/CSV in una card a comparsa),
+  `/sessioni` (`SessioniList` con stato pianificata/da riconciliare/presenze registrate +
+  `NewSessioneForm` con edizione fissa e scelta del docente), `/sessioni/[sessioneId]`
+  (pagina sessione spostata qui: `SessioneDettagli` — titolo, data, durata, riunione,
+  docente, Annulla sessione — + report importati, `CodaResolver`, `PresenzeManager`,
+  `CsvImportForm`), `/docenti` (`IncarichiPanel`: incarichi con persona e ruolo; assegna da
+  anagrafica con ricerca client o persona nuova), `/fondo` (`FondoPanel`: piani con n.
+  iscritti, **Assegna a tutti**, prontezza per la rendicontazione, link alla rendicontazione
+  filtrata), `/stato` (riusa `CompletamentoTable` dell'auditor per la sola edizione +
+  `EdizioneModifica` codice/date + `EdizioneAzioni` concludi/annulla).
+  `/admin/agenda` (`AgendaList`: tutte le sessioni per giorno, Prossime/Passate/Tutte, sola
+  lettura, coda aperta per sessione). `/admin/rendicontazione` (= vecchio report-fondo) con
+  schede Report fondi | Attestati (`/admin/rendicontazione/attestati`). `/admin/impostazioni`
+  (= vecchia pagina Ente). `/admin/learning-objects` = scheda "Libreria dei contenuti" di
+  Corsi (`CorsiTabs`), senza voce di menu. **Redirect** in `next.config.js`
+  (`/admin/sessioni`→agenda, `/admin/report-fondo`, `/admin/attestati`, `/admin/ente`) e
+  pagina `src/app/admin/sessioni/[id]/page.tsx` che cerca la sessione e reindirizza.
+  `src/app/page.tsx`: l'admin atterra su `/admin`.
+- *Dashboard*: KPI (corsi attivi, edizioni in corso, iscritti, sessioni nei 7 giorni) →
+  catalogo filtrato/agenda; tabella **Edizioni in corso** (iscritti, con piano, sessioni, da
+  riconciliare, attestati) con link all'edizione; prossimi 7 giorni; avviso se ci sono
+  partecipanti da riconciliare; attività recente con i nuovi eventi.
+- *Catalogo*: stati Tutti/Attivi/Bozze/Conclusi con conteggi, card con lezioni, edizioni
+  attive, iscritti; `?stato=attivo|bozza|concluso`.
+- *Backend*: migration `20261021000001_incarico_delete_admin.sql` (**applicata sul live**:
+  policy DELETE admin su `incarico`); route `POST /api/admin/edizioni/[id]/incarichi`
+  (persona esistente o nuova per email, Eventi `incarico.created` + eventuale
+  `persona.created` con `origine: 'incarico'`), `DELETE /api/admin/incarichi/[id]` (409 se
+  una sessione lo usa, Evento `incarico.removed`), `PATCH /api/admin/sessioni/[id]`
+  (titolo/data/durata/riunione/`incarico_id` della stessa edizione; `{annulla: true}` →
+  `annullato_at`, Eventi `sessione.updated`/`sessione.cancelled`),
+  `POST /api/admin/edizioni/[id]/piano` (`piano_id` a tutte le iscrizioni dell'edizione,
+  Evento `edizione.piano_assegnato {piano_id, n_iscrizioni}`). Etichette in
+  `eventi-etichette.ts`. Tipi `IncaricoRuolo`, `INCARICO_RUOLO_LABEL`, `RUOLI_DIDATTICI`,
+  `IncaricoConPersona`, `StatoCorso` in `db-types.ts`.
+- *Primitive*: `components/admin/Tabs.tsx` (schede = indirizzi, `.tabs` in CSS),
+  `useCall.ts` (fetch + refresh + toast + errore; sostituisce il `call()` del builder),
+  `ErrorBanner.tsx`, `SezioneTabs.tsx` (`CorsiTabs`, `RendicontazioneTabs`). CSS: `.tabs`,
+  `.head-chips`, `.ready` (prontezza), `.tbl tr.is-link`, `.agenda-day`, `.corso-intro`,
+  e **`.grid-2-380 > *, .grid-2 > *, .grid-3 > * { min-width: 0 }`** (le colonne non si
+  allargano alle tabelle: era la causa dello sforamento su telefono).
+- Il vecchio `CorsoEditor.tsx` (1.610 righe) è stato eliminato; le sezioni vivono nei file
+  `_components/` sopra. Linguaggio: "lezioni" (non "oggetti"/"struttura"), "attivo/concluso"
+  (non "congelato") nell'area admin; "congelato" resta termine tecnico del registro e del DB.
+- *Verifiche*: typecheck 0, lint 0, unit 39/39, fase4 15/15, build 40 route, **E2E smoke
+  69/69** a 1440/390 (aggiornata ai nuovi indirizzi, incluso il redirect di
+  `/admin/sessioni`), schermate in scratchpad `shotsA/` senza sforamenti né errori JS.
+  Senza chiave di servizio dal container non si provano le scritture nuove (incarichi,
+  PATCH sessione, piano a tutti).
+- **Da provare nel browser dall'utente** (anteprima Vercel del branch): giro completo
+  corso → edizione → sessione; assegnare un docente e sceglierlo in una sessione;
+  "Assegna a tutti" il piano; Concludi edizione dalla scheda Stato; l'agenda; i redirect
+  dai vecchi indirizzi. Poi **merge su `main` solo con autorizzazione esplicita**.
+- **Prossime ondate** (dal doc di analisi): **B libreria** (pagina contenuto con campi reali
+  invece del JSON, "Sostituisci file/video", libreria raggruppata per corso con orfani,
+  ricerca sul server nel pannello Dalla libreria); **C scala** (`corso.archiviato_at`,
+  catalogo a lista con ricerca/paginazione sul server, tabella categorie in Impostazioni,
+  pagine Persone e Aziende con dedup per partita IVA, selettori a ricerca, azioni in blocco,
+  dashboard con conteggi).
+
 ## Fase 5 — test finale e attestato (2026-10-20, branch `claude/affectionate-hawking-03ev7i`, **su `main` dalla sera del 2026-10-20** con autorizzazione esplicita dell'utente "riporta su main"; Task 1–6 fatti, gate M5a chiuso, gate M5 da chiudere nel browser)
 
 Richiesta dell'utente: "rilasciare a chi chiude il percorso e supera il test un

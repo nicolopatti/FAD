@@ -63,7 +63,12 @@ export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[]
   { tipo: 'iscrizione.imported', etichetta: 'Iscrizioni importate', gruppo: 'edizioni' },
   { tipo: 'iscrizione.removed', etichetta: 'Iscrizione rimossa', gruppo: 'edizioni' },
   { tipo: 'piano.created', etichetta: 'Piano finanziato creato', gruppo: 'fondi' },
+  { tipo: 'edizione.piano_assegnato', etichetta: 'Piano assegnato all’edizione', gruppo: 'fondi' },
+  { tipo: 'incarico.created', etichetta: 'Docente o tutor assegnato', gruppo: 'edizioni' },
+  { tipo: 'incarico.removed', etichetta: 'Docente o tutor rimosso', gruppo: 'edizioni' },
   { tipo: 'sessione.created', etichetta: 'Sessione pianificata', gruppo: 'presenze' },
+  { tipo: 'sessione.updated', etichetta: 'Sessione modificata', gruppo: 'presenze' },
+  { tipo: 'sessione.cancelled', etichetta: 'Sessione annullata', gruppo: 'presenze' },
   { tipo: 'report_grezzo_importato', etichetta: 'Report presenze importato', gruppo: 'presenze' },
   { tipo: 'presenza_webinar_registrata', etichetta: 'Presenza registrata', gruppo: 'presenze' },
   { tipo: 'partecipante_non_riconciliato', etichetta: 'Partecipante non riconosciuto', gruppo: 'presenze' },
@@ -127,8 +132,15 @@ export function riassuntoEvento(tipo: string, payload: Record<string, unknown> |
     case 'learning_object.archived':
     case 'learning_object.unarchived':
     case 'sessione.created':
+    case 'sessione.updated':
+    case 'sessione.cancelled':
     case 'piano.created':
       return str('titolo') ?? '';
+    case 'incarico.created':
+    case 'incarico.removed':
+      return str('ruolo') ?? '';
+    case 'edizione.piano_assegnato':
+      return num('n_iscrizioni') != null ? `${num('n_iscrizioni')} iscrizioni` : '';
     case 'struttura.added':
       return str('lo_titolo') ?? '';
     case 'quiz.submitted':

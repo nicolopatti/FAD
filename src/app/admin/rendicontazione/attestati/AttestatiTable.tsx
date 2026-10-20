@@ -51,7 +51,7 @@ export function AttestatiTable({ righe }: { righe: AttestatoLista[] }) {
           <div className="empty">
             <Icon name="shield" className="empty__icon" />
             <div className="empty__t">Nessun attestato emesso</div>
-            <div className="empty__s">Gli attestati compaiono qui quando un iscritto completa un corso che li prevede (o quando li emetti dalla sezione Iscritti).</div>
+            <div className="empty__s">Gli attestati compaiono qui quando un iscritto completa un corso che li prevede (o quando li emetti dalla scheda Iscritti dell&apos;edizione).</div>
           </div>
         ) : (
           <>
