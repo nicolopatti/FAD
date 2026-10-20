@@ -199,12 +199,34 @@ codice senza tavole intermedie.
   (`Lista.tsx`) arrivano ai Server Component come riferimenti vuoti** ("is not a
   function"): le pure (`parsePagina`, `intervallo`, `PER_PAGINA`, `fuoriIntervallo`,
   `hrefPaginaUno`) stanno in `lib/paginazione.ts`. PostgREST risponde 416 se `?pagina=` è
-  oltre l'ultima: le liste reindirizzano alla prima pagina con gli stessi filtri. Dal container senza
-  chiave di servizio le scritture rispondono 503 (archivia, categorie, persone, aziende,
-  blocco): **da provare nel browser dall'utente** nell'anteprima Vercel: archiviare e
-  ripristinare un corso concluso, creare/rinominare una categoria, modificare una persona,
-  creare un'azienda con P.IVA e unirne due, invitare/assegnare piano/emettere attestati in
-  blocco, importare un CSV con la colonna Partita IVA.
+  oltre l'ultima: le liste reindirizzano alla prima pagina con gli stessi filtri.
+- **Scritture verificate sul deploy (2026-10-20, "Non puoi verificare tu?")** con
+  `scripts/verifica-scritture.mjs` + workflow `.github/workflows/verifica-scritture.yml`:
+  gira su un runner GitHub (raggiunge vercel.app e Supabase, a differenza del container),
+  fa il login dell'admin via Supabase Auth, costruisce il cookie di sessione nel formato
+  `@supabase/ssr` (come `tests/carico/player.js`), entra nell'anteprima protetta col link
+  `_vercel_share` (strumento Vercel `get_access_to_vercel_url`, scade in 23 ore) e chiama le
+  API. **29/29** sull'anteprima del commit `2f3e6a5`: categorie (crea, doppione rifiutato,
+  assegna al corso in bozza, rinomina propagata, eliminazione rifiutata se usata, elimina),
+  archivia (bozza archiviata, corso attivo saltato, già archiviato, ripristino), persona
+  (modifica e ripristino, email non valida), aziende (P.IVA normalizzata `IT 098…` →
+  `098…`, doppia rifiutata, modifica, ricerca con esclusione, unione con sede copiata e
+  riga eliminata, pulizia unendo la prova nella demo, unione con sé stessa rifiutata),
+  blocco iscritti (piano assegnato/tolto a Neri con Bianchi "già così", azione ignota
+  400, attestato: Neri saltata "non completato", Bianchi "ha già un attestato valido"),
+  catena integra (246 eventi). Nessun residuo nel DB. **Effetto permanente**: il primo
+  giro ha emesso l'attestato di Mario Bianchi (ED-WEB-2026, idoneo al 100%: Evento 216).
+  **Difetto trovato e corretto grazie alla prova**: gli Eventi `categoria.*` portavano la
+  chiave `nome` → `audit_append` la rifiuta (guardia anti-PII sulle CHIAVI nome/cognome/
+  email/codice_fiscale, non sui valori) → HTTP 500 dopo l'INSERT. Ora `titolo`. **Regola**:
+  nei payload mai le chiavi `nome`/`cognome`/`email`/`codice_fiscale`, nemmeno per cose che
+  non sono persone. Limiti dello strumento: l'integrazione GitHub della sessione non può
+  avviare i workflow (`workflow_dispatch` → 403) → il workflow parte dal push che tocca lo
+  script o il file del workflow, con URL e link `_vercel_share` scritti nel file (da
+  aggiornare a ogni anteprima nuova; l'utente può anche lanciarlo a mano da GitHub con gli
+  input); i Vercel Sandbox non sono abilitati (403). Non provati: invito in blocco (manda
+  email), rimozione in blocco (toccherebbe i seed), CSV con Partita IVA (parsing lato
+  client, logica di `addIscritto` coperta dalla prova delle aziende).
 
 ## Fase 5 — test finale e attestato (2026-10-20, branch `claude/affectionate-hawking-03ev7i`, **su `main` dalla sera del 2026-10-20** con autorizzazione esplicita dell'utente "riporta su main"; Task 1–6 fatti, gate M5a chiuso, gate M5 da chiudere nel browser)
 
