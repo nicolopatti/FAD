@@ -85,6 +85,9 @@ const api = async (method, path, body, cookie = cookieAdmin) => {
 // 1) categorie: crea → assegna a un corso in bozza → rinomina (si propaga) → togli dal corso → elimina
 let catId = null;
 {
+  // residui di prove precedenti interrotte a metà
+  const lista = await api('GET', '/api/admin/categorie');
+  for (const c of lista.json?.categorie ?? []) if (/^Verifica C/.test(c.nome)) { const d = await api('DELETE', `/api/admin/categorie/${c.id}`); console.log(`pulizia categoria residua "${c.nome}": HTTP ${d.status}`); }
   const nome = `Verifica C ${Date.now().toString(36)}`;
   const c = await api('POST', '/api/admin/categorie', { nome });
   check('categoria: creazione', c.status === 200 && c.json?.categoria?.nome === nome, `HTTP ${c.status} ${c.json?.error ?? ''}`);
@@ -175,9 +178,12 @@ let catId = null;
 // 6) registro: la catena resta integra (auditor)
 {
   const auditor = await login(process.env.AUDITOR_EMAIL ?? 'auditor@fad.local', process.env.AUDITOR_PASSWORD ?? '');
-  const v = await api('GET', '/api/audit/verify', undefined, [vercel, cookieSessione(auditor)].filter(Boolean).join('; '));
+  const st = await fetch(`${SUPA}/rest/v1/rpc/current_stream_id`, { method: 'POST', headers: { apikey: ANON, authorization: `Bearer ${auditor.access_token}`, 'content-type': 'application/json' }, body: '{}' });
+  const streamId = String(await st.json()).replace(/"/g, '');
+  const v = await api('GET', `/api/audit/verify?stream_id=${encodeURIComponent(streamId)}`, undefined, [vercel, cookieSessione(auditor)].filter(Boolean).join('; '));
   const okCatena = v.status === 200 && (v.json?.ok === true || v.json?.integra === true || (Array.isArray(v.json?.problemi) && v.json.problemi.length === 0));
   check('registro: catena integra dopo le scritture', okCatena, `HTTP ${v.status} ${JSON.stringify(v.json).slice(0, 200)}`);
+  if (v.json?.eventi != null) console.log(`eventi nel registro: ${v.json.eventi}, testa seq ${v.json?.testa?.seq ?? '?'}`);
 }
 
 const ok = esiti.filter((e) => e[0]).length;

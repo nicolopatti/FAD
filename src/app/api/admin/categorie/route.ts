@@ -38,7 +38,8 @@ export async function POST(request: Request) {
     actor: { persona_id: session.personaId, type: 'persona' },
     subjectType: 'categoria',
     subjectId: data.id,
-    payload: { nome: data.nome },
+    // `titolo`, non `nome`: la guardia anti-PII di audit_append rifiuta la chiave `nome`.
+    payload: { titolo: data.nome },
   });
   return NextResponse.json({ ok: true, categoria: data });
 }

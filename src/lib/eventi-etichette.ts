@@ -192,7 +192,7 @@ export function riassuntoEvento(tipo: string, payload: Record<string, unknown> |
     case 'categoria.created':
     case 'categoria.updated':
     case 'categoria.removed':
-      return str('titolo') ?? str('nome') ?? '';
+      return str('titolo') ?? '';
     case 'azienda.unita':
       return num('n_iscrizioni') != null ? `${num('n_iscrizioni')} iscrizioni spostate` : '';
     default:

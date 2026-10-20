@@ -58,7 +58,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       actor: { persona_id: session.personaId, type: 'persona' },
       subjectType: 'categoria',
       subjectId: cat.id,
-      payload: { nome: data.nome, nome_precedente: cat.nome, corsi_aggiornati: corsiAggiornati },
+      payload: { titolo: data.nome, titolo_precedente: cat.nome, corsi_aggiornati: corsiAggiornati },
     });
   }
   return NextResponse.json({ ok: true, categoria: data, corsi_aggiornati: corsiAggiornati });
@@ -82,7 +82,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     actor: { persona_id: session.personaId, type: 'persona' },
     subjectType: 'categoria',
     subjectId: cat.id,
-    payload: { nome: cat.nome },
+    payload: { titolo: cat.nome },
   });
   return NextResponse.json({ ok: true });
 }

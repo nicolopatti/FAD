@@ -17,7 +17,6 @@ const EDIZIONI_IN_DASHBOARD = 12;
 function activityView(ev: EventoMini): { ico: string; node: React.ReactNode } | null {
   const p = ev.payload ?? {};
   const titolo = typeof p.titolo === 'string' ? p.titolo : null;
-  const nome = typeof p.nome === 'string' ? p.nome : null;
   const codice = typeof p.codice === 'string' ? p.codice : null;
   const loTitolo = typeof p.lo_titolo === 'string' ? p.lo_titolo : null;
   const n = typeof p.aggiunti === 'number' ? p.aggiunti : typeof p.righe === 'number' ? p.righe : null;
@@ -29,9 +28,9 @@ function activityView(ev: EventoMini): { ico: string; node: React.ReactNode } | 
     case 'corso.updated': return { ico: 'corsi', node: <>Aggiornato il corso {strong(titolo)}</> };
     case 'corso.archived': return { ico: 'archive', node: <>Archiviato il corso {strong(titolo)}</> };
     case 'corso.unarchived': return { ico: 'archive', node: <>Ripristinato il corso {strong(titolo)}</> };
-    case 'categoria.created': return { ico: 'plus', node: <>Nuova categoria {strong(nome)}</> };
-    case 'categoria.updated': return { ico: 'edit', node: <>Categoria rinominata in {strong(nome)}</> };
-    case 'categoria.removed': return { ico: 'x', node: <>Eliminata la categoria {strong(nome)}</> };
+    case 'categoria.created': return { ico: 'plus', node: <>Nuova categoria {strong(titolo)}</> };
+    case 'categoria.updated': return { ico: 'edit', node: <>Categoria rinominata in {strong(titolo)}</> };
+    case 'categoria.removed': return { ico: 'x', node: <>Eliminata la categoria {strong(titolo)}</> };
     case 'edizione.updated': return { ico: 'edit', node: <>Modificata l&apos;edizione <span className="mono">{codice}</span></> };
     case 'iscrizione.updated': return { ico: 'euro', node: <>{p.piano_id ? 'Assegnato un piano finanziato a un iscritto' : 'Tolto il piano finanziato a un iscritto'}</> };
     case 'edizione.piano_assegnato': return { ico: 'euro', node: <>Piano finanziato assegnato a tutta un&apos;edizione</> };
