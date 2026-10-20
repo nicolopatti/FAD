@@ -87,3 +87,83 @@ export function visioneIntegraleCompleta(segmenti: ReadonlyArray<Segmento>, dura
   if (!haEnded || !(durata > 0)) return false;
   return coperturaSecondi(segmenti) >= SOGLIA_VISIONE_INTEGRALE * durata;
 }
+
+/**
+ * Ricostruzione SERVER-SIDE dei tratti riprodotti dal tempo reale.
+ *
+ * Il client dichiara `segmenti_visti`, ma non è fonte di verità: un player a
+ * 2x (o una chiamata all'API costruita a mano) dichiarerebbe tratti mai visti in
+ * tempo reale. Qui si usano solo i timestamp server (`occurred_at`, scritti da
+ * `audit_append`) e le posizioni dichiarate:
+ *   play(pos) a t0 → stato "in riproduzione" da pos;
+ *   pause(pos)/seek/ended a t1 → tratto [pos0, min(pos_dichiarata, pos0 + (t1−t0)·TOLLERANZA)].
+ * A velocità 1x le due cose coincidono; a 2x il tratto vale la metà del dichiarato;
+ * una chiamata forgiata senza attesa reale vale ~0. Un evento di chiusura mancante
+ * (scheda chiusa) perde il tratto: errore per difetto, mai per eccesso.
+ */
+export type EventoVideo = {
+  event_type: string;
+  occurred_at: string; // timestamp server
+  payload: Record<string, unknown> | null;
+};
+
+/** Margine sul tempo reale: piccole derive del player e latenza di rete. */
+export const TOLLERANZA_TEMPO_REALE = 1.02;
+const LATENZA_SECONDI = 1.5;
+
+const num = (v: unknown): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+export function ricostruisciTrattiDaEventi(eventi: ReadonlyArray<EventoVideo>, durataNota = 0): Segmento[] {
+  const out: Segmento[] = [];
+  let inizioPos: number | null = null;
+  let inizioT = 0;
+  let durata = durataNota;
+  const chiudi = (t1: number, posDichiarata: number | null) => {
+    if (inizioPos == null) return;
+    const elapsed = Math.max(0, (t1 - inizioT) / 1000);
+    let fine = inizioPos + elapsed * TOLLERANZA_TEMPO_REALE + LATENZA_SECONDI;
+    if (posDichiarata != null) fine = Math.min(fine, posDichiarata);
+    if (durata > 0) fine = Math.min(fine, durata);
+    if (fine > inizioPos) out.push([inizioPos, fine]);
+    inizioPos = null;
+  };
+  for (const e of eventi) {
+    const t = Date.parse(e.occurred_at);
+    if (!Number.isFinite(t)) continue;
+    const p = e.payload ?? {};
+    const d = num(p.durata_secondi);
+    if (d != null && d > 0 && d > durata) durata = d;
+    switch (e.event_type) {
+      case 'video.play': {
+        // Un play senza pausa precedente (evento perso): chiudi il tratto aperto
+        // al tempo reale, poi riparti dalla posizione dichiarata.
+        chiudi(t, null);
+        inizioPos = num(p.posizione_secondi) ?? 0;
+        inizioT = t;
+        break;
+      }
+      case 'video.pause':
+        chiudi(t, num(p.posizione_secondi));
+        break;
+      case 'video.seek': {
+        // Il tratto prima del salto finisce al tempo reale; dopo il salto il
+        // player continua a riprodurre dalla nuova posizione SOLO se stava già
+        // riproducendo (un seek in pausa non apre nessun tratto).
+        const eraInRiproduzione = inizioPos != null;
+        chiudi(t, num(p.from_secondi));
+        const to = num(p.to_secondi);
+        if (eraInRiproduzione && to != null) { inizioPos = to; inizioT = t; }
+        break;
+      }
+      case 'video.ended':
+        chiudi(t, durata > 0 ? durata : null);
+        break;
+      default:
+        break;
+    }
+  }
+  return unisciSegmenti(out);
+}

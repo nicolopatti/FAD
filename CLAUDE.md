@@ -108,21 +108,31 @@ il trigger). Meccanica:
   visto (`setCurrentTime` indietro + avviso) e mostra il % riprodotto.
 - `/api/events/video` valida/ritaglia i segmenti (`normalizzaSegmenti`, `lib/visione.ts`)
   e aggiunge `copertura_secondi`. Niente PII.
-- `compliance.ts`: legge anche pause/seek/ended, unisce i segmenti per LO
-  (`unisciSegmenti`), espone `copertura_percentuale` per i video; con
-  `visione_integrale` un LO `video_ended` è completato solo se **ended E copertura ≥
-  95%** (`SOGLIA_VISIONE_INTEGRALE`, costante in `lib/visione.ts`). Durata = quella
-  riportata dal player se c'è, altrimenti `config.durata_secondi`. Gli eventi
-  precedenti a questa modifica non hanno segmenti → copertura 0: sul corso di prova la
-  Lezione 01 "completata trascinando" torna **non completata** (voluto).
+- `compliance.ts`: legge play/pause/seek/ended del discente sul LO e **ricostruisce i
+  tratti dal tempo reale** (`ricostruisciTrattiDaEventi`, `lib/visione.ts`): un play a
+  t0 da pos p e la chiusura (pause/seek/ended) a t1 valgono [p, min(pos dichiarata,
+  p + (t1−t0)·1.02 + 1.5 s)]; un seek in pausa non apre tratti; una chiusura mancante
+  perde il tratto (errore per difetto). I timestamp sono quelli server di
+  `audit_append`. Così **2x non conta** (metà copertura) e una chiamata API forgiata
+  senza attesa reale vale ~0. I `segmenti_visti` dichiarati dal client restano nel
+  log solo come informazione. Con `visione_integrale` un LO `video_ended` è completato
+  solo se **ended E copertura ricostruita ≥ 95%** (`SOGLIA_VISIONE_INTEGRALE`).
+  `copertura_percentuale` e `segmenti_visti` (ricostruiti) sono esposti in
+  `ProgressoLO`: il player riparte da lì dopo un ricaricamento e il limite dei salti
+  in avanti è la fine del tratto contiguo dall'inizio. Gli eventi precedenti al
+  2026-10-20 contano col tempo reale: sul corso di prova la Lezione 01 "completata
+  trascinando" torna **non completata** (voluto).
+- Player in modalità integrale: velocità bloccata a 1x (`speed=false` nell'embed +
+  `setPlaybackRate(1)` su `playbackratechange`), niente salti in avanti, "Riprodotto
+  finora: N%" cumulativo, testo che spiega che conta il tempo reale.
 - Admin: switch "Visione integrale dei video" in `/admin/corsi/new` e nel Course
   Builder (sezione Dati, disabilitato a corso congelato); chip nel catalogo; route
   POST/PATCH corsi accettano `visione_integrale`. Auditor: "(integrale ≥95%) · visto N%".
   Discente: testo informativo nel player e "Visto N%" nella lista.
-- Test: `tests/unit/visione.test.ts` (6), pgTAP `supabase/tests/corso_visione_integrale.sql` (5).
-Limite noto: la copertura è dichiarata dal client (come `video.ended`); la UI non
-permette scorciatoie, una chiamata API costruita a mano sì. Difesa ulteriore possibile:
-confrontare l'incremento di copertura con il tempo reale trascorso tra gli eventi.
+- Test: `tests/unit/visione.test.ts` (13, incluse le scene 2x / salto / forgiatura /
+  seek in pausa), pgTAP `supabase/tests/corso_visione_integrale.sql` (5).
+Limite residuo: il tempo reale misura la riproduzione, non l'attenzione (un video
+lasciato andare da solo conta). Per la formazione normata è lo standard accettato.
 
 **Autorizzazione di sessione (2026-10-19):** l'utente ha autorizzato
 esplicitamente tutte le modifiche senza chiedere conferma, incluso il push su

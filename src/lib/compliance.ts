@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LearningObjectType, StrutturaRow } from './db-types';
-import { coperturaPercentuale, unisciSegmenti, visioneIntegraleCompleta, type Segmento } from './visione';
+import { coperturaPercentuale, ricostruisciTrattiDaEventi, visioneIntegraleCompleta, type EventoVideo, type Segmento } from './visione';
 
 export type StrutturaItem = {
   struttura_id: string;
@@ -112,42 +112,43 @@ export async function computeProgressoForIscrizione(
     new Set(items.map((i) => COMPLETION_EVENT_FOR_RULE[i.regola_completamento.tipo])),
   ).filter(Boolean);
   // Visione integrale (corso.visione_integrale): oltre a `video.ended` serve la
-  // copertura dei tratti riprodotti, che il player invia come `segmenti_visti`
-  // nei payload di pause/seek/ended. Si leggono quindi anche quegli eventi.
+  // copertura dei tratti riprodotti. La copertura si RICOSTRUISCE dai timestamp
+  // server degli eventi play/pause/seek/ended (tempo reale, lib/visione.ts):
+  // i `segmenti_visti` dichiarati dal client restano nel log solo a titolo
+  // informativo (un player a 2x o una chiamata forgiata non contano).
   const integrale = Boolean(corso.visione_integrale);
   const hasVideo = items.some((i) => i.lo_type === 'video');
-  const coverageTypes = hasVideo ? ['video.pause', 'video.seek', 'video.ended'] : [];
+  const coverageTypes = hasVideo ? ['video.play', 'video.pause', 'video.seek', 'video.ended'] : [];
   const eventTypes = Array.from(new Set([...completionTypes, ...coverageTypes]));
   type EventoCompletamento = {
     subject_id: string | null;
     event_type: string;
+    occurred_at: string;
     actor: { persona_id?: string } | null;
-    payload: { segmenti_visti?: unknown; durata_secondi?: unknown } | null;
+    payload: Record<string, unknown> | null;
   };
 
   const completionEventsByLo = new Map<string, Set<string>>();
-  const segmentiByLo = new Map<string, Segmento[]>();
+  const videoEventsByLo = new Map<string, EventoVideo[]>();
   const durataByLo = new Map<string, number>();
   if (loIds.length && eventTypes.length) {
     const { data: events } = await supabase
       .from('evento')
-      .select('subject_id, event_type, actor, payload')
+      .select('subject_id, event_type, occurred_at, actor, payload')
       .eq('actor->>persona_id', iscrizione.persona_id)
       .in('event_type', eventTypes)
       .in('subject_id', loIds)
+      .order('seq', { ascending: true })
       .returns<EventoCompletamento[]>();
     for (const e of events ?? []) {
       // Controllo difensivo: il filtro SQL è già sull'attore.
       if (e.actor?.persona_id !== iscrizione.persona_id || !e.subject_id) continue;
       if (!completionEventsByLo.has(e.subject_id)) completionEventsByLo.set(e.subject_id, new Set());
       completionEventsByLo.get(e.subject_id)!.add(e.event_type);
-      const seg = e.payload?.segmenti_visti;
-      if (Array.isArray(seg)) {
-        const acc = segmentiByLo.get(e.subject_id) ?? [];
-        for (const s of seg) {
-          if (Array.isArray(s) && s.length === 2 && Number.isFinite(s[0]) && Number.isFinite(s[1])) acc.push([Number(s[0]), Number(s[1])]);
-        }
-        segmentiByLo.set(e.subject_id, acc);
+      if (e.event_type.startsWith('video.')) {
+        const acc = videoEventsByLo.get(e.subject_id) ?? [];
+        acc.push({ event_type: e.event_type, occurred_at: e.occurred_at, payload: e.payload });
+        videoEventsByLo.set(e.subject_id, acc);
       }
       const d = e.payload?.durata_secondi;
       if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
@@ -167,11 +168,11 @@ export async function computeProgressoForIscrizione(
     let copertura: number | undefined;
     let segmentiVideo: Segmento[] | undefined;
     if (it.lo_type === 'video') {
-      const segmenti = unisciSegmenti(segmentiByLo.get(it.learning_object_id) ?? []);
-      segmentiVideo = segmenti;
       // Durata: quella riportata dal player (reale) se c'è, altrimenti quella dichiarata dall'admin.
       const cfgDurata = Number((it.lo_config as { durata_secondi?: unknown }).durata_secondi);
       const durata = durataByLo.get(it.learning_object_id) ?? (Number.isFinite(cfgDurata) ? cfgDurata : 0);
+      const segmenti = ricostruisciTrattiDaEventi(videoEventsByLo.get(it.learning_object_id) ?? [], durata);
+      segmentiVideo = segmenti;
       if (segmenti.length || durata > 0) copertura = coperturaPercentuale(segmenti, durata);
       if (integrale && it.regola_completamento.tipo === 'video_ended') {
         completato = visioneIntegraleCompleta(segmenti, durata, haRuleEvent);

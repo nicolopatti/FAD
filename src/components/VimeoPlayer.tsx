@@ -14,6 +14,7 @@ type VimeoPlayerInstance = {
   on: (event: string, cb: (data: any) => void) => void;
   getCurrentTime: () => Promise<number>;
   setCurrentTime: (seconds: number) => Promise<number>;
+  setPlaybackRate: (rate: number) => Promise<number>;
 };
 
 type Props = {
@@ -132,6 +133,17 @@ export function VimeoPlayer({
         ultimo = null;
         send('video.seek', conTratti({ from_secondi: d?.previousSeconds ?? null, to_secondi: to }));
       });
+      if (visioneIntegrale) {
+        // Velocità fissa 1x: la copertura vale solo in tempo reale (è anche
+        // ricalcolata così sul server, quindi 2x non "conterebbe" comunque).
+        player.setPlaybackRate(1).catch(() => undefined);
+        player.on('playbackratechange', (d: any) => {
+          if (Number(d?.playbackRate) !== 1) {
+            player?.setPlaybackRate(1).catch(() => undefined);
+            setAvviso('Questo corso richiede la visione integrale a velocità normale.');
+          }
+        });
+      }
       player.on('ended', (d: any) => {
         if (Number.isFinite(d?.duration) && d.duration > 0) durata = d.duration;
         send('video.ended', conTratti({}));
@@ -171,7 +183,7 @@ export function VimeoPlayer({
       >
         <iframe
           ref={iframeRef}
-          src={vimeoEmbedUrl(vimeoId, vimeoHash)}
+          src={vimeoEmbedUrl(vimeoId, vimeoHash, { bloccaVelocita: visioneIntegrale })}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen
@@ -179,7 +191,7 @@ export function VimeoPlayer({
       </div>
       {visioneIntegrale && (
         <div className="muted" style={{ marginTop: 10, fontSize: 13, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <span>Visione integrale richiesta: il video va riprodotto per intero, senza salti in avanti.</span>
+          <span>Visione integrale richiesta: il video va riprodotto per intero, a velocità normale e senza salti in avanti. Il tempo conteggiato è quello reale.</span>
           {copertura != null && <span>Riprodotto finora: {copertura}%</span>}
           {avviso && <span style={{ color: 'var(--accent)' }}>{avviso}</span>}
         </div>

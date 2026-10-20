@@ -57,7 +57,14 @@ export function parseVimeoRef(input: unknown): VimeoRef | null {
 }
 
 /** URL dell'iframe del player (con `h` per i video non in elenco). */
-export function vimeoEmbedUrl(vimeoId: string, vimeoHash?: string | null): string {
-  const base = `https://player.vimeo.com/video/${encodeURIComponent(vimeoId)}?dnt=1`;
-  return vimeoHash ? `${base}&h=${encodeURIComponent(vimeoHash)}` : base;
+export function vimeoEmbedUrl(
+  vimeoId: string,
+  vimeoHash?: string | null,
+  opts: { bloccaVelocita?: boolean } = {},
+): string {
+  let url = `https://player.vimeo.com/video/${encodeURIComponent(vimeoId)}?dnt=1`;
+  if (vimeoHash) url += `&h=${encodeURIComponent(vimeoHash)}`;
+  // Visione integrale: nasconde il menu della velocità di riproduzione.
+  if (opts.bloccaVelocita) url += '&speed=false';
+  return url;
 }
