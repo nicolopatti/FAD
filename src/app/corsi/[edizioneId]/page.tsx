@@ -36,6 +36,7 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
   const pct = prog.totale > 0 ? Math.round((prog.completati / prog.totale) * 100) : 0;
   const currentId = prog.items.find((i) => i.sbloccato && !i.completato)?.learning_object_id;
   const next = prog.items.find((i) => i.sbloccato && !i.completato) ?? prog.items.find((i) => i.sbloccato);
+  const nVideo = prog.items.filter((i) => i.lo_type === 'video').length;
   const minutiTotali = prog.items.reduce((acc, i) => acc + (Number((i.lo_config as { durata_secondi?: unknown }).durata_secondi) || 0), 0) / 60;
   // Data dell'idoneità = completamento dell'ultima lezione obbligatoria.
   const idoneaIl = prog.idonea
@@ -75,11 +76,6 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
       ) : (
         <section className="course-hero">
           <div className="course-hero__inner">
-            <div className="course-hero__chips">
-              <span className="chip chip--onDark">{prog.totale} lezion{prog.totale === 1 ? 'e' : 'i'}</span>
-              {minutiTotali > 0 && <span className="chip chip--onDark">{Math.round(minutiTotali)} min</span>}
-              {prog.visione_integrale && <span className="chip chip--onDark">visione integrale</span>}
-            </div>
             <h1 className="course-hero__title">{prog.corso_titolo}</h1>
             {descrizione && <p className="course-hero__desc">{descrizione}</p>}
             {next && (
@@ -168,7 +164,10 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
               <div className={`progress__bar ${prog.idonea ? 'is-ok' : ''}`} style={{ width: `${pct}%` }} />
             </div>
             <div className="stack-sm" style={{ fontSize: 14 }}>
-              <div className="row row--between"><span className="page-lead">Lezioni completate</span><strong>{prog.completati} di {prog.totale}</strong></div>
+              <div className="row row--between"><span className="page-lead">Lezioni</span><strong>{prog.totale}{nVideo > 0 && nVideo === prog.totale ? ' video' : ''}</strong></div>
+              {minutiTotali > 0 && <div className="row row--between"><span className="page-lead">Durata</span><strong>{Math.round(minutiTotali)} min</strong></div>}
+              {prog.visione_integrale && <div className="row row--between"><span className="page-lead">Modalità</span><strong>visione integrale</strong></div>}
+              <div className="row row--between"><span className="page-lead">Completate</span><strong>{prog.completati} di {prog.totale}</strong></div>
               {prog.obbligatori_totale !== prog.totale && (
                 <div className="row row--between"><span className="page-lead">Obbligatorie</span><strong>{prog.obbligatori_completati} di {prog.obbligatori_totale}</strong></div>
               )}
