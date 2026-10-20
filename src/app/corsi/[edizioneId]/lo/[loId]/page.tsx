@@ -7,8 +7,24 @@ import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { AppShell, Ico } from '@/components/AppShell';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { DocumentoPlayer } from '@/components/DocumentoPlayer';
+import { QuizPlayer } from '@/components/QuizPlayer';
+import { configQuizDa, mescola } from '@/lib/quiz';
+import type { DomandaPublica } from '@/lib/quiz-types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+
+// Domande del test senza il flag `corretta`: la tabella non ha una policy di
+// lettura per il discente, le dà la RPC `quiz_domande_pubbliche` (SECURITY
+// DEFINER, solo a chi è iscritto a un corso con quel test) e il flag non lascia
+// mai il database. La pagina la chiama solo se il test è sbloccato (D26).
+// Ordine casuale a ogni apertura, se previsto.
+async function domandeDelTest(supabase: SupabaseClient, loId: string, ordineCasuale: boolean): Promise<DomandaPublica[] | null> {
+  const { data, error } = await supabase.rpc('quiz_domande_pubbliche', { p_learning_object_id: loId });
+  if (error) return null;
+  const pubbliche = (Array.isArray(data) ? data : []) as DomandaPublica[];
+  return ordineCasuale ? mescola(pubbliche) : pubbliche;
+}
 
 function durataLabel(config: Record<string, unknown>): string | null {
   const s = Number(config?.durata_secondi);
@@ -62,6 +78,9 @@ export default async function LearningObjectPage({ params }: { params: { edizion
 
   const nextHref = nextItem ? hrefDi(nextItem.learning_object_id) : undefined;
   const nextLabel = nextItem ? (nextItem.sbloccato || item.completato ? `Lezione ${nextItem.ordine}` : `Lezione ${nextItem.ordine}`) : undefined;
+  const quizCfg = item.lo_type === 'quiz' ? configQuizDa(item.lo_config) : null;
+  const domande = quizCfg && item.sbloccato ? await domandeDelTest(supabase, item.learning_object_id, quizCfg.ordine_casuale) : null;
+  const metaQuiz = quizCfg && domande ? `${domande.length} domand${domande.length === 1 ? 'a' : 'e'} · soglia ${quizCfg.soglia_percentuale}%` : null;
 
   return (
     <AppShell user={{ name: session.nome, email: session.email }} role="discente" wide>
@@ -71,8 +90,8 @@ export default async function LearningObjectPage({ params }: { params: { edizion
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div className="lesson-meta">
-              Lezione {indice} di {prog.totale}{durata ? ` · ${durata}` : ''}{!item.obbligatorio ? ' · facoltativa' : ''}
-              {item.completato && <span className="status-ok"> · completata</span>}
+              {item.lo_type === 'quiz' ? 'Test finale' : `Lezione ${indice} di ${prog.totale}`}{durata ? ` · ${durata}` : ''}{metaQuiz ? ` · ${metaQuiz}` : ''}{!item.obbligatorio ? ' · facoltativa' : ''}
+              {item.completato && <span className="status-ok"> · {item.lo_type === 'quiz' ? 'superato' : 'completata'}</span>}
             </div>
             <h1 className="lesson-title">{item.lo_titolo}</h1>
           </div>
@@ -99,6 +118,22 @@ export default async function LearningObjectPage({ params }: { params: { edizion
               nextHref={nextHref}
               nextLabel={nextLabel}
             />
+          ) : item.lo_type === 'quiz' && quizCfg ? (
+            domande ? (
+              <QuizPlayer
+                iscrizioneId={iscrizione.id}
+                learningObjectId={item.learning_object_id}
+                domande={domande}
+                soglia={quizCfg.soglia_percentuale}
+                tentativiMax={quizCfg.tentativi_max}
+                esito={item.quiz ?? { tentativi: 0, superato: false, ultima_percentuale: null, migliore_percentuale: null, superato_il: null }}
+                corsoHref={corsoHref}
+                nextHref={nextHref}
+                nextLabel={nextLabel}
+              />
+            ) : (
+              <div className="alert warn">Il test non è disponibile in questo momento. Riprova tra poco.</div>
+            )
           ) : (
             <div className="alert">Questo tipo di contenuto non è supportato.</div>
           )}
@@ -119,7 +154,9 @@ export default async function LearningObjectPage({ params }: { params: { edizion
               ? prog.visione_integrale
                 ? 'Questo corso richiede la visione integrale: il video si guarda per intero a velocità normale, senza salti in avanti. Conta il tempo reale di riproduzione.'
                 : 'La lezione risulta completata quando il video arriva alla fine.'
-              : 'Quando hai finito di leggere, conferma con il pulsante: la lezione viene registrata come completata.'}
+              : item.lo_type === 'quiz'
+                ? 'Le risposte vengono corrette dal sistema alla consegna e il risultato di ogni tentativo resta registrato.'
+                : 'Quando hai finito di leggere, conferma con il pulsante: la lezione viene registrata come completata.'}
           </p>
         </div>
 

@@ -8,7 +8,7 @@ import { fmtDataOra } from '@/components/admin/Atlante';
 
 export const dynamic = 'force-dynamic';
 
-const TYPE_LABEL: Record<string, string> = { video: 'Video', documento: 'Documento' };
+const TYPE_LABEL: Record<string, string> = { video: 'Video', documento: 'Documento', quiz: 'Test finale' };
 
 function durataLabel(config: Record<string, unknown>): string | null {
   const s = Number(config?.durata_secondi);
@@ -131,7 +131,10 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
                     <div className="lo-row__meta">
                       <span>{TYPE_LABEL[it.lo_type] ?? it.lo_type}{durata ? ` · ${durata}` : ''}</span>
                       {!it.obbligatorio && <span>· facoltativa</span>}
-                      {it.completato && <span className="status-ok">· completata{it.completato_il ? ` il ${fmtDataOra(it.completato_il)}` : ''}</span>}
+                      {it.completato && <span className="status-ok">· {it.lo_type === 'quiz' ? 'superato' : 'completata'}{it.completato_il ? ` il ${fmtDataOra(it.completato_il)}` : ''}{it.lo_type === 'quiz' && it.quiz?.migliore_percentuale != null ? ` (${it.quiz.migliore_percentuale}%)` : ''}</span>}
+                      {it.lo_type === 'quiz' && !it.completato && it.quiz && it.quiz.tentativi > 0 && (
+                        <span>· {it.quiz.tentativi} tentativ{it.quiz.tentativi === 1 ? 'o' : 'i'}{it.quiz.ultima_percentuale != null ? `, ultimo ${it.quiz.ultima_percentuale}%` : ''}</span>
+                      )}
                       {isCurrent && !it.completato && <span className="status-now">· da fare</span>}
                       {!it.completato && it.sbloccato && it.copertura_percentuale != null && it.copertura_percentuale > 0 && (
                         <span>· vista al {it.copertura_percentuale}%</span>
@@ -142,7 +145,7 @@ export default async function DettaglioCorsoPage({ params }: { params: { edizion
                   <div className="lo-row__action">
                     {it.sbloccato ? (
                       <Link className={`btn btn--sm ${isCurrent ? '' : 'btn--ghost'}`} href={`/corsi/${params.edizioneId}/lo/${it.learning_object_id}`}>
-                        {it.completato ? 'Rivedi' : isCurrent ? 'Apri' : 'Apri'}
+                        {it.lo_type === 'quiz' ? (it.completato ? 'Esito' : 'Fai il test') : it.completato ? 'Rivedi' : 'Apri'}
                         <Ico name="chevR" size={14} />
                       </Link>
                     ) : null}

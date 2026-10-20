@@ -6,6 +6,7 @@ export type GruppoEvento =
   | 'accesso'
   | 'video'
   | 'documento'
+  | 'test'
   | 'catalogo'
   | 'edizioni'
   | 'presenze'
@@ -15,6 +16,7 @@ export const GRUPPI: { id: GruppoEvento; etichetta: string }[] = [
   { id: 'accesso', etichetta: 'Accessi' },
   { id: 'video', etichetta: 'Video' },
   { id: 'documento', etichetta: 'Documenti' },
+  { id: 'test', etichetta: 'Test finali' },
   { id: 'catalogo', etichetta: 'Corsi e contenuti' },
   { id: 'edizioni', etichetta: 'Edizioni e iscrizioni' },
   { id: 'presenze', etichetta: 'Sessioni e presenze' },
@@ -31,6 +33,9 @@ export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[]
   { tipo: 'video.ended', etichetta: 'Video terminato', gruppo: 'video' },
   { tipo: 'documento.opened', etichetta: 'Documento aperto', gruppo: 'documento' },
   { tipo: 'documento.completed', etichetta: 'Lettura confermata', gruppo: 'documento' },
+  { tipo: 'quiz.started', etichetta: 'Test avviato', gruppo: 'test' },
+  { tipo: 'quiz.submitted', etichetta: 'Test consegnato', gruppo: 'test' },
+  { tipo: 'quiz.domande_aggiornate', etichetta: 'Domande del test aggiornate', gruppo: 'catalogo' },
   { tipo: 'learning_object.created', etichetta: 'Contenuto creato', gruppo: 'catalogo' },
   { tipo: 'learning_object.updated', etichetta: 'Contenuto modificato', gruppo: 'catalogo' },
   { tipo: 'learning_object.archived', etichetta: 'Contenuto archiviato', gruppo: 'catalogo' },
@@ -116,6 +121,16 @@ export function riassuntoEvento(tipo: string, payload: Record<string, unknown> |
       return str('titolo') ?? '';
     case 'struttura.added':
       return str('lo_titolo') ?? '';
+    case 'quiz.submitted':
+      return [
+        num('percentuale') != null ? `${num('percentuale')}%` : null,
+        p.superato === true ? 'superato' : p.superato === false ? 'non superato' : null,
+        num('tentativo') != null ? `tentativo ${num('tentativo')}` : null,
+      ].filter(Boolean).join(' · ');
+    case 'quiz.started':
+      return num('tentativo') != null ? `tentativo ${num('tentativo')}` : '';
+    case 'quiz.domande_aggiornate':
+      return num('n_domande') != null ? `${num('n_domande')} domande` : '';
     case 'struttura.imported':
       return num('aggiunti') != null ? `${num('aggiunti')} aggiunte${str('origine') ? ` (${str('origine')})` : ''}` : '';
     case 'edizione.created':

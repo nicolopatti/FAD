@@ -56,6 +56,7 @@ export default async function CompletamentoPage() {
           copertura: it.copertura_percentuale ?? null,
           stato: it.completato ? 'ok' : it.sbloccato ? 'da_fare' : 'bloccato',
           completato_il: it.completato_il ?? null,
+          quiz: it.quiz ? { tentativi: it.quiz.tentativi, migliore: it.quiz.migliore_percentuale, ultima: it.quiz.ultima_percentuale, superato: it.quiz.superato } : null,
         })),
       };
     }),

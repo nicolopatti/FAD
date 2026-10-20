@@ -17,14 +17,23 @@ export type ContenutoRow = {
   usato_in: number;
 };
 
-type TipoF = 'tutti' | 'video' | 'documento';
+type TipoF = 'tutti' | 'video' | 'documento' | 'quiz';
 type StatoF = 'attivi' | 'archiviati' | 'tutti';
 type SortF = 'recenti' | 'titolo' | 'utilizzo';
+
+const TIPO_LABEL: Record<LearningObjectType, string> = { video: 'Video', documento: 'PDF', quiz: 'Test' };
+const TIPO_CHIP: Record<LearningObjectType, string> = { video: 'chip--teal', documento: 'chip--ocra', quiz: 'chip--accent' };
+const TIPO_ICON: Record<LearningObjectType, string> = { video: 'video', documento: 'documento', quiz: 'quiz' };
 
 function riferimento(r: ContenutoRow): string {
   if (r.type === 'video') {
     const id = r.config?.vimeo_id;
     return `vimeo · ${typeof id === 'string' ? id : '?'}`;
+  }
+  if (r.type === 'quiz') {
+    const s = r.config?.soglia_percentuale;
+    const t = r.config?.tentativi_max;
+    return `soglia ${typeof s === 'number' ? s : '?'}% · tentativi ${typeof t === 'number' ? t : 'illimitati'}`;
   }
   const f = r.config?.filename;
   return typeof f === 'string' ? f : 'documento.pdf';
@@ -35,6 +44,7 @@ function durataCol(r: ContenutoRow): string {
     const d = r.config?.durata_secondi;
     return fmtDurataSec(typeof d === 'number' ? d : null);
   }
+  if (r.type === 'quiz') return '—';
   const size = r.config?.size;
   const kb = typeof size === 'number' ? Math.round(size / 1024) : null;
   return kb != null ? `${kb} KB` : '—';
@@ -97,7 +107,7 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
       <div className="page-head">
         <div className="page-head__lead">
           <h1>Contenuti</h1>
-          <p>Libreria degli oggetti didattici riutilizzabili (video e documenti) del tenant.</p>
+          <p>Libreria dei contenuti riutilizzabili nei corsi: video, documenti e test finali.</p>
         </div>
         <div className="page-head__actions">
           <Link className="btn" href="/admin/learning-objects/new">
@@ -115,7 +125,7 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
         </div>
         <div className="toolbar__spacer" />
         <div className="filterset">
-          <Seg value={tipo} onChange={(v) => setTipo(v as TipoF)} options={[['tutti', 'Tutti'], ['video', 'Video'], ['documento', 'PDF']]} />
+          <Seg value={tipo} onChange={(v) => setTipo(v as TipoF)} options={[['tutti', 'Tutti'], ['video', 'Video'], ['documento', 'PDF'], ['quiz', 'Test']]} />
           <Seg value={stato} onChange={(v) => setStato(v as StatoF)} options={[['attivi', 'Attivi'], ['archiviati', 'Archiviati'], ['tutti', 'Tutti']]} />
           <select className="select" style={{ width: 'auto' }} value={sort} onChange={(e) => setSort(e.target.value as SortF)}>
             <option value="recenti">Più recenti</option>
@@ -151,14 +161,14 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
                 <tr key={r.id} style={r.archiviato ? { opacity: 0.65 } : undefined}>
                   <td>
                     <span className={`type-ico type-ico--${r.type}`}>
-                      <Icon name={r.type === 'video' ? 'video' : 'documento'} />
+                      <Icon name={TIPO_ICON[r.type]} />
                     </span>
                   </td>
                   <td>
                     <Link href={`/admin/learning-objects/${r.id}`} className="t-title">{r.titolo}</Link>
                     <div className="mono muted" style={{ fontSize: 11 }}>{riferimento(r)}</div>
                   </td>
-                  <td><span className={`chip ${r.type === 'video' ? 'chip--teal' : 'chip--ocra'}`}>{r.type === 'video' ? 'Video' : 'PDF'}</span></td>
+                  <td><span className={`chip ${TIPO_CHIP[r.type]}`}>{TIPO_LABEL[r.type]}</span></td>
                   <td className="mono">{durataCol(r)}</td>
                   <td>
                     {r.usato_in > 0 ? (

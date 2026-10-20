@@ -22,6 +22,8 @@ export type ProgressoLO = StrutturaItem & {
   copertura_percentuale?: number;
   /** Solo video: tratti riprodotti [inizio, fine] in secondi, uniti, ricostruiti dal log. */
   segmenti_visti?: Segmento[];
+  /** Solo test: tentativi e percentuali dagli Eventi `quiz.submitted`. */
+  quiz?: EsitoQuiz;
 };
 
 export type ProgressoIscrizione = {
@@ -43,6 +45,9 @@ export type ProgressoIscrizione = {
 const COMPLETION_EVENT_FOR_RULE: Record<string, string> = {
   video_ended: 'video.ended',
   documento_completed: 'documento.completed',
+  // Il test (Fase 5): l'Evento `quiz.submitted` conta come completamento solo se
+  // `payload.superato` è true (correzione fatta dal server, D26).
+  quiz_passed: 'quiz.submitted',
 };
 
 // Etichetta leggibile della regola di completamento per la UI di audit (D35).
@@ -53,10 +58,24 @@ export function regolaLabel(tipo: string): string {
       return 'visione integrale';
     case 'documento_completed':
       return 'lettura integrale';
+    case 'quiz_passed':
+      return 'test superato';
     default:
       return tipo;
   }
 }
+
+/** Esito del test finale ricavato dagli Eventi `quiz.submitted` del discente. */
+export type EsitoQuiz = {
+  tentativi: number;
+  superato: boolean;
+  /** percentuale dell'ultimo tentativo */
+  ultima_percentuale: number | null;
+  /** miglior percentuale tra i tentativi */
+  migliore_percentuale: number | null;
+  /** istante del primo tentativo superato */
+  superato_il: string | null;
+};
 
 export async function computeProgressoForIscrizione(
   supabase: SupabaseClient,
@@ -105,11 +124,14 @@ export async function computeProgressoForIscrizione(
 
   const loIds = items.map((i) => i.learning_object_id);
 
-  // Eventi di completamento di QUESTA persona sugli LO di questo corso.
+  // Eventi di completamento di QUESTA iscrizione sugli LO di questo corso.
   // Il filtro sull'attore è in SQL (indice evento_actor_persona_idx, migration
   // 20261019000004): prima si leggevano gli eventi di tutti i discenti del corso
   // e si filtrava in JavaScript — costo proporzionale agli iscritti a ogni
-  // richiesta del player.
+  // richiesta del player. Il filtro sull'iscrizione (payload.iscrizione_id, indice
+  // evento_payload_iscrizione_idx) evita che un contenuto della libreria riusato
+  // in due corsi porti il credito da un corso all'altro: ogni iscrizione ha la
+  // propria evidenza (tutti gli eventi del player lo portano dalla Fase 1).
   const completionTypes = Array.from(
     new Set(items.map((i) => COMPLETION_EVENT_FOR_RULE[i.regola_completamento.tipo])),
   ).filter(Boolean);
@@ -134,11 +156,13 @@ export async function computeProgressoForIscrizione(
   const completionAtByLo = new Map<string, string>();
   const videoEventsByLo = new Map<string, EventoVideo[]>();
   const durataByLo = new Map<string, number>();
+  const quizByLo = new Map<string, EsitoQuiz>();
   if (loIds.length && eventTypes.length) {
     const { data: events } = await supabase
       .from('evento')
       .select('subject_id, event_type, occurred_at, actor, payload')
       .eq('actor->>persona_id', iscrizione.persona_id)
+      .eq('payload->>iscrizione_id', iscrizione.id)
       .in('event_type', eventTypes)
       .in('subject_id', loIds)
       .order('seq', { ascending: true })
@@ -146,6 +170,18 @@ export async function computeProgressoForIscrizione(
     for (const e of events ?? []) {
       // Controllo difensivo: il filtro SQL è già sull'attore.
       if (e.actor?.persona_id !== iscrizione.persona_id || !e.subject_id) continue;
+      if (e.event_type === 'quiz.submitted') {
+        // Il test conta solo se superato (correzione del server nel payload).
+        const perc = typeof e.payload?.percentuale === 'number' ? (e.payload.percentuale as number) : null;
+        const superato = e.payload?.superato === true;
+        const q = quizByLo.get(e.subject_id) ?? { tentativi: 0, superato: false, ultima_percentuale: null, migliore_percentuale: null, superato_il: null };
+        q.tentativi += 1;
+        q.ultima_percentuale = perc;
+        if (perc != null && (q.migliore_percentuale == null || perc > q.migliore_percentuale)) q.migliore_percentuale = perc;
+        if (superato && !q.superato) { q.superato = true; q.superato_il = e.occurred_at; }
+        quizByLo.set(e.subject_id, q);
+        if (!superato) continue;
+      }
       if (!completionEventsByLo.has(e.subject_id)) completionEventsByLo.set(e.subject_id, new Set());
       completionEventsByLo.get(e.subject_id)!.add(e.event_type);
       if (!e.event_type.startsWith('video.') || e.event_type === 'video.ended') {
@@ -191,6 +227,7 @@ export async function computeProgressoForIscrizione(
     if (completato) out.completato_il = completionAtByLo.get(it.learning_object_id);
     if (copertura !== undefined) out.copertura_percentuale = copertura;
     if (segmentiVideo) out.segmenti_visti = segmentiVideo;
+    if (it.lo_type === 'quiz') out.quiz = quizByLo.get(it.learning_object_id) ?? { tentativi: 0, superato: false, ultima_percentuale: null, migliore_percentuale: null, superato_il: null };
     return out;
   });
 

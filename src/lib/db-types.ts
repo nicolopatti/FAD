@@ -52,7 +52,9 @@ export type EventoRow = {
   hash: string | null;
 };
 
-export type LearningObjectType = 'video' | 'documento';
+export type LearningObjectType = 'video' | 'documento' | 'quiz';
+
+export const LO_TYPE_LABEL: Record<LearningObjectType, string> = { video: 'Video', documento: 'Documento', quiz: 'Test' };
 
 export type LearningObjectMini = {
   titolo: string;
@@ -83,6 +85,25 @@ export type DocumentoConfig = {
   filename?: string;
 };
 
+// Test finale (Fase 5): le domande stanno in `quiz_domanda`; qui solo le regole.
+export type QuizConfig = {
+  soglia_percentuale: number; // 0–100, superato se percentuale ≥ soglia
+  tentativi_max: number | null; // null = illimitati
+  ordine_casuale: boolean;
+  mostra_correzione: boolean; // mostra le risposte giuste dopo un tentativo superato
+};
+
+export type QuizTipoDomanda = 'scelta_singola' | 'scelta_multipla';
+export type QuizRisposta = { testo: string; corretta?: boolean };
+export type QuizDomandaRow = {
+  id: string;
+  learning_object_id: string;
+  ordine: number;
+  testo: string;
+  tipo: QuizTipoDomanda;
+  risposte: QuizRisposta[];
+};
+
 export type CorsoRow = {
   id: string;
   tenant_id: string;
@@ -95,7 +116,7 @@ export type CorsoRow = {
   creato_il: string;
 };
 
-export type RegolaCompletamento = { tipo: 'video_ended' } | { tipo: 'documento_completed' };
+export type RegolaCompletamento = { tipo: 'video_ended' } | { tipo: 'documento_completed' } | { tipo: 'quiz_passed' };
 
 export type StrutturaCorsoRow = {
   id: string;

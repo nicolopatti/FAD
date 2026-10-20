@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 import type { DocumentoConfig, LearningObjectType, VideoConfig } from '@/lib/db-types';
 import { parseVimeoRef } from '@/lib/vimeo';
+import { validaConfigQuiz } from '@/lib/quiz';
 
 type CreateBody = {
   id?: string;
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
 
   const { id, type, titolo, config } = body;
-  if (type !== 'video' && type !== 'documento') {
+  if (type !== 'video' && type !== 'documento' && type !== 'quiz') {
     return NextResponse.json({ ok: false, error: 'type non valido' }, { status: 400 });
   }
   if (typeof titolo !== 'string' || titolo.trim() === '') {
@@ -71,7 +72,9 @@ export async function POST(request: Request) {
   const normalizedConfig =
     type === 'video'
       ? validateVideoConfig(config)
-      : validateDocumentoConfig(config, session.tenantId);
+      : type === 'quiz'
+        ? validaConfigQuiz(config)
+        : validateDocumentoConfig(config, session.tenantId);
   if (typeof normalizedConfig === 'string') {
     return NextResponse.json({ ok: false, error: normalizedConfig }, { status: 400 });
   }

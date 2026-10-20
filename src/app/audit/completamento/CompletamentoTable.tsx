@@ -15,7 +15,10 @@ export type LoRiga = {
   copertura: number | null;
   stato: 'ok' | 'da_fare' | 'bloccato';
   completato_il: string | null;
+  quiz: { tentativi: number; migliore: number | null; ultima: number | null; superato: boolean } | null;
 };
+
+const TIPO_LABEL: Record<string, string> = { video: 'Video', documento: 'Documento', quiz: 'Test finale' };
 
 export type RigaCompletamento = {
   iscrizione_id: string;
@@ -210,8 +213,9 @@ function RigaView({ r, open, pct, onToggle }: { r: RigaCompletamento; open: bool
                   <span className="compl-lo__main">
                     <span className="compl-lo__t">{it.titolo}</span>
                     <span className="muted log-sub">
-                      {it.tipo === 'video' ? 'Video' : 'Documento'} · {it.obbligatorio ? 'obbligatoria' : 'facoltativa'} · {it.regola}{it.integrale && it.tipo === 'video' ? ' (≥ 95% riprodotto)' : ''}
+                      {TIPO_LABEL[it.tipo] ?? it.tipo} · {it.obbligatorio ? 'obbligatoria' : 'facoltativa'} · {it.regola}{it.integrale && it.tipo === 'video' ? ' (≥ 95% riprodotto)' : ''}
                       {it.copertura != null ? ` · visto ${it.copertura}%` : ''}
+                      {it.quiz ? ` · ${it.quiz.tentativi} tentativ${it.quiz.tentativi === 1 ? 'o' : 'i'}${it.quiz.migliore != null ? `, migliore ${it.quiz.migliore}%` : ''}${it.quiz.superato ? ' (superato)' : ''}` : ''}
                       {it.completato_il ? ` · completata il ${fmtDataOra(it.completato_il)}` : ''}
                     </span>
                   </span>

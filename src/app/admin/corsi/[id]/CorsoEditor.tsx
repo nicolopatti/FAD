@@ -8,6 +8,7 @@ import {
   type CorsoRow,
   type EdizioneRow,
   type LearningObjectRow,
+  type LearningObjectType,
   type StrutturaCorsoConLO,
 } from '@/lib/db-types';
 import { parseDelimited } from '@/lib/csv';
@@ -38,6 +39,9 @@ export type IscrittoRow = {
 export type PianoMini = { id: string; titolo: string; codice: string | null; fondo: string | null };
 
 const CATEGORIE = ['Sicurezza', 'Privacy', 'Antincendio', 'Primo soccorso', 'Formazione'];
+const TIPO_LABEL: Record<LearningObjectType, string> = { video: 'Video', documento: 'PDF', quiz: 'Test' };
+const TIPO_CHIP: Record<LearningObjectType, string> = { video: 'chip--teal', documento: 'chip--ocra', quiz: 'chip--accent' };
+const TIPO_ICON: Record<LearningObjectType, string> = { video: 'video', documento: 'documento', quiz: 'quiz' };
 
 export function CorsoEditor({
   corso,
@@ -475,6 +479,7 @@ function SezioneStruttura({
             const lo = s.learning_object;
             const tipo = lo?.type ?? 'video';
             const durata = tipo === 'video' ? fmtDurataSec(typeof lo?.config?.durata_secondi === 'number' ? (lo!.config.durata_secondi as number) : null) : null;
+            const soglia = tipo === 'quiz' && typeof lo?.config?.soglia_percentuale === 'number' ? (lo!.config.soglia_percentuale as number) : null;
             return (
               <div
                 key={s.id}
@@ -500,12 +505,15 @@ function SezioneStruttura({
                 </button>
                 <span className="lo-idx">{String(i + 1).padStart(2, '0')}</span>
                 <div className="row" style={{ minWidth: 0 }}>
-                  <span className={`type-ico type-ico--${tipo}`}><Icon name={tipo === 'video' ? 'video' : 'documento'} /></span>
+                  <span className={`type-ico type-ico--${tipo}`}><Icon name={TIPO_ICON[tipo]} /></span>
                   <div className="lo-main">
-                    <div className="lo-main__title">{lo?.titolo ?? '(oggetto rimosso)'}</div>
+                    <div className="lo-main__title">
+                      {tipo === 'quiz' ? <Link href={`/admin/learning-objects/${s.learning_object_id}`} title="Apri le domande del test">{lo?.titolo ?? '(oggetto rimosso)'}</Link> : (lo?.titolo ?? '(oggetto rimosso)')}
+                    </div>
                     <div className="lo-main__meta">
-                      <span className={`chip ${tipo === 'video' ? 'chip--teal' : 'chip--ocra'}`}>{tipo === 'video' ? 'Video' : 'PDF'}</span>
+                      <span className={`chip ${TIPO_CHIP[tipo]}`}>{TIPO_LABEL[tipo]}</span>
                       {durata && <span><Icon name="clock" style={{ width: 12, height: 12, verticalAlign: -2 }} /> {durata}</span>}
+                      {soglia != null && <span>soglia {soglia}%</span>}
                       <span>· {regolaLabel(s.regola_completamento.tipo)}</span>
                     </div>
                   </div>
@@ -541,7 +549,7 @@ function SezioneStruttura({
 type ImportStrutturaRow = {
   riga: number;
   titolo: string;
-  tipo: 'video' | 'documento' | null;
+  tipo: LearningObjectType | null;
   riferimento: string;
   durata: string;
   obbligatorio: boolean;
@@ -615,10 +623,11 @@ function AggiungiManuale({
   onBusy: BusyFn;
 }) {
   const [aggiungendo, setAggiungendo] = useState(false);
-  const [newType, setNewType] = useState<'video' | 'documento'>('video');
+  const [newType, setNewType] = useState<LearningObjectType>('video');
   const [titolo, setTitolo] = useState('');
   const [vimeo, setVimeo] = useState('');
   const [durata, setDurata] = useState('');
+  const [soglia, setSoglia] = useState('70');
   const [pdf, setPdf] = useState<File | null>(null);
   const [errs, setErrs] = useState<Errori>({});
   const [q, setQ] = useState('');
@@ -637,6 +646,9 @@ function AggiungiManuale({
       const sec = parseMmSs(durata);
       if (!durata.trim()) e.durata = 'Indica la durata, es. 12:40.';
       else if (sec == null || sec <= 0) e.durata = 'Formato non valido: usa mm:ss (es. 12:40) o i secondi.';
+    } else if (newType === 'quiz') {
+      const s = Number(soglia);
+      if (!soglia.trim() || !Number.isFinite(s) || s < 0 || s > 100) e.soglia = 'Percentuale da 0 a 100.';
     } else if (!pdf) {
       e.pdf = 'Seleziona il file PDF da caricare.';
     } else if (pdf.type !== 'application/pdf') {
@@ -655,6 +667,8 @@ function AggiungiManuale({
       let config: Record<string, unknown>;
       if (newType === 'video') {
         config = { vimeo_id: vimeo.trim(), durata_secondi: parseMmSs(durata) };
+      } else if (newType === 'quiz') {
+        config = { soglia_percentuale: Number(soglia), tentativi_max: null, ordine_casuale: true, mostra_correzione: true };
       } else {
         const file = pdf as File; // validato sopra
         onBusy(true);
@@ -667,7 +681,10 @@ function AggiungiManuale({
         config = { storage_key: key, mime: 'application/pdf', size: file.size, filename: file.name };
       }
       const created = (await call('POST', '/api/admin/learning-objects', { type: newType, titolo: titolo.trim(), config })) as { learning_object: { id: string } };
-      await call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: created.learning_object.id }, { successo: 'Contenuto creato e aggiunto al corso.', busy: setAggiungendo });
+      await call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: created.learning_object.id }, {
+        successo: newType === 'quiz' ? 'Test creato e aggiunto al corso: ora aggiungi le domande (apri il test dalla struttura).' : 'Contenuto creato e aggiunto al corso.',
+        busy: setAggiungendo,
+      });
       setTitolo(''); setVimeo(''); setDurata(''); setPdf(null);
     } catch {
       /* errore già mostrato da call */
@@ -681,6 +698,7 @@ function AggiungiManuale({
         <div className="seg seg--mono" style={{ marginBottom: 12 }}>
           <button type="button" className={newType === 'video' ? 'is-active' : ''} onClick={() => setNewType('video')}>Video</button>
           <button type="button" className={newType === 'documento' ? 'is-active' : ''} onClick={() => setNewType('documento')}>Documento</button>
+          <button type="button" className={newType === 'quiz' ? 'is-active' : ''} onClick={() => setNewType('quiz')}>Test</button>
         </div>
         <form onSubmit={createAndAdd} noValidate>
           <Field id="nuovo-titolo" label="Titolo" required error={errs.titolo}>
@@ -695,6 +713,10 @@ function AggiungiManuale({
                 <input id="nuovo-durata" className="input" value={durata} onChange={(e) => { setDurata(e.target.value); if (errs.durata) setErrs({ ...errs, durata: '' }); }} disabled={busy} placeholder="12:40" inputMode="numeric" aria-invalid={Boolean(errs.durata)} />
               </Field>
             </div>
+          ) : newType === 'quiz' ? (
+            <Field id="nuovo-soglia" label="Soglia di superamento (%)" required error={errs.soglia} hint="Le domande si aggiungono subito dopo, dalla pagina del test (tentativi illimitati, modificabili lì).">
+              <input id="nuovo-soglia" className="input" type="number" min={0} max={100} value={soglia} onChange={(e) => { setSoglia(e.target.value); if (errs.soglia) setErrs({ ...errs, soglia: '' }); }} disabled={busy} aria-invalid={Boolean(errs.soglia)} />
+            </Field>
           ) : (
             <Field id="nuovo-pdf" label="File PDF" required error={errs.pdf}>
               <div>
@@ -721,10 +743,10 @@ function AggiungiManuale({
           <div style={{ maxHeight: 280, overflow: 'auto' }}>
             {libFiltered.map((lo) => (
               <div key={lo.id} className="libitem">
-                <span className={`type-ico type-ico--${lo.type}`}><Icon name={lo.type === 'video' ? 'video' : 'documento'} /></span>
+                <span className={`type-ico type-ico--${lo.type}`}><Icon name={TIPO_ICON[lo.type]} /></span>
                 <div className="libitem__main">
                   <div className="libitem__title">{lo.titolo}</div>
-                  <div className="libitem__meta">{lo.type === 'video' ? 'Video' : 'PDF'}</div>
+                  <div className="libitem__meta">{TIPO_LABEL[lo.type]}</div>
                 </div>
                 <button type="button" className="btn btn--secondary btn--xs" disabled={busy} onClick={() => call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: lo.id }, { successo: `"${lo.titolo}" aggiunto al corso.` })}>
                   <Icon name="plus" /> Aggiungi
@@ -772,7 +794,7 @@ function AggiungiCsv({
       const out: ImportStrutturaRow[] = raw.map((r, idx) => {
         const titolo = (ci.titolo >= 0 ? r[ci.titolo] : '')?.trim() ?? '';
         const tipoRaw = (ci.tipo >= 0 ? r[ci.tipo] : '')?.toLowerCase().trim() ?? '';
-        const tipo: 'video' | 'documento' | null = tipoRaw.startsWith('vid') ? 'video' : tipoRaw.startsWith('doc') || tipoRaw.includes('pdf') ? 'documento' : null;
+        const tipo: LearningObjectType | null = tipoRaw.startsWith('vid') ? 'video' : tipoRaw.startsWith('doc') || tipoRaw.includes('pdf') ? 'documento' : tipoRaw.startsWith('test') || tipoRaw.startsWith('quiz') ? 'quiz' : null;
         const riferimento = (ci.riferimento >= 0 ? r[ci.riferimento] : '')?.trim() ?? '';
         const durata = (ci.durata >= 0 ? r[ci.durata] : '')?.trim() ?? '';
         const obbS = (ci.obbligatorio >= 0 ? r[ci.obbligatorio] : '')?.toLowerCase().trim() ?? '';
@@ -820,7 +842,7 @@ function AggiungiCsv({
       >
         <Icon name="upload" className="dropzone__icon" />
         <div className="dropzone__t">Trascina qui un file .csv</div>
-        <div className="dropzone__s">colonne: Titolo, Tipo, Riferimento, Durata (mm:ss), Obbligatorio · da Excel: salva come CSV</div>
+        <div className="dropzone__s">colonne: Titolo, Tipo (video/documento/test), Riferimento (ID Vimeo; per i test la soglia %), Durata (mm:ss), Obbligatorio · da Excel: salva come CSV</div>
       </div>
       <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(parse); e.target.value = ''; }} />
 
@@ -833,7 +855,7 @@ function AggiungiCsv({
                 <tr key={r.riga}>
                   <td className="mono">{r.riga}</td>
                   <td>{r.titolo || <span className="muted">—</span>}</td>
-                  <td>{r.tipo ? (r.tipo === 'video' ? 'Video' : 'PDF') : '—'}</td>
+                  <td>{r.tipo ? TIPO_LABEL[r.tipo] : '—'}</td>
                   <td>
                     {r.esito === 'errore' ? <span className="chip chip--err">Errore · {r.motivo}</span>
                       : r.esito === 'libreria' ? <span className="chip chip--teal">Dalla libreria</span>

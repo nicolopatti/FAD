@@ -41,6 +41,7 @@ export const ICON_PATHS: Record<string, string> = {
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
   edit: '<path d="M4 20h4l10.5-10.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16z"/><path d="M13 7l4 4"/>',
   euroCircle: '<circle cx="12" cy="12" r="9"/><path d="M15 9.5a3.5 3.5 0 1 0 0 5M8 11h5M8 13h4"/>',
+  quiz: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3"/><path d="M8.5 12l2.2 2.2L15.5 9.5"/><path d="M9 17h6"/>',
 };
 
 export function Icon({
@@ -180,6 +181,7 @@ export function fmtTempoRelativo(iso: string | null | undefined): string {
 export function regolaLabel(tipo: string): string {
   if (tipo === 'video_ended') return 'Visione integrale';
   if (tipo === 'documento_completed') return 'Lettura integrale';
+  if (tipo === 'quiz_passed') return 'Test superato';
   return tipo;
 }
 

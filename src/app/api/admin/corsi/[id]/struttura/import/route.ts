@@ -7,14 +7,16 @@ import type { LearningObjectType, RegolaCompletamento } from '@/lib/db-types';
 
 type ImportRow = {
   titolo?: string;
-  tipo?: 'video' | 'documento' | null;
+  tipo?: 'video' | 'documento' | 'quiz' | null;
   riferimento?: string | null;
   durata_secondi?: number | null;
   obbligatorio?: boolean;
 };
 
 function defaultRegola(type: LearningObjectType): RegolaCompletamento {
-  return type === 'video' ? { tipo: 'video_ended' } : { tipo: 'documento_completed' };
+  if (type === 'video') return { tipo: 'video_ended' };
+  if (type === 'quiz') return { tipo: 'quiz_passed' };
+  return { tipo: 'documento_completed' };
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
@@ -63,34 +65,46 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (existing) {
       loId = existing.id;
     } else {
-      // Creazione al volo: solo video (il documento richiede l'upload del PDF).
-      if (r.tipo !== 'video') { saltati.push({ titolo, motivo: 'documento nuovo: caricalo prima in libreria' }); continue; }
-      const vimeo = parseVimeoRef(r.riferimento);
-      const durata = r.durata_secondi;
-      if (!vimeo || typeof durata !== 'number' || durata <= 0) { saltati.push({ titolo, motivo: 'video: ID/link Vimeo o durata mancanti' }); continue; }
-      const videoConfig: Record<string, unknown> = { vimeo_id: vimeo.vimeo_id, durata_secondi: Math.round(durata) };
-      if (vimeo.vimeo_hash) videoConfig.vimeo_hash = vimeo.vimeo_hash;
+      // Creazione al volo: video e test (il documento richiede l'upload del PDF;
+      // il test nasce senza domande, da aggiungere dalla libreria).
+      let nuovoType: LearningObjectType;
+      let nuovoConfig: Record<string, unknown>;
+      if (r.tipo === 'video') {
+        const vimeo = parseVimeoRef(r.riferimento);
+        const durata = r.durata_secondi;
+        if (!vimeo || typeof durata !== 'number' || durata <= 0) { saltati.push({ titolo, motivo: 'video: ID/link Vimeo o durata mancanti' }); continue; }
+        nuovoType = 'video';
+        nuovoConfig = { vimeo_id: vimeo.vimeo_id, durata_secondi: Math.round(durata) };
+        if (vimeo.vimeo_hash) nuovoConfig.vimeo_hash = vimeo.vimeo_hash;
+      } else if (r.tipo === 'quiz') {
+        const soglia = Number(r.riferimento);
+        nuovoType = 'quiz';
+        nuovoConfig = { soglia_percentuale: Number.isFinite(soglia) && soglia >= 0 && soglia <= 100 ? Math.round(soglia) : 70, tentativi_max: null, ordine_casuale: true, mostra_correzione: true };
+      } else {
+        saltati.push({ titolo, motivo: 'documento nuovo: caricalo prima in libreria' });
+        continue;
+      }
       const { data: createdLo, error: loErr } = await supabase
         .from('learning_object')
-        .insert({ tenant_id: session.tenantId, type: 'video', titolo, config: videoConfig })
+        .insert({ tenant_id: session.tenantId, type: nuovoType, titolo, config: nuovoConfig })
         .select('id, type, titolo')
         .single();
       if (loErr || !createdLo) { saltati.push({ titolo, motivo: loErr?.message ?? 'creazione LO fallita' }); continue; }
       loId = createdLo.id;
-      byTitle.set(key, { id: createdLo.id, type: 'video' });
+      byTitle.set(key, { id: createdLo.id, type: nuovoType });
       await appendEvent({
         tenantId: session.tenantId,
         eventType: 'learning_object.created',
         actor: { persona_id: session.personaId, type: 'persona' },
         subjectType: 'learning_object',
         subjectId: createdLo.id,
-        payload: { type: 'video', titolo: createdLo.titolo },
+        payload: { type: nuovoType, titolo: createdLo.titolo },
       });
     }
 
     if (usedLo.has(loId)) { saltati.push({ titolo, motivo: 'già nel corso' }); continue; }
 
-    const loType = existing?.type ?? 'video';
+    const loType = byTitle.get(key)?.type ?? 'video';
     const { data: st, error: stErr } = await supabase
       .from('struttura_corso')
       .insert({

@@ -10,9 +10,9 @@ type AddBody = {
 };
 
 function defaultRegola(type: LearningObjectType): RegolaCompletamento {
-  return type === 'video'
-    ? { tipo: 'video_ended' }
-    : { tipo: 'documento_completed' };
+  if (type === 'video') return { tipo: 'video_ended' };
+  if (type === 'quiz') return { tipo: 'quiz_passed' };
+  return { tipo: 'documento_completed' };
 }
 
 export async function POST(

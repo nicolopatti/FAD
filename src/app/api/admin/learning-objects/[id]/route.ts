@@ -2,10 +2,23 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
+import { validaConfigQuiz } from '@/lib/quiz';
 
 type UpdateBody = {
   titolo?: string;
+  /** solo per i test: soglia/tentativi/ordine/correzione (congelati con D22) */
+  config?: Record<string, unknown>;
 };
+
+// Il LO è usato in un corso con almeno un'edizione? (freeze D22, calcolato con
+// il client RLS dell'admin: struttura → corso → edizioni)
+async function loCongelato(supabase: ReturnType<typeof createSupabaseServerClient>, loId: string): Promise<boolean> {
+  const { data: righe } = await supabase.from('struttura_corso').select('corso_id').eq('learning_object_id', loId);
+  const corsi = Array.from(new Set((righe ?? []).map((r) => r.corso_id as string)));
+  if (corsi.length === 0) return false;
+  const { count } = await supabase.from('edizione').select('id', { count: 'exact', head: true }).in('corso_id', corsi);
+  return (count ?? 0) > 0;
+}
 
 export async function PATCH(
   request: Request,
@@ -17,6 +30,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
   }
 
+  const supabase = createSupabaseServerClient();
   const updates: Record<string, unknown> = {};
   if (typeof body.titolo === 'string') {
     const t = body.titolo.trim();
@@ -25,12 +39,24 @@ export async function PATCH(
     }
     updates.titolo = t;
   }
+  if (body.config && typeof body.config === 'object') {
+    const { data: lo } = await supabase.from('learning_object').select('type').eq('id', params.id).maybeSingle();
+    if (!lo) return NextResponse.json({ ok: false, error: 'contenuto non trovato' }, { status: 404 });
+    if (lo.type !== 'quiz') {
+      return NextResponse.json({ ok: false, error: 'le proprietà di questo contenuto non si modificano: archivialo e creane uno nuovo' }, { status: 400 });
+    }
+    const cfg = validaConfigQuiz(body.config);
+    if (typeof cfg === 'string') return NextResponse.json({ ok: false, error: cfg }, { status: 400 });
+    if (await loCongelato(supabase, params.id)) {
+      return NextResponse.json({ ok: false, error: 'Il test è usato in un corso congelato: soglia e regole non si possono più modificare.' }, { status: 409 });
+    }
+    updates.config = cfg;
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ ok: false, error: 'nessun campo da aggiornare' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from('learning_object')
     .update(updates)
@@ -47,7 +73,7 @@ export async function PATCH(
     actor: { persona_id: session.personaId, type: 'persona' },
     subjectType: 'learning_object',
     subjectId: data.id,
-    payload: { titolo: data.titolo },
+    payload: { titolo: data.titolo, ...(updates.config ? { config: updates.config } : {}) },
   });
 
   return NextResponse.json({ ok: true, learning_object: data });
