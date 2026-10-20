@@ -1500,6 +1500,23 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
+> **Aggiornamento 2026-10-20 notte, area admin (leggere per primo).** Le tre ondate
+> dell'area admin (A orientamento, B libreria, C scala: dettagli nella sezione in testa al
+> file) sono su `main` dal commit `cdcda87` (fast-forward autorizzato dall'utente "Vai") e
+> in produzione; migration applicate sul live fino alla `20261021000002`. Le scritture
+> dell'ondata C sono state provate sul deploy con `scripts/verifica-scritture.mjs` (29/29).
+> **Prossimi passi:**
+> 1. Riscontro dell'utente nel browser sull'area admin nuova (catalogo a lista, Persone e
+>    Aziende, categorie, azioni in blocco); le rifiniture si fanno in un'unica passata.
+> 2. Non provati da qui: invito in blocco (manda email) e rimozione in blocco.
+> 3. Il workflow `verifica-scritture.yml` ha scritti dentro URL e link `_vercel_share`
+>    dell'anteprima (il link scade dopo 23 ore): per riusarlo aggiornarli, oppure
+>    lanciarlo a mano da GitHub → Actions con gli input. L'integrazione GitHub della
+>    sessione non può avviarlo (403); i Vercel Sandbox non sono abilitati.
+> 4. Dal doc di analisi restano idee non pianificate (non richieste): selettori a ricerca
+>    nei form della rendicontazione, azioni in blocco su altre liste. Niente altro di
+>    aperto sull'area admin. Il resto delle note qui sotto resta valido.
+>
 > **Aggiornamento 2026-10-20 sera (leggere per primo).** Tutto il branch
 > `claude/affectionate-hawking-03ev7i` è su `main` (fast-forward autorizzato
 > dall'utente): Fase 5 completa (test finale, attestato, editor del modello), Blocco B
