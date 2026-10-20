@@ -9,9 +9,13 @@ import type { IscrizioneListaRow } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function MieiCorsiPage() {
+type Filtro = 'tutti' | 'in_corso' | 'completati';
+
+export default async function MieiCorsiPage({ searchParams }: { searchParams?: { filtro?: string } }) {
   const session = await requireSession();
   const supabase = createSupabaseServerClient();
+  const filtro: Filtro =
+    searchParams?.filtro === 'in_corso' || searchParams?.filtro === 'completati' ? searchParams.filtro : 'tutti';
 
   const iscrizioni = unwrap(await supabase
     .from('iscrizione')
@@ -21,117 +25,90 @@ export default async function MieiCorsiPage() {
     .eq('persona_id', session.personaId)
     .returns<IscrizioneListaRow[]>(), 'i tuoi corsi');
 
-  const rows = await Promise.all(
+  const tutti = await Promise.all(
     iscrizioni.map(async (i) => {
       const prog = await computeProgressoForIscrizione(supabase, i.id);
       return { iscrizione: i, prog };
     }),
   );
 
-  const inCorso = rows.filter((r) => r.prog && !r.prog.idonea && r.prog.completati > 0).length;
-  const idonei = rows.filter((r) => r.prog?.idonea).length;
-  const daIniziare = rows.filter((r) => r.prog && r.prog.completati === 0).length;
+  const inCorso = tutti.filter((r) => r.prog && !r.prog.idonea).length;
+  const idonei = tutti.filter((r) => r.prog?.idonea).length;
+  const rows = tutti.filter((r) =>
+    filtro === 'tutti' ? true : filtro === 'in_corso' ? !r.prog?.idonea : Boolean(r.prog?.idonea),
+  );
+
+  const nome = session.nome?.trim().split(' ')[0];
+  const riepilogo = [
+    inCorso > 0 ? `${inCorso} in corso` : null,
+    idonei > 0 ? `${idonei} idoneit${idonei === 1 ? 'à ottenuta' : 'à ottenute'}` : null,
+  ].filter(Boolean).join(' · ');
 
   return (
-    <AppShell
-      user={{ name: session.nome, email: session.email }}
-      role="discente"
-      active="corsi"
-    >
-      <header className="page-head">
-        <div className="page-head__title">
-          <span className="eyebrow">{session.nome ? `Bentornato, ${session.nome}` : 'Bentornato'}</span>
-          <h1>Il tuo percorso formativo.</h1>
-          <p className="meta" style={{ fontSize: 16, marginTop: 4, maxWidth: '54ch' }}>
-            {rows.length === 0
-              ? 'Nessun corso ancora assegnato dalla tua azienda.'
-              : `${rows.length} cors${rows.length === 1 ? 'o' : 'i'} assegnati. Le idoneità sono ricalcolate a ogni accesso dal log eventi append-only del tenant.`}
-          </p>
-        </div>
-        {rows.length > 0 && (
-          <div className="row" style={{ gap: 28 }}>
-            <div>
-              <div className="kpi__label">In corso</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 600, color: 'var(--ink)' }}>
-                {inCorso}
-              </div>
-            </div>
-            <div style={{ width: 1, height: 44, background: 'var(--border)' }} />
-            <div>
-              <div className="kpi__label">Idoneità</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 600, color: 'var(--primary)' }}>
-                {idonei}
-                <small style={{ color: 'var(--muted-2)', fontSize: 18, fontWeight: 500, fontFamily: 'var(--font-sans)' }}>
-                  /{rows.length}
-                </small>
-              </div>
-            </div>
-            <div style={{ width: 1, height: 44, background: 'var(--border)' }} />
-            <div>
-              <div className="kpi__label">Da iniziare</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 600, color: 'var(--ink)' }}>
-                {daIniziare}
-              </div>
-            </div>
-          </div>
-        )}
+    <AppShell user={{ name: session.nome, email: session.email }} role="discente">
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
+        <h1 style={{ fontSize: 'var(--text-2xl)' }}>{nome ? `Ciao, ${nome}` : 'I tuoi corsi'}</h1>
+        <p className="page-lead" style={{ margin: 0 }}>
+          {tutti.length === 0 ? 'Non hai ancora corsi assegnati: quando il tuo ente te ne assegna uno, lo trovi qui.' : riepilogo || `${tutti.length} cors${tutti.length === 1 ? 'o' : 'i'}`}
+        </p>
       </header>
 
-      {rows.length === 0 && (
-        <div className="panel muted">Nessun corso ancora assegnato.</div>
+      {filtro !== 'tutti' && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 18, flexWrap: 'wrap' }}>
+          <span className="chip chip--ghost">{filtro === 'in_corso' ? 'Solo i corsi in corso' : 'Solo i corsi completati'}</span>
+          <Link href="/corsi" className="back-link">Mostra tutti</Link>
+        </div>
+      )}
+
+      {rows.length === 0 && tutti.length > 0 && (
+        <div className="panel page-lead">
+          {filtro === 'in_corso' ? 'Nessun corso in corso: li hai completati tutti.' : 'Nessun corso completato, per ora.'}
+        </div>
       )}
 
       <div className="stack">
         {rows.map(({ iscrizione, prog }) => {
-          const corsoTitolo = iscrizione.edizione?.corso?.titolo ?? '— corso non disponibile —';
+          const corsoTitolo = iscrizione.edizione?.corso?.titolo ?? 'Corso non disponibile';
           const descrizione = iscrizione.edizione?.corso?.descrizione ?? null;
-          const codice = iscrizione.edizione?.codice ?? '—';
           const completati = prog?.completati ?? 0;
           const totale = prog?.totale ?? 0;
           const pct = totale > 0 ? Math.round((completati / totale) * 100) : 0;
           const idonea = prog?.idonea ?? false;
+          const prossima = prog?.items.find((i) => i.sbloccato && !i.completato);
 
           return (
-            <Link
-              key={iscrizione.id}
-              className="corso-card"
-              href={`/corsi/${iscrizione.edizione_id}`}
-            >
+            <Link key={iscrizione.id} className="corso-card" href={`/corsi/${iscrizione.edizione_id}`}>
               <Cover categoria={iscrizione.edizione?.corso?.categoria} src={coverUrl(iscrizione.edizione?.corso?.cover_path)} />
               <div className="corso-card__body">
                 <div className="corso-card__head">
-                  <span className="eyebrow">Edizione {codice}</span>
+                  <span className="page-lead">{totale} lezion{totale === 1 ? 'e' : 'i'}</span>
                   <StatusChip idonea={idonea} completati={completati} />
                 </div>
                 <h2 className="corso-card__title">{corsoTitolo}</h2>
-                {descrizione && (
-                  <p className="corso-card__desc">{descrizione}</p>
-                )}
+                {descrizione && <p className="corso-card__desc">{descrizione}</p>}
 
                 {prog && (
                   <div className="corso-card__progress">
                     <div className="corso-card__progressRow">
                       <span className="corso-card__progressLabel">
-                        {completati}/{totale} oggetti · obbligatori{' '}
-                        <strong style={{ color: 'var(--ink-2)' }}>
-                          {prog.obbligatori_completati}/{prog.obbligatori_totale}
-                        </strong>
+                        {idonea ? 'Completato' : `${completati} di ${totale} lezioni completate`}
                       </span>
                       <span className="corso-card__progressValue">{pct}%</span>
                     </div>
                     <div className="progress progress--lg">
-                      <div
-                        className={`progress__bar ${idonea ? 'is-ok' : 'is-warn'}`}
-                        style={{ width: `${pct}%` }}
-                      />
+                      <div className={`progress__bar ${idonea ? 'is-ok' : ''}`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 )}
 
                 <div className="corso-card__cta">
-                  <span className="btn btn--secondary btn--sm">
-                    {completati === 0 ? 'Inizia il corso' : idonea ? 'Rivedi materiali' : 'Riprendi'}
-                    <Ico name="chevR" size={14} />
+                  <span className={`btn btn--sm ${idonea ? 'btn--secondary' : ''}`}>
+                    {completati === 0
+                      ? 'Inizia il corso'
+                      : idonea
+                        ? 'Rivedi le lezioni'
+                        : `Riprendi${prossima ? `: lezione ${prossima.ordine}` : ''}`}
+                    <Ico name="arrowR" size={14} />
                   </span>
                 </div>
               </div>

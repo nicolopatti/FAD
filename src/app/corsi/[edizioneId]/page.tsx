@@ -3,20 +3,21 @@ import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
-import { AppShell, Crumb, Ico } from '@/components/AppShell';
+import { AppShell, Ico } from '@/components/AppShell';
+import { fmtDataOra } from '@/components/admin/Atlante';
 
 export const dynamic = 'force-dynamic';
 
-const TYPE_LABEL: Record<string, string> = {
-  video: 'Video',
-  documento: 'Documento',
-};
+const TYPE_LABEL: Record<string, string> = { video: 'Video', documento: 'Documento' };
 
-export default async function DettaglioCorsoPage({
-  params,
-}: {
-  params: { edizioneId: string };
-}) {
+function durataLabel(config: Record<string, unknown>): string | null {
+  const s = Number(config?.durata_secondi);
+  if (!Number.isFinite(s) || s <= 0) return null;
+  const m = Math.round(s / 60);
+  return m < 1 ? '1 min' : `${m} min`;
+}
+
+export default async function DettaglioCorsoPage({ params }: { params: { edizioneId: string } }) {
   const session = await requireSession();
   const supabase = createSupabaseServerClient();
 
@@ -25,118 +26,130 @@ export default async function DettaglioCorsoPage({
     .select('id, edizione:edizione_id ( codice, corso:corso_id ( descrizione ) )')
     .eq('persona_id', session.personaId)
     .eq('edizione_id', params.edizioneId)
-    .maybeSingle<{
-      id: string;
-      edizione: { codice: string; corso: { descrizione: string | null } | null } | null;
-    }>();
+    .maybeSingle<{ id: string; edizione: { codice: string; corso: { descrizione: string | null } | null } | null }>();
   if (!iscrizione) notFound();
 
   const prog = await computeProgressoForIscrizione(supabase, iscrizione.id);
   if (!prog) notFound();
 
-  const codice = iscrizione.edizione?.codice ?? '—';
   const descrizione = iscrizione.edizione?.corso?.descrizione ?? null;
   const pct = prog.totale > 0 ? Math.round((prog.completati / prog.totale) * 100) : 0;
-  // Lo stato "current" = primo oggetto sbloccato e non ancora completato.
   const currentId = prog.items.find((i) => i.sbloccato && !i.completato)?.learning_object_id;
   const next = prog.items.find((i) => i.sbloccato && !i.completato) ?? prog.items.find((i) => i.sbloccato);
+  const minutiTotali = prog.items.reduce((acc, i) => acc + (Number((i.lo_config as { durata_secondi?: unknown }).durata_secondi) || 0), 0) / 60;
+  // Data dell'idoneità = completamento dell'ultima lezione obbligatoria.
+  const idoneaIl = prog.idonea
+    ? prog.items.filter((i) => i.obbligatorio && i.completato_il).map((i) => i.completato_il!).sort().at(-1) ?? null
+    : null;
 
   return (
-    <AppShell user={{ name: session.nome, email: session.email }} role="discente" active="corsi" wide>
-      <Crumb
-        items={[{ label: 'I miei corsi', href: '/corsi' }, { label: prog.corso_titolo }]}
-      />
+    <AppShell user={{ name: session.nome, email: session.email }} role="discente" wide>
+      <Link href="/corsi" className="back-link" style={{ marginBottom: 16 }}>
+        <Ico name="chevL" size={16} /> I miei corsi
+      </Link>
 
-      {/* Hero del corso: classi CSS (prima era tutto inline e non reggeva su telefono) */}
-      <section className="course-hero">
-        <div className="course-hero__inner">
-          <div className="course-hero__chips">
-            <span className="chip chip--onDark">Edizione {codice}</span>
-            <span className="chip chip--onDark">{prog.totale} lezion{prog.totale === 1 ? 'e' : 'i'}</span>
-            <span className="chip chip--onDark">{prog.idonea ? 'Idoneità ottenuta' : `${prog.completati} completat${prog.completati === 1 ? 'a' : 'e'}`}</span>
+      {prog.idonea ? (
+        /* Momento di chiusura: il corso è completato e l'idoneità è registrata. */
+        <section className="seal-panel" aria-labelledby="idoneita">
+          <div className="seal-panel__art">
+            <svg role="img" aria-label="Idoneità registrata" width="160" height="160" viewBox="0 0 160 160" fill="none">
+              <circle cx="80" cy="80" r="72" stroke="rgba(255,255,255,.12)" strokeWidth="2" />
+              <circle className="ring" cx="80" cy="80" r="68" strokeWidth="3" strokeLinecap="round" transform="rotate(-90 80 80)" />
+              <circle cx="80" cy="80" r="54" fill="rgba(124,240,195,.1)" />
+              <path className="check" d="M56 82l16 16 33-36" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
-          <h1 className="course-hero__title">{prog.corso_titolo}</h1>
-          {descrizione && <p className="course-hero__desc">{descrizione}</p>}
-          {next && (
-            <div className="course-hero__actions">
-              <Link
-                className="btn btn--accent btn--lg"
-                href={`/corsi/${params.edizioneId}/lo/${next.learning_object_id}`}
-              >
-                {prog.completati === 0 ? 'Inizia il corso' : 'Riprendi'}
-                <Ico name="play" size={14} />
-              </Link>
+          <div className="seal-panel__body">
+            <div className="seal-panel__kicker">Corso completato</div>
+            <h1 id="idoneita" className="seal-panel__title">Hai ottenuto l&apos;idoneità per &quot;{prog.corso_titolo}&quot;</h1>
+            <p className="seal-panel__text">
+              {idoneaIl ? `Registrata il ${fmtDataOra(idoneaIl)}. ` : ''}
+              Il tuo percorso è stato registrato in modo che nessuno possa modificarlo, e il tuo ente può verificarlo in qualsiasi momento.
+            </p>
+            <div className="seal-panel__meta">
+              <span>{prog.totale} lezion{prog.totale === 1 ? 'e' : 'i'}{minutiTotali > 0 ? ` · ${Math.round(minutiTotali)} min` : ''}</span>
+              {prog.visione_integrale && <span>visione integrale</span>}
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      ) : (
+        <section className="course-hero">
+          <div className="course-hero__inner">
+            <div className="course-hero__chips">
+              <span className="chip chip--onDark">{prog.totale} lezion{prog.totale === 1 ? 'e' : 'i'}</span>
+              {minutiTotali > 0 && <span className="chip chip--onDark">{Math.round(minutiTotali)} min</span>}
+              {prog.visione_integrale && <span className="chip chip--onDark">visione integrale</span>}
+            </div>
+            <h1 className="course-hero__title">{prog.corso_titolo}</h1>
+            {descrizione && <p className="course-hero__desc">{descrizione}</p>}
+            {next && (
+              <div className="course-hero__actions">
+                <Link className="btn btn--lg" style={{ background: '#fff', color: 'var(--ink)' }} href={`/corsi/${params.edizioneId}/lo/${next.learning_object_id}`}>
+                  {prog.completati === 0 ? 'Inizia il corso' : `Riprendi: lezione ${next.ordine}`}
+                  <Ico name="arrowR" size={16} />
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       <div className="detail-layout">
-        {/* Programma */}
         <section>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 }}>
-            <div>
-              <h2 style={{ fontSize: 24 }}>Programma del corso</h2>
-              <p className="meta" style={{ margin: '4px 0 0' }}>
-                {prog.sblocco_sequenziale
-                  ? "Sblocco sequenziale degli obbligatori — l'ordine è applicato dal server."
-                  : 'Contenuti disponibili in qualunque ordine.'}
-              </p>
+          {prog.idonea && (
+            <div style={{ marginBottom: 28 }}>
+              <h2 style={{ marginBottom: 12 }}>E adesso?</h2>
+              <div className="next-steps">
+                <div className="next-step">
+                  <div className="next-step__icon"><Ico name="doc2" size={18} /></div>
+                  <div><strong>L&apos;attestato arriva dal tuo ente</strong><p>Il referente della formazione riceve l&apos;esito e lo trasmette a chi deve riceverlo. Non devi fare altro.</p></div>
+                </div>
+                <div className="next-step">
+                  <div className="next-step__icon next-step__icon--ok"><Ico name="cap" size={18} /></div>
+                  <div><strong>Puoi rivedere le lezioni quando vuoi</strong><p>Il completamento resta valido: rivederle non cambia nulla nel registro.</p></div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+                <Link className="btn" href="/corsi">Vai ai tuoi corsi <Ico name="arrowR" size={14} /></Link>
+              </div>
             </div>
-            <span className="meta">
-              {prog.completati} di {prog.totale} completati
-            </span>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+            <h2>{prog.idonea ? 'Il tuo percorso' : 'Le lezioni'}</h2>
+            <span className="page-lead">{prog.completati} di {prog.totale} completate</span>
           </div>
 
           <div>
             {prog.items.map((it) => {
-              const stato = it.completato
-                ? 'ok'
-                : it.sbloccato
-                  ? 'current'
-                  : 'locked';
               const isCurrent = it.learning_object_id === currentId;
+              const cls = it.completato ? 'is-ok' : isCurrent ? 'is-current' : !it.sbloccato ? 'is-locked' : '';
+              const durata = durataLabel(it.lo_config as Record<string, unknown>);
               return (
-                <div
-                  key={it.struttura_id}
-                  className={`lo-row ${stato === 'ok' ? 'is-ok' : ''} ${isCurrent ? 'is-current' : ''} ${stato === 'locked' ? 'is-locked' : ''}`}
-                >
+                <div key={it.struttura_id} className={`lo-row ${cls}`}>
                   <div className="lo-row__index">
-                    {it.completato ? (
-                      <Ico name="check" size={16} />
-                    ) : !it.sbloccato ? (
-                      <Ico name="lock" size={14} />
-                    ) : (
-                      String(it.ordine).padStart(2, '0')
-                    )}
+                    {it.completato ? <Ico name="check" size={16} /> : !it.sbloccato ? <Ico name="lock" size={14} /> : String(it.ordine)}
                   </div>
                   <div>
                     <div className="lo-row__title">{it.lo_titolo}</div>
                     <div className="lo-row__meta">
-                      <span>{TYPE_LABEL[it.lo_type] ?? it.lo_type}</span>
-                      <span>· {it.obbligatorio ? 'Obbligatorio' : 'Facoltativo'}</span>
-                      {it.completato && <span style={{ color: 'var(--primary)' }}>· Completato</span>}
-                      {isCurrent && <span style={{ color: 'var(--accent)' }}>· Da fare</span>}
-                      {!it.completato && it.copertura_percentuale != null && it.copertura_percentuale > 0 && (
-                        <span>· Visto {it.copertura_percentuale}%{prog.visione_integrale ? ' (serve il 95%)' : ''}</span>
+                      <span>{TYPE_LABEL[it.lo_type] ?? it.lo_type}{durata ? ` · ${durata}` : ''}</span>
+                      {!it.obbligatorio && <span>· facoltativa</span>}
+                      {it.completato && <span className="status-ok">· completata{it.completato_il ? ` il ${fmtDataOra(it.completato_il)}` : ''}</span>}
+                      {isCurrent && !it.completato && <span className="status-now">· da fare</span>}
+                      {!it.completato && it.sbloccato && it.copertura_percentuale != null && it.copertura_percentuale > 0 && (
+                        <span>· vista al {it.copertura_percentuale}%</span>
                       )}
-                      {stato === 'locked' && (
-                        <span style={{ color: 'var(--muted-2)' }}>· Si sblocca al completamento del precedente</span>
-                      )}
+                      {!it.sbloccato && <span>· si apre dopo la precedente</span>}
                     </div>
                   </div>
                   <div className="lo-row__action">
                     {it.sbloccato ? (
-                      <Link
-                        className="btn btn--ghost btn--sm"
-                        href={`/corsi/${params.edizioneId}/lo/${it.learning_object_id}`}
-                      >
-                        {it.completato ? 'Rivedi' : 'Apri'}
+                      <Link className={`btn btn--sm ${isCurrent ? '' : 'btn--ghost'}`} href={`/corsi/${params.edizioneId}/lo/${it.learning_object_id}`}>
+                        {it.completato ? 'Rivedi' : isCurrent ? 'Apri' : 'Apri'}
                         <Ico name="chevR" size={14} />
                       </Link>
-                    ) : (
-                      <span style={{ color: 'var(--muted-2)' }}>—</span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );
@@ -144,49 +157,30 @@ export default async function DettaglioCorsoPage({
           </div>
         </section>
 
-        {/* Sidebar avanzamento */}
         <aside className="player-sidebar">
           <div className="panel">
-            <span className="eyebrow">Il tuo avanzamento</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 10, marginBottom: 14 }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 600, color: 'var(--ink)', lineHeight: 1 }}>
-                {pct}
-                <span style={{ fontSize: 26, color: 'var(--muted-2)' }}>%</span>
-              </span>
+            <div className="page-lead">Il tuo avanzamento</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 6, marginBottom: 12 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 44, fontWeight: 700, color: 'var(--ink)', lineHeight: 1, letterSpacing: '-.03em' }}>{pct}</span>
+              <span style={{ fontSize: 22, color: 'var(--muted-2)', fontWeight: 600 }}>%</span>
             </div>
-            <div className="progress progress--lg" style={{ marginBottom: 18 }}>
-              <div className={`progress__bar ${prog.idonea ? 'is-ok' : 'is-warn'}`} style={{ width: `${pct}%` }} />
+            <div className="progress progress--lg" style={{ marginBottom: 16 }}>
+              <div className={`progress__bar ${prog.idonea ? 'is-ok' : ''}`} style={{ width: `${pct}%` }} />
             </div>
-            <div className="stack-sm" style={{ fontSize: 13.5 }}>
-              <div className="row row--between">
-                <span className="meta">Oggetti completati</span>
-                <strong style={{ color: 'var(--ink)' }}>
-                  {prog.completati}/{prog.totale}
-                </strong>
-              </div>
-              <div className="row row--between">
-                <span className="meta">Obbligatori</span>
-                <strong style={{ color: 'var(--ink)' }}>
-                  {prog.obbligatori_completati}/{prog.obbligatori_totale}
-                </strong>
-              </div>
-              <div className="row row--between">
-                <span className="meta">Idoneità</span>
-                <strong style={{ color: prog.idonea ? 'var(--primary)' : 'var(--ink)' }}>
-                  {prog.idonea ? 'Ottenuta' : 'Non ancora'}
-                </strong>
-              </div>
+            <div className="stack-sm" style={{ fontSize: 14 }}>
+              <div className="row row--between"><span className="page-lead">Lezioni completate</span><strong>{prog.completati} di {prog.totale}</strong></div>
+              {prog.obbligatori_totale !== prog.totale && (
+                <div className="row row--between"><span className="page-lead">Obbligatorie</span><strong>{prog.obbligatori_completati} di {prog.obbligatori_totale}</strong></div>
+              )}
+              <div className="row row--between"><span className="page-lead">Idoneità</span><strong className={prog.idonea ? 'status-ok' : ''}>{prog.idonea ? 'Ottenuta' : 'Non ancora'}</strong></div>
             </div>
           </div>
-
-          <div className="panel">
-            <span className="eyebrow">Cosa significa &quot;sblocco sequenziale&quot;</span>
-            <p className="meta" style={{ marginTop: 10, marginBottom: 0, fontSize: 13, lineHeight: 1.55 }}>
-              Gli oggetti obbligatori si sbloccano nell&apos;ordine. L&apos;apertura diretta
-              dell&apos;URL di un oggetto bloccato viene rifiutata dall&apos;API: l&apos;ordine è
-              applicato lato server, non solo nascosto nell&apos;interfaccia.
+          {prog.sblocco_sequenziale && !prog.idonea && (
+            <p className="page-lead" style={{ margin: '0 6px', lineHeight: 1.55 }}>
+              Le lezioni si aprono una dopo l&apos;altra, nell&apos;ordine del programma.
+              {prog.visione_integrale ? ' I video si guardano per intero, a velocità normale.' : ''}
             </p>
-          </div>
+          )}
         </aside>
       </div>
     </AppShell>

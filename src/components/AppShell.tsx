@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Route } from 'next';
 import { LogoutButton } from './LogoutButton';
-import { SidebarNav, type NavItem } from './SidebarNav';
+import { SidebarNav, TopNav, TabNav, type NavItem } from './SidebarNav';
 
 import { ICON_PATHS } from './icons';
 
@@ -54,6 +54,13 @@ const NAV_BY_ROLE: Record<Role, { section: string; items: NavItem[] }> = {
   },
 };
 
+// Voci del discente: le stesse in testata (desktop) e nella barra in basso (telefono).
+const DISCENTE_NAV: NavItem[] = [
+  { key: 'corsi', label: 'Corsi', href: '/corsi', ico: 'courses', exact: true },
+  { key: 'in-corso', label: 'In corso', href: '/corsi?filtro=in_corso', ico: 'clock' },
+  { key: 'profilo', label: 'Profilo', href: '/profilo', ico: 'user' },
+];
+
 export function AppShell({
   user,
   role = 'discente',
@@ -80,6 +87,36 @@ export function AppShell({
     : base.items;
   const displayName = user.name?.trim() || user.email;
   const initial = (user.name?.trim() || user.email || 'U').slice(0, 1).toUpperCase();
+
+  if (role === 'discente') {
+    // Discente: testata leggera in alto e, su telefono, barra in basso (tavola "Mobile B").
+    return (
+      <div className="app app--top">
+        <header className="topbar">
+          <Link href="/corsi" className="topbar__brand">
+            <span className="topbar__mark" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M6 4l14 8-14 8z" /></svg>
+            </span>
+            FAD
+          </Link>
+          <nav className="topbar__nav" aria-label="Principale">
+            <TopNav items={DISCENTE_NAV} />
+          </nav>
+          <div className="topbar__user">
+            <span>{displayName}</span>
+            <span className="topbar__avatar" aria-hidden="true">{initial}</span>
+            <LogoutButton iconOnly />
+          </div>
+        </header>
+        <main>
+          <div className={`content ${wide ? 'content--wide' : ''}`}>{children}</div>
+        </main>
+        <nav className="tabbar" aria-label="Principale">
+          <TabNav items={DISCENTE_NAV} />
+        </nav>
+      </div>
+    );
+  }
 
   return (
     <div className="app">

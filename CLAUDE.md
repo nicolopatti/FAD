@@ -67,6 +67,57 @@ Verifiche: `typecheck` 0 errori, `test:unit` 20/20, `test:fase4` 15/15, crawler
 Playwright rieseguito (schermate prima/dopo in scratchpad). **Il player video
 va riprovato nel browser dall'utente** (il container non raggiunge vimeo.com).
 
+**Direzione visiva "F" scelta dall'utente (2026-10-20, stessa sessione).** Dopo
+l'ondata 1 l'utente ha giudicato i mockup e il tema Atlante ancora "nello stile
+tipico dei siti fatti con Claude" (sfondo crema/sabbia, etichette mono
+maiuscole, tutto in scatole con bordi caldi e angoli stretti, grottesco bold +
+grigio tenue, teal/ocra, gradienti, tratteggi). Scartate le direzioni "Registro"
+(carta bianca + serif) e "Piatta" (bianco/nero + giallo). **Scelta F**: sfondo
+bianco freddo `#f6f7f9`, **blu profondo `#16326c`** (non blu-nero) per pannelli,
+pulsanti e titoli, blu `#2f5bea` per avanzamento/link, verde menta `#7cf0c3` sui
+fondi blu, verde `#1f8a5b` per il completato; **Red Hat Display** (titoli) +
+**Red Hat Text** (testo) via `next/font/google`; angoli 12–28 px, pulsanti a
+pillola, card senza bordo con ombra morbida, nessuna etichetta maiuscola, nessun
+gradiente/texture. Mobile: **barra in basso** (opzione B). Login: **modulo a
+sinistra + anteprima del corso a destra** (opzione 3). Tela aggiornata con le sole
+tavole approvate (artifact `1nJhmcS81SvtpnMfBWSWuV`).
+
+**Ondata 2 fatta (sistema F + discente):**
+- `globals.css`: token F nel `:root` + **strato finale "Sistema F"** in coda che
+  vince sulla cascata (pulsanti pillola, card/kpi/panel con ombra, chip in
+  minuscolo, campi arrotondati, sidebar F, testata `.topbar` + `.tabbar`,
+  `.end-screen`, `.seal-panel`, `.next-step`, `.login*`, animazioni `draw`,
+  `rise`, `ring-in`, `seal-draw`, `bar`, tutte spente con `prefers-reduced-motion`).
+  Il vecchio CSS del login è stato rimosso. Le classi Atlante restano (admin
+  e auditor le usano) ma rese F dallo strato finale.
+- `AppShell`: **discente = testata in alto + barra in basso su telefono**
+  (`DISCENTE_NAV`: Corsi `/corsi`, In corso `/corsi?filtro=in_corso`, Profilo
+  `/profilo`); admin/auditor = sidebar (su telefono diventa barra orizzontale
+  scorrevole). `SidebarNav` espone anche `TopNav`/`TabNav` (`isActive` con query
+  e `exact`). Nuova pagina `/profilo`. `icons.ts` ampliato (clock, user, arrow*,
+  eye, doc2, cap).
+- Pagine discente riscritte: `/login` (errori Supabase tradotti, mostra password,
+  anteprima animata), `/corsi` (saluto "Ciao, Nome", card `.corso-card` con
+  cover blu, filtro `?filtro=`), `/corsi/[edizioneId]` (hero blu; **se idonea:
+  `.seal-panel` con sigillo animato + "E adesso?"**; lista lezioni con "completata
+  il …" da `completato_il`), `/corsi/[edizioneId]/lo/[loId]` (link di ritorno al
+  posto delle briciole, "Lezione N di M · durata", `.video-frame`, navigazione
+  precedente/successiva a pillola, programma `.panel--program`, lezione bloccata
+  con rimando a quella da fare). **Niente più gergo** (LO, Evento, append-only,
+  `video.ended`, API) nelle pagine del discente.
+- `VimeoPlayer`: schermata finale `.end-screen` (anello che pulsa durante l'invio,
+  check che si disegna alla conferma, stato errore con "Riprova ora"), prop
+  `nextHref`/`nextLabel` → "Lezione N" come azione principale. `DocumentoPlayer`:
+  cornice, link "apri in nuova scheda", chip "Lettura completata" + lezione
+  successiva. `compliance.ts`: `ProgressoLO.completato_il` (timestamp server del
+  primo evento di completamento).
+
+Verifiche ondata 2: `typecheck` 0, `build` 28 route, `test:unit` 20/20,
+`test:fase4` 15/15, schermate Playwright a 1440/390 su login, corsi, dettaglio
+(in corso e completato), lezione, documento, profilo, admin, auditor: nessun
+overflow. **Da provare nel browser dall'utente**: il player fino a fine lezione
+(schermata finale e "Lezione successiva"), la tab bar su telefono.
+
 **Prossime ondate** (vedi artifact revisione, sezione "Piano per ondate"):
 2 discente (login nuovo, fine lezione/corso, nav mobile A, testi senza gergo,
 movimento) → 3 admin → 4 auditor + tema scuro. Per far girare l'app in

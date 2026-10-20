@@ -15,6 +15,8 @@ export type StrutturaItem = {
 
 export type ProgressoLO = StrutturaItem & {
   completato: boolean;
+  /** Timestamp server dell'evento di completamento (ISO), se completato. */
+  completato_il?: string;
   sbloccato: boolean;
   /** Solo video: % della durata effettivamente riprodotta (unione dei tratti visti), se tracciata. */
   copertura_percentuale?: number;
@@ -129,6 +131,7 @@ export async function computeProgressoForIscrizione(
   };
 
   const completionEventsByLo = new Map<string, Set<string>>();
+  const completionAtByLo = new Map<string, string>();
   const videoEventsByLo = new Map<string, EventoVideo[]>();
   const durataByLo = new Map<string, number>();
   if (loIds.length && eventTypes.length) {
@@ -145,6 +148,10 @@ export async function computeProgressoForIscrizione(
       if (e.actor?.persona_id !== iscrizione.persona_id || !e.subject_id) continue;
       if (!completionEventsByLo.has(e.subject_id)) completionEventsByLo.set(e.subject_id, new Set());
       completionEventsByLo.get(e.subject_id)!.add(e.event_type);
+      if (!e.event_type.startsWith('video.') || e.event_type === 'video.ended') {
+        // primo evento di completamento: resta quello (append-only, ordine per seq)
+        if (!completionAtByLo.has(e.subject_id)) completionAtByLo.set(e.subject_id, e.occurred_at);
+      }
       if (e.event_type.startsWith('video.')) {
         const acc = videoEventsByLo.get(e.subject_id) ?? [];
         acc.push({ event_type: e.event_type, occurred_at: e.occurred_at, payload: e.payload });
@@ -181,6 +188,7 @@ export async function computeProgressoForIscrizione(
     const sbloccato = corso.sblocco_sequenziale ? allMandatoryPreviousComplete : true;
     if (it.obbligatorio && !completato) allMandatoryPreviousComplete = false;
     const out: ProgressoLO = { ...it, completato, sbloccato };
+    if (completato) out.completato_il = completionAtByLo.get(it.learning_object_id);
     if (copertura !== undefined) out.copertura_percentuale = copertura;
     if (segmentiVideo) out.segmenti_visti = segmentiVideo;
     return out;

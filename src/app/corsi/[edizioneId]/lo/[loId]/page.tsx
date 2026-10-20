@@ -1,19 +1,24 @@
 import Link from 'next/link';
+import type { Route } from 'next';
 import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
-import { AppShell, Crumb, Ico } from '@/components/AppShell';
+import { AppShell, Ico } from '@/components/AppShell';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { DocumentoPlayer } from '@/components/DocumentoPlayer';
 
 export const dynamic = 'force-dynamic';
 
-export default async function LearningObjectPage({
-  params,
-}: {
-  params: { edizioneId: string; loId: string };
-}) {
+function durataLabel(config: Record<string, unknown>): string | null {
+  const s = Number(config?.durata_secondi);
+  if (!Number.isFinite(s) || s <= 0) return null;
+  const m = Math.floor(s / 60);
+  const sec = Math.round(s % 60);
+  return `${m} min${sec ? ` ${sec} s` : ''}`;
+}
+
+export default async function LearningObjectPage({ params }: { params: { edizioneId: string; loId: string } }) {
   const session = await requireSession();
   const supabase = createSupabaseServerClient();
 
@@ -28,204 +33,127 @@ export default async function LearningObjectPage({
   const prog = await computeProgressoForIscrizione(supabase, iscrizione.id);
   if (!prog) notFound();
 
-  const item = prog.items.find((i) => i.learning_object_id === params.loId);
-  if (!item) notFound();
-
-  const indice = prog.items.findIndex((i) => i.learning_object_id === params.loId) + 1;
+  const idx = prog.items.findIndex((i) => i.learning_object_id === params.loId);
+  if (idx < 0) notFound();
+  const item = prog.items[idx];
+  const indice = idx + 1;
+  const prev = idx > 0 ? prog.items[idx - 1] : null;
+  const nextItem = idx < prog.items.length - 1 ? prog.items[idx + 1] : null;
+  const corsoHref = `/corsi/${params.edizioneId}` as Route;
+  const hrefDi = (loId: string) => `/corsi/${params.edizioneId}/lo/${loId}` as Route;
+  const durata = durataLabel(item.lo_config as Record<string, unknown>);
 
   // D26: enforcement server-side. Se non sbloccato, l'accesso è negato.
   if (!item.sbloccato) {
+    const daFare = prog.items.find((i) => i.sbloccato && !i.completato);
     return (
-      <AppShell user={{ name: session.nome, email: session.email }} role="discente" active="corsi" wide>
-        <Crumb
-          items={[
-            { label: 'I miei corsi', href: '/corsi' },
-            { label: prog.corso_titolo, href: `/corsi/${params.edizioneId}` },
-            { label: item.lo_titolo },
-          ]}
-        />
-        <div className="alert">
-          <strong>Contenuto bloccato.</strong> Completa prima gli oggetti didattici
-          precedenti obbligatori.
+      <AppShell user={{ name: session.nome, email: session.email }} role="discente" wide>
+        <Link href={corsoHref} className="back-link" style={{ marginBottom: 16 }}><Ico name="chevL" size={16} /> {prog.corso_titolo}</Link>
+        <div className="panel" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <h1 style={{ fontSize: 'var(--text-xl)' }}>Questa lezione non è ancora aperta</h1>
+          <p className="page-lead" style={{ margin: 0, fontSize: 15 }}>Le lezioni si aprono una dopo l&apos;altra: completa prima quelle precedenti.</p>
+          {daFare && (
+            <div><Link className="btn" href={hrefDi(daFare.learning_object_id)}>Vai alla lezione {daFare.ordine} <Ico name="arrowR" size={14} /></Link></div>
+          )}
         </div>
       </AppShell>
     );
   }
 
+  const nextHref = nextItem ? hrefDi(nextItem.learning_object_id) : undefined;
+  const nextLabel = nextItem ? (nextItem.sbloccato || item.completato ? `Lezione ${nextItem.ordine}` : `Lezione ${nextItem.ordine}`) : undefined;
+
   return (
-    <AppShell user={{ name: session.nome, email: session.email }} role="discente" active="corsi" wide>
-      <Crumb
-        items={[
-          { label: 'I miei corsi', href: '/corsi' },
-          { label: prog.corso_titolo, href: `/corsi/${params.edizioneId}` },
-          { label: `LO ${String(indice).padStart(2, '0')} · ${item.lo_titolo}` },
-        ]}
-      />
-
+    <AppShell user={{ name: session.nome, email: session.email }} role="discente" wide>
       <div className="player-layout">
-        {/* Player + descrizione */}
-        <div className="stack-lg">
-          <div className="player-stage">
-            <div className="player-body">
-              <div className="row" style={{ gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-                {item.completato ? (
-                  <span className="chip chip--ok">
-                    <span className="dot" />
-                    Completato
-                  </span>
-                ) : (
-                  <span className="chip chip--accent">
-                    <span className="dot" />
-                    In corso
-                  </span>
-                )}
-                <span className="chip">{item.obbligatorio ? 'Obbligatorio' : 'Facoltativo'}</span>
-                <span className="chip chip--ghost">{item.lo_type === 'video' ? 'Video' : 'Documento'}</span>
-                <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: 13 }}>
-                  Oggetto {indice} di {prog.totale}
-                </span>
-              </div>
-              <h2 style={{ fontSize: 28, marginBottom: 16 }}>{item.lo_titolo}</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          <Link href={corsoHref} className="back-link"><Ico name="chevL" size={16} /> {prog.corso_titolo}</Link>
 
-              {item.lo_type === 'video' ? (
-                <VimeoPlayer
-                  vimeoId={String((item.lo_config as { vimeo_id?: string }).vimeo_id ?? '')}
-                  vimeoHash={(item.lo_config as { vimeo_hash?: string }).vimeo_hash}
-                  visioneIntegrale={prog.visione_integrale}
-                  trattiIniziali={item.segmenti_visti}
-                  coperturaIniziale={item.copertura_percentuale}
-                  corsoHref={`/corsi/${params.edizioneId}`}
-                  iscrizioneId={iscrizione.id}
-                  learningObjectId={item.learning_object_id}
-                />
-              ) : item.lo_type === 'documento' ? (
-                <DocumentoPlayer
-                  iscrizioneId={iscrizione.id}
-                  learningObjectId={item.learning_object_id}
-                  filename={(item.lo_config as { filename?: string }).filename}
-                  alreadyCompleted={item.completato}
-                />
-              ) : (
-                <div className="alert">Tipo di Learning Object non supportato.</div>
-              )}
-
-              <div className="alert alert--audit" style={{ marginTop: 22 }}>
-                <span className="seal" style={{ background: 'var(--primary)' }}>i</span>
-                <div>
-                  {item.lo_type === 'video' ? (
-                    <>
-                      <strong>Riproduzione tracciata.</strong> Gli eventi del player (play /
-                      pause / seek / ended) sono firmati e accodati al log immutabile del
-                      tenant.{' '}
-                      {prog.visione_integrale ? (
-                        <>
-                          Questo corso richiede la <strong>visione integrale</strong>: l&apos;oggetto si
-                          considera completato solo se almeno il 95% del video risulta riprodotto
-                          (tratti visti registrati nel log) e all&apos;invio dell&apos;evento{' '}
-                          <code>video.ended</code>. Non è possibile saltare avanti.
-                        </>
-                      ) : (
-                        <>
-                          L&apos;oggetto si considera completato solo all&apos;invio
-                          dell&apos;evento <code>video.ended</code>: non esistono scorciatoie.
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <strong>Lettura tracciata.</strong> Apertura e completamento del
-                      documento sono accodati al log immutabile del tenant. L&apos;oggetto
-                      risulta completato dopo l&apos;evento <code>documento.completed</code>.
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {item.completato && item.lo_type === 'video' && (
-                <div className="alert ok" style={{ marginTop: 14 }}>
-                  Hai già completato questo oggetto. Puoi rivederlo, il completamento resta valido.
-                </div>
-              )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="lesson-meta">
+              Lezione {indice} di {prog.totale}{durata ? ` · ${durata}` : ''}{!item.obbligatorio ? ' · facoltativa' : ''}
+              {item.completato && <span className="status-ok"> · completata</span>}
             </div>
+            <h1 className="lesson-title">{item.lo_titolo}</h1>
           </div>
+
+          {item.lo_type === 'video' ? (
+            <VimeoPlayer
+              vimeoId={String((item.lo_config as { vimeo_id?: string }).vimeo_id ?? '')}
+              vimeoHash={(item.lo_config as { vimeo_hash?: string }).vimeo_hash}
+              visioneIntegrale={prog.visione_integrale}
+              trattiIniziali={item.segmenti_visti}
+              coperturaIniziale={item.copertura_percentuale}
+              corsoHref={corsoHref}
+              nextHref={nextHref}
+              nextLabel={nextLabel}
+              iscrizioneId={iscrizione.id}
+              learningObjectId={item.learning_object_id}
+            />
+          ) : item.lo_type === 'documento' ? (
+            <DocumentoPlayer
+              iscrizioneId={iscrizione.id}
+              learningObjectId={item.learning_object_id}
+              filename={(item.lo_config as { filename?: string }).filename}
+              alreadyCompleted={item.completato}
+              nextHref={nextHref}
+              nextLabel={nextLabel}
+            />
+          ) : (
+            <div className="alert">Questo tipo di contenuto non è supportato.</div>
+          )}
+
+          <div className="lesson-nav">
+            {prev ? (
+              <Link className="btn btn--secondary btn--sm" href={hrefDi(prev.learning_object_id)}><Ico name="chevL" size={14} /> Lezione {prev.ordine}</Link>
+            ) : <span />}
+            {nextItem && (nextItem.sbloccato || item.completato) ? (
+              <Link className="btn btn--sm" href={hrefDi(nextItem.learning_object_id)}>Lezione {nextItem.ordine} <Ico name="chevR" size={14} /></Link>
+            ) : nextItem ? (
+              <span className="page-lead" style={{ alignSelf: 'center' }}>La lezione {nextItem.ordine} si apre al completamento di questa</span>
+            ) : null}
+          </div>
+
+          <p className="page-lead" style={{ margin: 0, lineHeight: 1.55, maxWidth: '62ch' }}>
+            {item.lo_type === 'video'
+              ? prog.visione_integrale
+                ? 'Questo corso richiede la visione integrale: il video si guarda per intero a velocità normale, senza salti in avanti. Conta il tempo reale di riproduzione.'
+                : 'La lezione risulta completata quando il video arriva alla fine.'
+              : 'Quando hai finito di leggere, conferma con il pulsante: la lezione viene registrata come completata.'}
+          </p>
         </div>
 
-        {/* Outline corso */}
         <aside className="player-sidebar">
-          <div className="panel" style={{ padding: '20px 18px' }}>
-            <div className="row row--between" style={{ marginBottom: 14, padding: '0 6px' }}>
-              <span className="eyebrow">Programma del corso</span>
-              <span className="meta" style={{ fontSize: 12 }}>
-                {prog.completati} di {prog.totale}
-              </span>
+          <div className="panel panel--program">
+            <div className="row row--between" style={{ marginBottom: 12 }}>
+              <h2 style={{ fontSize: 18 }}>Programma</h2>
+              <span className="page-lead">{prog.completati} di {prog.totale}</span>
             </div>
-            <div className="progress" style={{ marginBottom: 18 }}>
-              <div
-                className={`progress__bar ${prog.idonea ? 'is-ok' : 'is-warn'}`}
-                style={{ width: `${prog.totale > 0 ? Math.round((prog.completati / prog.totale) * 100) : 0}%` }}
-              />
+            <div className="progress" style={{ marginBottom: 14 }}>
+              <div className={`progress__bar ${prog.idonea ? 'is-ok' : ''}`} style={{ width: `${prog.totale > 0 ? Math.round((prog.completati / prog.totale) * 100) : 0}%` }} />
             </div>
-
             <ol className="outline-list">
               {prog.items.map((lo, i) => {
                 const active = lo.learning_object_id === params.loId;
-                const cls = lo.completato
-                  ? 'is-ok'
-                  : active
-                    ? 'is-current'
-                    : !lo.sbloccato
-                      ? 'is-locked'
-                      : '';
+                const cls = lo.completato ? 'is-ok' : active ? 'is-current' : !lo.sbloccato ? 'is-locked' : '';
                 const inner = (
                   <>
                     <span className="outline-row__icon">
-                      {lo.completato ? (
-                        <Ico name="check" size={16} />
-                      ) : !lo.sbloccato ? (
-                        <Ico name="lock" size={14} />
-                      ) : (
-                        <Ico name="play" size={14} />
-                      )}
+                      {lo.completato ? <Ico name="check" size={16} /> : !lo.sbloccato ? <Ico name="lock" size={14} /> : <span style={{ fontSize: 12, fontWeight: 600 }}>{i + 1}</span>}
                     </span>
-                    <span>
-                      <div className="outline-row__title">{lo.lo_titolo}</div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 11,
-                          color: active ? 'var(--primary)' : 'var(--muted-2)',
-                          marginTop: 2,
-                        }}
-                      >
-                        LO {String(i + 1).padStart(2, '0')} · {lo.lo_type === 'video' ? 'Video' : 'Documento'}
-                      </div>
-                    </span>
-                    <span className="outline-row__num">{!lo.sbloccato ? '—' : ''}</span>
+                    <span className="outline-row__title">{lo.lo_titolo}</span>
+                    <span className="outline-row__num">{active ? 'ora' : ''}</span>
                   </>
                 );
                 return (
                   <li key={lo.struttura_id} className={`outline-row ${cls}`}>
                     {lo.sbloccato && !active ? (
-                      <Link
-                        href={`/corsi/${params.edizioneId}/lo/${lo.learning_object_id}`}
-                        style={{ display: 'contents', color: 'inherit' }}
-                      >
-                        {inner}
-                      </Link>
-                    ) : (
-                      inner
-                    )}
+                      <Link href={hrefDi(lo.learning_object_id)} style={{ display: 'contents', color: 'inherit' }}>{inner}</Link>
+                    ) : inner}
                   </li>
                 );
               })}
             </ol>
-
-            <div style={{ paddingTop: 16, marginTop: 10, borderTop: '1px solid var(--border)' }}>
-              <Link className="btn btn--block" href={`/corsi/${params.edizioneId}`}>
-                Torna al corso
-                <Ico name="chevR" size={14} />
-              </Link>
-            </div>
           </div>
         </aside>
       </div>

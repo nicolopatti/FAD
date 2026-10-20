@@ -1,12 +1,17 @@
 import './globals.css';
-import { Bricolage_Grotesque, IBM_Plex_Mono } from 'next/font/google';
-import { GeistSans } from 'geist/font/sans';
+import { Red_Hat_Display, Red_Hat_Text, IBM_Plex_Mono } from 'next/font/google';
 import { FeedbackProvider } from '@/components/ui/Feedback';
 
-const bricolage = Bricolage_Grotesque({
+const display = Red_Hat_Display({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-bricolage',
+  weight: ['500', '600', '700'],
+  variable: '--font-display-src',
+  display: 'swap',
+});
+const text = Red_Hat_Text({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-text-src',
   display: 'swap',
 });
 const plexMono = IBM_Plex_Mono({
@@ -25,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="it"
-      className={`${GeistSans.variable} ${bricolage.variable} ${plexMono.variable}`}
+      className={`${display.variable} ${text.variable} ${plexMono.variable}`}
     >
       <body>
         <FeedbackProvider>{children}</FeedbackProvider>

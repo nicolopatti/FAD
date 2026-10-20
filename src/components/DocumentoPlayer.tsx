@@ -2,12 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import type { Route } from 'next';
 
 type Props = {
   iscrizioneId: string;
   learningObjectId: string;
   filename?: string;
   alreadyCompleted: boolean;
+  nextHref?: string;
+  nextLabel?: string;
 };
 
 export function DocumentoPlayer({
@@ -15,6 +19,8 @@ export function DocumentoPlayer({
   learningObjectId,
   filename,
   alreadyCompleted,
+  nextHref,
+  nextLabel,
 }: Props) {
   const router = useRouter();
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -93,37 +99,34 @@ export function DocumentoPlayer({
       {error && <div className="alert bad" role="alert">{error}</div>}
 
       {signedUrl ? (
-        <iframe
-          src={signedUrl}
-          title={filename ?? 'Documento'}
-          style={{
-            width: '100%',
-            height: '70vh',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-          }}
-        />
+        <div className="video-frame" style={{ background: 'var(--surface-2)' }}>
+          <iframe
+            src={signedUrl}
+            title={filename ?? 'Documento'}
+            style={{ width: '100%', height: '70vh', border: 0, display: 'block' }}
+          />
+        </div>
       ) : (
-        !error && <div className="muted">Carico il PDF…</div>
+        !error && <div className="skeleton" style={{ height: '50vh', borderRadius: 'var(--radius-xl)' }} aria-busy="true" />
       )}
 
-      <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+      {signedUrl && (
+        <div style={{ marginTop: 10 }}>
+          <a className="back-link" href={signedUrl} target="_blank" rel="noreferrer">Apri il documento in una nuova scheda</a>
+        </div>
+      )}
+
+      <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {isCompleted ? (
-          <span className="badge ok">Lettura registrata</span>
+          <>
+            <span className="chip chip--ok"><span className="dot" /> Lettura completata</span>
+            {nextHref && <Link className="btn btn--sm" href={nextHref as Route}>{nextLabel ?? 'Lezione successiva'}</Link>}
+          </>
         ) : (
-          <button
-            type="button"
-            className="btn"
-            onClick={markCompleted}
-            disabled={busy || !signedUrl}
-          >
+          <button type="button" className="btn" onClick={markCompleted} disabled={busy || !signedUrl}>
             {busy ? 'Registro…' : 'Ho terminato la lettura'}
           </button>
         )}
-        <span className="muted" style={{ fontSize: '0.9em' }}>
-          La regola di completamento è <code>documento_completed</code>: l'LO risulta
-          completato dopo aver dichiarato la lettura, gli eventi vanno nel log.
-        </span>
       </div>
     </div>
   );

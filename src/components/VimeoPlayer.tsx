@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Route } from 'next';
+import { Ico } from '@/components/AppShell';
 import { vimeoEmbedUrl } from '@/lib/vimeo';
 import { coperturaPercentuale, unisciSegmenti, type Segmento } from '@/lib/visione';
 
@@ -32,6 +33,9 @@ type Props = {
   coperturaIniziale?: number;
   /** Link al corso, mostrato nella schermata finale. */
   corsoHref?: string;
+  /** Lezione successiva (se esiste): è l'azione principale a fine video. */
+  nextHref?: string;
+  nextLabel?: string;
   iscrizioneId: string;
   learningObjectId: string;
 };
@@ -48,7 +52,7 @@ const TOLLERANZA_SEEK = 1.5;
 const CHECKPOINT_MS = 60_000;
 
 export function VimeoPlayer({
-  vimeoId, vimeoHash, visioneIntegrale = false, trattiIniziali, coperturaIniziale, corsoHref,
+  vimeoId, vimeoHash, visioneIntegrale = false, trattiIniziali, coperturaIniziale, corsoHref, nextHref, nextLabel,
   iscrizioneId, learningObjectId,
 }: Props) {
   const router = useRouter();
@@ -251,56 +255,50 @@ export function VimeoPlayer({
 
   return (
     <div>
-      <div
-        style={{
-          position: 'relative',
-          paddingTop: '56.25%',
-          borderRadius: 'var(--radius-lg)',
-          overflow: 'hidden',
-          background: '#1a1814',
-          boxShadow: 'var(--shadow-1)',
-        }}
-      >
+      <div className="video-frame" style={{ paddingTop: '56.25%' }}>
         <iframe
           ref={iframeRef}
           src={vimeoEmbedUrl(vimeoId, vimeoHash, { bloccaVelocita: visioneIntegrale })}
+          title="Video della lezione"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
           allow="autoplay; fullscreen; picture-in-picture"
           allowFullScreen
         />
         {finito && (
-          <div
-            style={{
-              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, textAlign: 'center',
-              background: 'rgba(26, 24, 20, 0.96)', color: '#f4efe6',
-            }}
-          >
-            <div style={{ fontSize: 22, fontWeight: 600 }} aria-live="polite">
+          <div className="end-screen" role="dialog" aria-live="polite" aria-label="Fine della lezione">
+            <div className={`end-screen__ring ${registrazione === 'in_corso' ? 'end-screen__ring--wait' : registrazione === 'errore' ? 'end-screen__ring--err' : ''}`}>
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {registrazione === 'errore' ? <path d="M12 7v6M12 17h.01" /> : <path d="M5 12.5l4.5 4.5L19 7.5" />}
+              </svg>
+            </div>
+            <div className="end-screen__title">
               {registrazione === 'ok' ? 'Lezione completata' : registrazione === 'errore' ? 'Lezione terminata, ma non registrata' : 'Lezione terminata'}
             </div>
-            <div style={{ fontSize: 14, opacity: 0.85, maxWidth: 420 }}>
-              {registrazione === 'in_corso' && 'Registrazione in corso…'}
-              {registrazione === 'ok' && (visioneIntegrale
-                ? `La visione è stata registrata.${copertura != null ? ` Riprodotto: ${copertura}%.` : ''} Il completamento è calcolato sul tempo reale di riproduzione.`
-                : 'La visione è stata registrata.')}
-              {registrazione === 'errore' && 'Non siamo riusciti a registrare la fine della lezione (connessione assente o errore del server). Non chiudere la pagina: riprova.'}
+            <div className="end-screen__sub">
+              {registrazione === 'in_corso' && 'Stiamo registrando il completamento…'}
+              {registrazione === 'ok' && (visioneIntegrale && copertura != null ? `Registrata · visione ${copertura}%` : 'Registrata nel tuo percorso.')}
+              {registrazione === 'errore' && 'Non siamo riusciti a registrare la fine della lezione (connessione assente o errore del servizio). Non chiudere la pagina: riprova.'}
             </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
+            <div className="end-screen__actions">
               {registrazione === 'errore' && (
-                <button type="button" className="btn" onClick={() => inviaEndedRef.current?.()}>Riprova ora</button>
+                <button type="button" className="btn btn--light" onClick={() => inviaEndedRef.current?.()}>Riprova ora</button>
               )}
-              <button type="button" className="btn btn--secondary" onClick={rivedi}>Rivedi</button>
-              {corsoHref && <Link className="btn btn--secondary" href={corsoHref as Route}>Torna al corso</Link>}
+              {registrazione === 'ok' && nextHref && (
+                <Link className="btn btn--light" href={nextHref as Route}>{nextLabel ?? 'Lezione successiva'} <Ico name="arrowR" size={16} /></Link>
+              )}
+              {registrazione === 'ok' && !nextHref && corsoHref && (
+                <Link className="btn btn--light" href={corsoHref as Route}>Torna al corso <Ico name="arrowR" size={16} /></Link>
+              )}
+              <button type="button" className="btn btn--glass" onClick={rivedi}>Rivedi</button>
+              {registrazione !== 'ok' && corsoHref && <Link className="btn btn--glass" href={corsoHref as Route}>Torna al corso</Link>}
             </div>
           </div>
         )}
       </div>
-      {visioneIntegrale && (
-        <div className="muted" style={{ marginTop: 10, fontSize: 13, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <span>Visione integrale richiesta: il video va riprodotto per intero, a velocità normale e senza salti in avanti. Il tempo conteggiato è quello reale.</span>
-          {copertura != null && <span>Riprodotto finora: {copertura}%</span>}
-          {avviso && <span style={{ color: 'var(--accent)' }}>{avviso}</span>}
+      {visioneIntegrale && ((copertura != null && copertura > 0) || avviso) && (
+        <div className="page-lead" style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }} aria-live="polite">
+          {copertura != null && copertura > 0 && <span>Visto finora: {copertura}%</span>}
+          {avviso && <span className="status-now">{avviso}</span>}
         </div>
       )}
     </div>

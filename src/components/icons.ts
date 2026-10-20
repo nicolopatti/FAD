@@ -16,6 +16,13 @@ export const ICON_PATHS: Record<string, string> = {
   chevL: 'M15 6l-6 6 6 6',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   report: 'M4 4h16v4H4zM4 12h16v8H4z',
+  clock: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
+  user: 'M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM4 21c0-4 3.6-7 8-7s8 3 8 7',
+  arrowR: 'M5 12h14M13 6l6 6-6 6',
+  arrowL: 'M19 12H5M11 6l-6 6 6 6',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+  doc2: 'M6 3h9l4 4v14H6zM9 12h6M9 16h6',
+  cap: 'M12 3l9 4.5-9 4.5-9-4.5L12 3zM3 12l9 4.5 9-4.5',
   // voci dell'area admin (stile lineare coerente)
   dashboard: 'M4 4h6v8H4zM14 4h6v5h-6zM14 13h6v7h-6zM4 16h6v4H4z',
   corsi: 'M5 4h13v16H6a2 2 0 0 1-2-2V5z',
