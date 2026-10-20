@@ -137,6 +137,11 @@ il trigger). Meccanica:
 - Verifica sul log reale (2026-10-20, Lezione 01, 38 eventi seq 97–134): il giro
   "trascina alla fine" ricostruisce il 15,7% → non completata; il giro intero a 1x
   ricostruisce [0, 519] → 100% → completata.
+- Verifica Lezione 02 (2026-10-20, seq 136–147, con la versione finale del player in
+  produzione): play da 0, 9 `video.progress` a ~60 s l'uno con posizione che avanza
+  di 60 s (1x confermata), `ended` a 555,2 s dopo 9'16" reali → copertura 100%,
+  Lezione 03 sbloccata. Catena integra a 147 eventi. **Il flusso discente del corso
+  di prova è verificato end-to-end nel browser dall'utente.**
 - Player in modalità integrale: velocità bloccata a 1x (`speed=false` nell'embed +
   `setPlaybackRate(1)` su `playbackratechange`), niente salti in avanti, "Riprodotto
   finora: N%" cumulativo, testo che spiega che conta il tempo reale.
@@ -703,6 +708,27 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 4. Tutto il resto del brief: D2, D8, D11, D18, D19, D23, D24, D26, D27, D35 implementati come specificato.
 
 ## Cosa fare nella prossima sessione
+
+> **Aggiornamento 2026-10-20 (leggere PRIMA del resto di questa sezione, che è
+> storica).** Stato: Fase 1–4 chiuse; hardening Tappa 1 fatto (sicurezza log, indici,
+> login pulita); Vimeo robusto; corso di prova a 6 video verificato end-to-end nel
+> browser; visione integrale per corso in produzione. Ambiente adatto a
+> **sviluppo/test con dati finti**, non a clienti reali. Roadmap completa nel doc
+> Claude "FAD — Piano di completamento" (artifact `13300d45-3520-4cfb-965f-7ad73a3fe042`).
+> Prossimi passi, in ordine:
+> 1. **Lato utente (non eseguibili da qui):** backup DB, "leaked password protection"
+>    in Auth, piani Supabase Pro + Vercel Pro (finché Free: tenere sveglio il progetto,
+>    pausa dopo 7 giorni di inattività), su Vimeo End screen → "Empty" per i video.
+> 2. **Blocco B restante:** #2 report auditor in una funzione SQL (oggi ~10 query per
+>    iscrizione in `Promise.all`), #5 RPC unica per gli eventi video, #7 unione
+>    policy RLS multiple, #8 tenant non più da env; test di carico (k6, 300 sessioni).
+> 3. **Blocco C/E:** staging separato (oggi le preview Vercel usano il DB di
+>    produzione), monitoraggio/alert, SMTP + inviti/reset password, E2E Playwright e
+>    pgTAP in CI.
+> 4. **Blocco D:** tracciati ufficiali Fondimpresa/FonCoop (serve la documentazione
+>    dell'utente), Teams (runbook Azure), Fase 5 attestato (serve brief).
+> Metodo: ogni sessione lavora su un branch `claude/<slug>`; il push su `main` richiede
+> autorizzazione esplicita dell'utente in quella sessione.
 
 **Fase 4 — report fondi: Task 1–6 ✅, gate M4a ✅ + M4 ✅ a livello DB.** Gate
 M1a/M1/M2/M3a/M4a/M4 tutti verdi (M3 e M4a#4 rinviati a runbook esterno). Il generatore
