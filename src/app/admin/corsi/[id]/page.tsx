@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { unwrap } from '@/lib/db-result';
 import type {
   CorsoRow,
   EdizioneRow,
@@ -29,7 +30,7 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
     .maybeSingle<CorsoRow>();
   if (!corso) notFound();
 
-  const { data: struttura } = await supabase
+  const struttura = unwrap(await supabase
     .from('struttura_corso')
     .select(`
       id, tenant_id, corso_id, learning_object_id, ordine, obbligatorio,
@@ -38,9 +39,9 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
     `)
     .eq('corso_id', params.id)
     .order('ordine', { ascending: true })
-    .returns<StrutturaCorsoConLO[]>();
+    .returns<StrutturaCorsoConLO[]>(), 'la struttura del corso');
 
-  const { data: edizioni } = await supabase
+  const edizioni = unwrap(await supabase
     .from('edizione')
     .select(`
       id, tenant_id, corso_id, codice,
@@ -49,19 +50,19 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
     `)
     .eq('corso_id', params.id)
     .order('creato_il', { ascending: false })
-    .returns<EdizioneRow[]>();
+    .returns<EdizioneRow[]>(), 'le edizioni');
 
-  const usedLoIds = new Set((struttura ?? []).map((s) => s.learning_object_id));
-  const { data: allLo } = await supabase
+  const usedLoIds = new Set(struttura.map((s) => s.learning_object_id));
+  const allLo = unwrap(await supabase
     .from('learning_object')
     .select('id, tenant_id, type, titolo, config, archiviato_at, creato_il')
     .is('archiviato_at', null)
     .order('titolo', { ascending: true })
-    .returns<LearningObjectRow[]>();
-  const availableLo = (allLo ?? []).filter((lo) => !usedLoIds.has(lo.id));
+    .returns<LearningObjectRow[]>(), 'i contenuti disponibili');
+  const availableLo = allLo.filter((lo) => !usedLoIds.has(lo.id));
 
   // Iscritti per ogni edizione del corso (persona + azienda).
-  const edizioneIds = (edizioni ?? []).map((e) => e.id);
+  const edizioneIds = edizioni.map((e) => e.id);
   let iscrittiByEdizione: Record<string, IscrittoRow[]> = {};
   if (edizioneIds.length) {
     const { data: iscrizioni } = await supabase
@@ -93,8 +94,8 @@ export default async function CorsoDetailPage({ params }: { params: { id: string
   return (
     <CorsoEditor
       corso={corso}
-      struttura={struttura ?? []}
-      edizioni={edizioni ?? []}
+      struttura={struttura}
+      edizioni={edizioni}
       availableLo={availableLo}
       iscrittiByEdizione={iscrittiByEdizione}
     />

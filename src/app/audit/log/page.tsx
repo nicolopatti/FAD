@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { unwrap } from '@/lib/db-result';
 import { requireAuditor } from '@/lib/auth-context';
 import { ChainVerifyButton } from '@/components/ChainVerifyButton';
 import type { EventoRow } from '@/lib/db-types';
@@ -30,14 +31,14 @@ export default async function AuditLogPage({
   const richiesta = Number.parseInt(searchParams?.pagina ?? '', 10);
   const pagina = Number.isFinite(richiesta) && richiesta >= 1 ? Math.min(richiesta, pagine) : pagine;
   const from = (pagina - 1) * PAGE_SIZE;
-  const { data: eventi } = await supabase
+  const eventi = unwrap(await supabase
     .from('evento')
     .select('id, seq, event_type, occurred_at, actor, subject_type, subject_id, payload, prev_hash, hash')
     .order('seq', { ascending: true })
     .range(from, from + PAGE_SIZE - 1)
-    .returns<EventoRow[]>();
-  const primoSeq = eventi?.[0]?.seq;
-  const ultimoSeq = eventi?.[eventi.length - 1]?.seq;
+    .returns<EventoRow[]>(), 'il log eventi');
+  const primoSeq = eventi[0]?.seq;
+  const ultimoSeq = eventi[eventi.length - 1]?.seq;
   const paginatore = (
     <nav className="muted" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
       <span>
@@ -54,7 +55,7 @@ export default async function AuditLogPage({
   // Anagrafica per la risoluzione dei pseudonimi nella cronologia leggibile.
   const personaIds = Array.from(
     new Set(
-      (eventi ?? [])
+      eventi
         .map((e) => e.actor?.persona_id)
         .filter((x): x is string => typeof x === 'string'),
     ),
@@ -71,7 +72,7 @@ export default async function AuditLogPage({
   // Idem per learning_object mostrati in cronologia.
   const loIds = Array.from(
     new Set(
-      (eventi ?? [])
+      eventi
         .filter((e) => e.subject_type === 'learning_object')
         .map((e) => e.subject_id)
         .filter((x): x is string => typeof x === 'string'),
@@ -111,7 +112,7 @@ export default async function AuditLogPage({
             </tr>
           </thead>
           <tbody>
-            {(eventi ?? []).map((e) => {
+            {eventi.map((e) => {
               const personaId = e.actor?.persona_id;
               const p = personaId ? personaById.get(personaId) : undefined;
               const lo =
@@ -167,7 +168,7 @@ export default async function AuditLogPage({
             </tr>
           </thead>
           <tbody>
-            {(eventi ?? []).map((e) => (
+            {eventi.map((e) => (
               <tr key={e.id}>
                 <td className="mono">{e.seq}</td>
                 <td className="mono">{e.event_type}</td>

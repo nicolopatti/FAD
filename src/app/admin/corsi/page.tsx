@@ -1,5 +1,6 @@
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { unwrap } from '@/lib/db-result';
 import { durataVideoSecondi } from '@/components/admin/Atlante';
 import { CorsiCatalog, type CorsoCard } from './CorsiCatalog';
 
@@ -26,8 +27,8 @@ export default async function CorsiListPage() {
     supabase.from('edizione').select('corso_id'),
   ]);
 
-  const struttura = strutturaR.data ?? [];
-  const edizioni = edizioniR.data ?? [];
+  const struttura = unwrap(strutturaR, 'la struttura dei corsi');
+  const edizioni = unwrap(edizioniR, 'le edizioni');
 
   const byCorsoLo = new Map<string, { type: string; config: Record<string, unknown> }[]>();
   for (const s of struttura) {
@@ -39,7 +40,7 @@ export default async function CorsiListPage() {
   const ediCount = new Map<string, number>();
   for (const e of edizioni) ediCount.set(e.corso_id as string, (ediCount.get(e.corso_id as string) ?? 0) + 1);
 
-  const cards: CorsoCard[] = (corsiR.data ?? []).map((c) => {
+  const cards: CorsoCard[] = unwrap(corsiR, 'i corsi').map((c) => {
     const los = byCorsoLo.get(c.id) ?? [];
     const ne = ediCount.get(c.id) ?? 0;
     return {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { LearningObjectType } from '@/lib/db-types';
 import { Icon, fmtDurataSec } from '@/components/admin/Atlante';
+import { useFeedback } from '@/components/ui/Feedback';
 
 export type ContenutoRow = {
   id: string;
@@ -41,6 +42,7 @@ function durataCol(r: ContenutoRow): string {
 
 export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
   const router = useRouter();
+  const { confirm, toast } = useFeedback();
   const [q, setQ] = useState('');
   const [tipo, setTipo] = useState<TipoF>('tutti');
   const [stato, setStato] = useState<StatoF>('attivi');
@@ -66,6 +68,14 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
   }, [rows, q, tipo, stato, sort]);
 
   async function toggleArchive(r: ContenutoRow) {
+    if (!r.archiviato) {
+      const ok = await confirm({
+        titolo: `Archiviare "${r.titolo}"?`,
+        messaggio: 'Il contenuto sparisce dalla libreria attiva e non potrà essere aggiunto a nuovi corsi. I corsi che già lo usano continuano a funzionare. Puoi ripristinarlo in qualsiasi momento.',
+        conferma: 'Archivia',
+      });
+      if (!ok) return;
+    }
     setBusy(r.id);
     setError(null);
     try {
@@ -74,6 +84,7 @@ export function ContenutiTable({ rows }: { rows: ContenutoRow[] }) {
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       router.refresh();
+      toast(r.archiviato ? `"${r.titolo}" ripristinato.` : `"${r.titolo}" archiviato.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LearningObjectRow } from '@/lib/db-types';
 import { Icon } from '@/components/admin/Atlante';
+import { useFeedback } from '@/components/ui/Feedback';
 
 export function EditLearningObjectForm({ lo }: { lo: LearningObjectRow }) {
   const router = useRouter();
+  const { confirm, toast } = useFeedback();
   const [titolo, setTitolo] = useState(lo.titolo);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +30,7 @@ export function EditLearningObjectForm({ lo }: { lo: LearningObjectRow }) {
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       router.refresh();
+      toast('Titolo salvato.');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -36,6 +39,14 @@ export function EditLearningObjectForm({ lo }: { lo: LearningObjectRow }) {
   }
 
   async function archiveOrUnarchive() {
+    if (!archived) {
+      const ok = await confirm({
+        titolo: `Archiviare "${lo.titolo}"?`,
+        messaggio: 'Il contenuto sparisce dalla libreria attiva e non potrà essere aggiunto a nuovi corsi. I corsi che già lo usano continuano a funzionare. Puoi ripristinarlo in qualsiasi momento.',
+        conferma: 'Archivia',
+      });
+      if (!ok) return;
+    }
     setError(null);
     setBusy(true);
     try {
@@ -44,6 +55,7 @@ export function EditLearningObjectForm({ lo }: { lo: LearningObjectRow }) {
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       router.refresh();
+      toast(archived ? 'Contenuto ripristinato.' : 'Contenuto archiviato.');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { unwrap } from '@/lib/db-result';
 import { requireAuditor } from '@/lib/auth-context';
 import { computeProgressoForIscrizione, computeFrequenzaForIscrizione, regolaLabel } from '@/lib/compliance';
 import type { IscrizioneAuditRow } from '@/lib/db-types';
@@ -11,17 +12,17 @@ export default async function CompletamentoPage() {
   await requireAuditor();
   const supabase = createSupabaseServerClient();
 
-  const { data: iscrizioni } = await supabase
+  const iscrizioni = unwrap(await supabase
     .from('iscrizione')
     .select(`
       id, persona_id, edizione_id,
       persona:persona_id ( nome, cognome, email ),
       edizione:edizione_id ( id, codice, corso:corso_id ( id, titolo ) )
     `)
-    .returns<IscrizioneAuditRow[]>();
+    .returns<IscrizioneAuditRow[]>(), 'le iscrizioni');
 
   const rows = await Promise.all(
-    (iscrizioni ?? []).map(async (i) => {
+    iscrizioni.map(async (i) => {
       const [prog, freq] = await Promise.all([
         computeProgressoForIscrizione(supabase, i.id),
         computeFrequenzaForIscrizione(supabase, i.id),

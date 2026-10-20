@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { unwrap } from '@/lib/db-result';
 import { Icon, Cover, coverUrl, fmtData, fmtTempoRelativo } from '@/components/admin/Atlante';
 
 export const dynamic = 'force-dynamic';
@@ -84,11 +85,11 @@ export default async function AdminDashboard() {
       .limit(20),
   ]);
 
-  const corsi = corsiR.data ?? [];
-  const edizioni = edizioniR.data ?? [];
-  const struttura = strutturaR.data ?? [];
-  const iscrizioni = iscrizioniR.data ?? [];
-  const sessioni = sessioniR.data ?? [];
+  const corsi = unwrap(corsiR, 'i corsi');
+  const edizioni = unwrap(edizioniR, 'le edizioni');
+  const struttura = unwrap(strutturaR, 'la struttura dei corsi');
+  const iscrizioni = unwrap(iscrizioniR, 'le iscrizioni');
+  const sessioni = unwrap(sessioniR, 'le sessioni');
 
   const edizioniAttive = edizioni.filter((e) => !e.concluso_at && !e.annullato_at).length;
   const personeIscritte = new Set(iscrizioni.map((i) => i.persona_id as string)).size;
@@ -112,7 +113,7 @@ export default async function AdminDashboard() {
   const bozze = corsi.length - congelati;
 
   const recenti = corsi.slice(0, 4);
-  const attivita = ((eventiR.data ?? []) as EventoMini[])
+  const attivita = (unwrap(eventiR, 'le attività recenti') as EventoMini[])
     .map((ev) => ({ ev, view: activityView(ev) }))
     .filter((x) => x.view !== null)
     .slice(0, 7);

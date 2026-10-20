@@ -1,5 +1,6 @@
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { unwrap } from '@/lib/db-result';
 import type { LearningObjectRow } from '@/lib/db-types';
 import { ContenutiTable, type ContenutoRow } from './ContenutiTable';
 
@@ -19,12 +20,12 @@ export default async function LearningObjectsListPage() {
   ]);
 
   const usage = new Map<string, number>();
-  for (const s of strutturaR.data ?? []) {
+  for (const s of unwrap(strutturaR, 'l’utilizzo dei contenuti')) {
     const id = s.learning_object_id as string;
     usage.set(id, (usage.get(id) ?? 0) + 1);
   }
 
-  const rows: ContenutoRow[] = (loR.data ?? []).map((lo) => ({
+  const rows: ContenutoRow[] = unwrap(loR, 'i contenuti').map((lo) => ({
     id: lo.id,
     type: lo.type,
     titolo: lo.titolo,

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireSession } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { unwrap } from '@/lib/db-result';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
 import { AppShell, Cover, StatusChip, Ico } from '@/components/AppShell';
 import type { IscrizioneListaRow } from '@/lib/db-types';
@@ -11,16 +12,16 @@ export default async function MieiCorsiPage() {
   const session = await requireSession();
   const supabase = createSupabaseServerClient();
 
-  const { data: iscrizioni } = await supabase
+  const iscrizioni = unwrap(await supabase
     .from('iscrizione')
     .select(
       'id, edizione_id, edizione:edizione_id ( id, codice, corso:corso_id ( id, titolo, descrizione ) )',
     )
     .eq('persona_id', session.personaId)
-    .returns<IscrizioneListaRow[]>();
+    .returns<IscrizioneListaRow[]>(), 'i tuoi corsi');
 
   const rows = await Promise.all(
-    (iscrizioni ?? []).map(async (i) => {
+    iscrizioni.map(async (i) => {
       const prog = await computeProgressoForIscrizione(supabase, i.id);
       return { iscrizione: i, prog };
     }),

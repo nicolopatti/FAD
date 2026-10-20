@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/admin/Atlante';
+import { useFeedback } from '@/components/ui/Feedback';
 
 export type IscrittoOption = { id: string; label: string };
 export type CodaItem = {
@@ -52,8 +53,9 @@ function CodaRow({ item, tuttiIscritti }: { item: CodaItem; tuttiIscritti: Iscri
   const [motivazione, setMotivazione] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, toast } = useFeedback();
 
-  async function call(url: string, body: unknown) {
+  async function call(url: string, body: unknown, successo: string) {
     setError(null);
     setBusy(true);
     try {
@@ -65,6 +67,7 @@ function CodaRow({ item, tuttiIscritti }: { item: CodaItem; tuttiIscritti: Iscri
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       router.refresh();
+      toast(successo);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);
@@ -103,7 +106,7 @@ function CodaRow({ item, tuttiIscritti }: { item: CodaItem; tuttiIscritti: Iscri
           type="button"
           className="btn btn--sm"
           disabled={busy || !iscrizioneId || !motivazione.trim()}
-          onClick={() => call(`/api/admin/coda/${item.id}/risolvi`, { iscrizione_id: iscrizioneId, motivazione })}
+          onClick={() => call(`/api/admin/coda/${item.id}/risolvi`, { iscrizione_id: iscrizioneId, motivazione }, 'Presenza registrata.')}
         >
           {busy ? '…' : 'Registra presenza'}
         </button>
@@ -111,8 +114,16 @@ function CodaRow({ item, tuttiIscritti }: { item: CodaItem; tuttiIscritti: Iscri
           type="button"
           className="btn btn--ghost btn--sm"
           disabled={busy || !motivazione.trim()}
-          onClick={() => call(`/api/admin/coda/${item.id}/ignora`, { motivazione })}
-          title="Scrive partecipante_non_riconciliato (nessuna presenza)"
+          onClick={async () => {
+            const ok = await confirm({
+              titolo: 'Ignorare questa riga del report?',
+              messaggio: 'Il partecipante viene registrato come non riconciliato: nessuna presenza gli sarà attribuita. La scelta resta nel registro e non si può annullare.',
+              conferma: 'Ignora riga',
+              pericolosa: true,
+            });
+            if (ok) call(`/api/admin/coda/${item.id}/ignora`, { motivazione }, 'Riga ignorata: nessuna presenza attribuita.');
+          }}
+          title="Nessuna presenza attribuita a questa riga"
         >
           Ignora
         </button>

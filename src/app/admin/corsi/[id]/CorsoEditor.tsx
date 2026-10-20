@@ -11,6 +11,7 @@ import {
   type StrutturaCorsoConLO,
 } from '@/lib/db-types';
 import { parseDelimited } from '@/lib/csv';
+import { useFeedback } from '@/components/ui/Feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import {
   Icon,
@@ -55,14 +56,18 @@ export function CorsoEditor({
   iscrittiByEdizione: Record<string, IscrittoRow[]>;
 }) {
   const router = useRouter();
+  const { toast } = useFeedback();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // D22 — il Corso è congelato appena ha almeno un'Edizione.
   const frozen = edizioni.length > 0;
 
-  async function call(method: string, url: string, body?: unknown): Promise<unknown> {
+  // `busy` globale disabilita i controlli; `opts.busy` è lo stato locale del
+  // pulsante premuto (prima tutte le etichette diventavano "Salvo…" insieme).
+  async function call(method: string, url: string, body?: unknown, opts?: CallOpts): Promise<unknown> {
     setBusy(true);
+    opts?.busy?.(true);
     setError(null);
     try {
       const res = await fetch(url, {
@@ -72,12 +77,14 @@ export function CorsoEditor({
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       router.refresh();
+      if (opts?.successo) toast(opts.successo);
       return json;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       throw err;
     } finally {
       setBusy(false);
+      opts?.busy?.(false);
     }
   }
 
@@ -145,7 +152,8 @@ export function CorsoEditor({
   );
 }
 
-type CallFn = (method: string, url: string, body?: unknown) => Promise<unknown>;
+type CallOpts = { successo?: string; busy?: BusyFn };
+type CallFn = (method: string, url: string, body?: unknown, opts?: CallOpts) => Promise<unknown>;
 type ErrFn = (m: string | null) => void;
 type BusyFn = (v: boolean) => void;
 
@@ -180,6 +188,7 @@ function SezioneDati({
   onError: ErrFn;
   onBusy: BusyFn;
 }) {
+  const [salvando, setSalvando] = useState(false);
   const router = useRouter();
   const [titolo, setTitolo] = useState(corso.titolo);
   const [categoria, setCategoria] = useState(corso.categoria ?? '');
@@ -213,7 +222,7 @@ function SezioneDati({
       categoria: categoria || null,
       sblocco_sequenziale: sblocco,
       visione_integrale: integrale,
-    });
+    }, { successo: 'Dati del corso salvati.', busy: setSalvando });
   }
 
   async function uploadCover(file: File) {
@@ -232,7 +241,7 @@ function SezioneDati({
         .from('copertine')
         .upload(path, file, { upsert: true, contentType: file.type });
       if (upErr) throw upErr;
-      await call('PATCH', `/api/admin/corsi/${corso.id}`, { cover_path: path });
+      await call('PATCH', `/api/admin/corsi/${corso.id}`, { cover_path: path }, { successo: 'Copertina aggiornata.' });
     } catch (err) {
       onError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -242,7 +251,7 @@ function SezioneDati({
   }
 
   async function removeCover() {
-    await call('PATCH', `/api/admin/corsi/${corso.id}`, { cover_path: null });
+    await call('PATCH', `/api/admin/corsi/${corso.id}`, { cover_path: null }, { successo: 'Copertina rimossa.' });
     router.refresh();
   }
 
@@ -327,7 +336,7 @@ function SezioneDati({
 
         {!frozen && (
           <div style={{ marginTop: 14 }}>
-            <button type="submit" className="btn" disabled={busy || !dirty}>{busy ? 'Salvo…' : 'Salva dati'}</button>
+            <button type="submit" className="btn" disabled={busy || !dirty}>{salvando ? 'Salvo…' : 'Salva dati'}</button>
           </div>
         )}
       </div>
@@ -349,6 +358,7 @@ function SezioneStruttura({
   call: CallFn;
   corsoId: string;
 }) {
+  const { confirm } = useFeedback();
   const serverIds = struttura.map((s) => s.id);
   const serverKey = serverIds.join(',');
 
@@ -394,8 +404,14 @@ function SezioneStruttura({
     await call('PATCH', `/api/admin/corsi/${corsoId}/struttura/${s.id}`, { obbligatorio: !s.obbligatorio });
   }
   async function remove(s: StrutturaCorsoConLO) {
-    if (!confirm('Rimuovere questo oggetto dalla struttura?')) return;
-    await call('DELETE', `/api/admin/corsi/${corsoId}/struttura/${s.id}`);
+    const ok = await confirm({
+      titolo: 'Togliere questa lezione dal corso?',
+      messaggio: <><strong>{s.learning_object?.titolo ?? 'La lezione'}</strong> resta nella libreria dei contenuti: viene tolta solo da questo corso.</>,
+      conferma: 'Togli dal corso',
+      pericolosa: true,
+    });
+    if (!ok) return;
+    await call('DELETE', `/api/admin/corsi/${corsoId}/struttura/${s.id}`, undefined, { successo: 'Lezione tolta dal corso.' });
   }
 
   return (
@@ -538,6 +554,7 @@ function AggiungiManuale({
   onError: ErrFn;
   onBusy: BusyFn;
 }) {
+  const [aggiungendo, setAggiungendo] = useState(false);
   const [newType, setNewType] = useState<'video' | 'documento'>('video');
   const [titolo, setTitolo] = useState('');
   const [vimeo, setVimeo] = useState('');
@@ -574,7 +591,7 @@ function AggiungiManuale({
         config = { storage_key: key, mime: 'application/pdf', size: pdf.size, filename: pdf.name };
       }
       const created = (await call('POST', '/api/admin/learning-objects', { type: newType, titolo: titolo.trim(), config })) as { learning_object: { id: string } };
-      await call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: created.learning_object.id });
+      await call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: created.learning_object.id }, { successo: 'Contenuto creato e aggiunto al corso.', busy: setAggiungendo });
       setTitolo(''); setVimeo(''); setDurata(''); setPdf(null);
     } catch {
       /* errore già mostrato da call */
@@ -614,7 +631,7 @@ function AggiungiManuale({
               <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={(e) => setPdf(e.target.files?.[0] ?? null)} />
             </div>
           )}
-          <button type="submit" className="btn" disabled={busy}>{busy ? 'Aggiungo…' : 'Crea e aggiungi'}</button>
+          <button type="submit" className="btn" disabled={busy}>{aggiungendo ? 'Aggiungo…' : 'Crea e aggiungi'}</button>
         </form>
       </div>
 
@@ -635,7 +652,7 @@ function AggiungiManuale({
                   <div className="libitem__title">{lo.titolo}</div>
                   <div className="libitem__meta">{lo.type === 'video' ? 'Video' : 'PDF'}</div>
                 </div>
-                <button type="button" className="btn btn--secondary btn--xs" disabled={busy} onClick={() => call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: lo.id })}>
+                <button type="button" className="btn btn--secondary btn--xs" disabled={busy} onClick={() => call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: lo.id }, { successo: `"${lo.titolo}" aggiunto al corso.` })}>
                   <Icon name="plus" /> Aggiungi
                 </button>
               </div>
@@ -660,6 +677,7 @@ function AggiungiCsv({
   busy: boolean;
   call: CallFn;
 }) {
+  const { toast } = useFeedback();
   const [rows, setRows] = useState<ImportStrutturaRow[]>([]);
   const [over, setOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -698,7 +716,7 @@ function AggiungiCsv({
       setRows(out);
     } catch (e) {
       setRows([]);
-      alert(e instanceof Error ? e.message : String(e));
+      toast(e instanceof Error ? e.message : String(e), 'errore');
     }
   }
 
@@ -713,7 +731,7 @@ function AggiungiCsv({
         durata_secondi: r.tipo === 'video' ? parseMmSs(r.durata) : null,
         obbligatorio: r.obbligatorio,
       })),
-    });
+    }, { successo: `${importabili.length} contenut${importabili.length === 1 ? 'o importato' : 'i importati'}.` });
     setRows([]);
   }
 
@@ -782,18 +800,29 @@ function SezioneEdizioni({
   onError: ErrFn;
   onBusy: BusyFn;
 }) {
+  const { confirm } = useFeedback();
+  const [creando, setCreando] = useState(false);
   const [codice, setCodice] = useState('');
   const [di, setDi] = useState('');
   const [df, setDf] = useState('');
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    // La prima edizione congela il corso (D22): è irreversibile, va detto prima.
+    if (edizioni.length === 0) {
+      const ok = await confirm({
+        titolo: 'Creare la prima edizione e congelare il corso?',
+        messaggio: <>Da questo momento <strong>titolo, descrizione, categoria, impostazioni e struttura</strong> non saranno più modificabili, perché le persone iscritte devono seguire sempre lo stesso percorso. Restano modificabili la copertina e i contenuti delle singole lezioni. Non si può tornare indietro.</>,
+        conferma: 'Crea edizione e congela',
+      });
+      if (!ok) return;
+    }
     // `call` gestisce busy, errore e `router.refresh()`: senza il refresh
     // l'edizione creata non compariva e un secondo clic ne creava un doppione.
     try {
       await call('POST', `/api/admin/corsi/${corsoId}/edizioni`, {
         codice, data_inizio: di || null, data_fine: df || null,
-      });
+      }, { successo: `Edizione ${codice} creata.`, busy: setCreando });
       setCodice(''); setDi(''); setDf('');
     } catch {
       // errore già mostrato dal banner
@@ -824,8 +853,8 @@ function SezioneEdizioni({
                     <td className="muted">{fmtData(e.fad_apertura)} → {fmtData(e.fad_chiusura)}</td>
                     <td>
                       <div className="row">
-                        <button type="button" className="btn btn--ghost btn--xs" disabled={busy || stato !== 'attiva'} onClick={() => { if (confirm('Concludere questa edizione?')) call('POST', `/api/admin/edizioni/${e.id}/concludi`); }}>Concludi</button>
-                        <button type="button" className="btn btn--danger btn--xs" disabled={busy || stato === 'annullata'} onClick={() => { if (confirm('Annullare questa edizione?')) call('POST', `/api/admin/edizioni/${e.id}/annulla`); }}>Annulla</button>
+                        <button type="button" className="btn btn--ghost btn--xs" disabled={busy || stato !== 'attiva'} onClick={async () => { if (await confirm({ titolo: `Concludere l'edizione ${e.codice}?`, messaggio: 'Gli iscritti non potranno più fruire dei contenuti. Lo stato finale di ciascuno resta registrato.', conferma: 'Concludi' })) call('POST', `/api/admin/edizioni/${e.id}/concludi`, undefined, { successo: `Edizione ${e.codice} conclusa.` }); }}>Concludi</button>
+                        <button type="button" className="btn btn--danger btn--xs" disabled={busy || stato === 'annullata'} onClick={async () => { if (await confirm({ titolo: `Annullare l'edizione ${e.codice}?`, messaggio: 'L\'edizione resta nel registro come annullata e non sarà più fruibile. L\'operazione non si può annullare.', conferma: 'Annulla edizione', pericolosa: true })) call('POST', `/api/admin/edizioni/${e.id}/annulla`, undefined, { successo: `Edizione ${e.codice} annullata.` }); }}>Annulla edizione</button>
                       </div>
                     </td>
                   </tr>
@@ -851,7 +880,7 @@ function SezioneEdizioni({
               <input className="input" type="date" value={df} onChange={(e) => setDf(e.target.value)} disabled={busy} />
             </div>
           </div>
-          <button type="submit" className="btn" disabled={busy}>{busy ? 'Creo…' : 'Crea edizione'}</button>
+          <button type="submit" className="btn" disabled={busy}>{creando ? 'Creo…' : 'Crea edizione'}</button>
         </form>
       </div>
     </div>
@@ -885,6 +914,7 @@ function SezioneIscritti({
   onError: ErrFn;
   onBusy: BusyFn;
 }) {
+  const { confirm } = useFeedback();
   const attive = edizioni;
   const [selId, setSelId] = useState<string>(attive[0]?.id ?? '');
   const sel = attive.find((e) => e.id === selId) ?? attive[0];
@@ -940,7 +970,7 @@ function SezioneIscritti({
                   <td className="mono">{i.codice_fiscale ?? <span className="chip chip--err">assente</span>}</td>
                   <td>{i.azienda ?? <span className="muted">—</span>}</td>
                   <td>
-                    <button type="button" className="icon-btn" title="Rimuovi iscritto" disabled={busy} onClick={() => { if (confirm(`Rimuovere ${i.cognome} ${i.nome} dall'edizione?`)) call('DELETE', `/api/admin/iscrizioni/${i.iscrizione_id}`); }}>
+                    <button type="button" className="icon-btn" title="Rimuovi iscritto" disabled={busy} onClick={async () => { if (await confirm({ titolo: `Rimuovere ${i.cognome} ${i.nome} dall'edizione?`, messaggio: 'La persona resta in anagrafica; viene tolta solo l\'iscrizione a questa edizione.', conferma: 'Rimuovi', pericolosa: true })) call('DELETE', `/api/admin/iscrizioni/${i.iscrizione_id}`, undefined, { successo: `${i.cognome} ${i.nome} rimosso dall'edizione.` }); }}>
                       <Icon name="trash" />
                     </button>
                   </td>
@@ -993,7 +1023,7 @@ function IscrittoManuale({
       await call('POST', `/api/admin/edizioni/${edizioneId}/iscritti`, {
         cognome: cognome.trim(), nome: nome.trim(), email: email.trim(),
         codice_fiscale: cf.trim() || null, azienda: azienda.trim() || null,
-      });
+      }, { successo: `${cognome.trim()} ${nome.trim()} iscritto all'edizione.` });
       setCognome(''); setNome(''); setEmail(''); setCf(''); setAzienda('');
     } catch { /* mostrato da call */ }
   }
@@ -1027,6 +1057,7 @@ function IscrittiCsv({
   call: CallFn;
   onBusy: BusyFn;
 }) {
+  const { toast } = useFeedback();
   const [rows, setRows] = useState<ImportIscrittoRow[]>([]);
   const [over, setOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1063,7 +1094,7 @@ function IscrittiCsv({
       setRows(out);
     } catch (e) {
       setRows([]);
-      alert(e instanceof Error ? e.message : String(e));
+      toast(e instanceof Error ? e.message : String(e), 'errore');
     }
   }
 
@@ -1077,7 +1108,7 @@ function IscrittiCsv({
           cognome: r.cognome, nome: r.nome, email: r.email,
           codice_fiscale: r.codice_fiscale || null, azienda: r.azienda || null,
         })),
-      });
+      }, { successo: `${importabili.length} iscritt${importabili.length === 1 ? 'o importato' : 'i importati'}.` });
       setRows([]);
     } catch { /* mostrato */ } finally { onBusy(false); }
   }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon, fmtDataOra } from '@/components/admin/Atlante';
+import { useFeedback } from '@/components/ui/Feedback';
 
 export type SnapshotRow = {
   id: string;
@@ -26,6 +27,7 @@ export function DepositaPanel({
   snapshots: SnapshotRow[];
 }) {
   const router = useRouter();
+  const { confirm, toast } = useFeedback();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -33,6 +35,14 @@ export function DepositaPanel({
   const [verifiche, setVerifiche] = useState<Record<string, string>>({});
 
   async function deposita(override: boolean) {
+    if (!override) {
+      const ok = await confirm({
+        titolo: `Depositare il report ${formato}?`,
+        messaggio: 'I dati calcolati adesso vengono congelati in uno snapshot che non si può modificare né cancellare, e l\'operazione viene scritta nel registro. Potrai sempre generare un nuovo snapshot.',
+        conferma: 'Deposita',
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     setError(null);
     setOk(null);
@@ -52,6 +62,7 @@ export function DepositaPanel({
       setOk(`Snapshot depositato — Evento #${json.result.evento_seq}, hash ${String(json.result.hash).slice(0, 16)}…`);
       setNeedsOverride(false);
       router.refresh();
+      toast('Report depositato.');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
