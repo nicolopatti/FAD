@@ -204,7 +204,11 @@ export function Iscritti({
                               <button type="button" className="btn btn--ghost btn--xs" disabled={busy} onClick={() => emettiAttestato(i)} title="Emette un nuovo attestato con i dati di adesso; il precedente resta come sostituito"><Icon name="edit" /> Riemetti</button>
                             </div>
                           ) : (
-                            <button type="button" className="btn btn--ghost btn--xs" disabled={busy} onClick={() => emettiAttestato(i)}>Emetti</button>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+                              {/* Il title di un pulsante disabilitato non si vede ovunque: il motivo breve sta anche sotto. */}
+                              <span title={i.non_emettibile ?? undefined}><button type="button" className="btn btn--ghost btn--xs" disabled={busy || Boolean(i.non_emettibile)} title={i.non_emettibile ?? 'Emetti l’attestato'} onClick={() => emettiAttestato(i)}>Emetti</button></span>
+                              {i.non_emettibile && <span className="muted" style={{ fontSize: 11 }}>{i.non_emettibile.startsWith('Non ancora') ? 'non ancora idoneo' : 'dati dell’ente incompleti'}</span>}
+                            </div>
                           )}
                         </td>
                       )}

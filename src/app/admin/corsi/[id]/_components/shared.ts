@@ -29,6 +29,8 @@ export type IscrittoRow = {
   piano_titolo: string | null;
   /** Attestato valido (Fase 5), se emesso. */
   attestato: { id: string; numero: string; emesso_at: string } | null;
+  /** B9: perché adesso non si può emettere l'attestato (null = si può). */
+  non_emettibile?: string | null;
 };
 
 export const corsoHref = (corsoId: string) => `/admin/corsi/${corsoId}` as const;
