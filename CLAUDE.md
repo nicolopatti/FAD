@@ -18,8 +18,9 @@ vendita**; il multi-ente tocca la base dell'infrastruttura e va prima capito.
 - `docs/brief-fase-6-vendita.md`: brief della Fase 6 (offerta su un'edizione, accesso per
   iscrizione, catalogo pubblico, registrazione, Stripe Checkout + webhook idempotente,
   area Vendite, gate M6a/M6, **§10 da ratificare**, §11 prerequisiti lato utente: Stripe,
-  SMTP bloccante, Supabase Pro, testi legali, ente reale, IVA). **Nessun codice finché la
-  §10 non è ratificata.**
+  SMTP bloccante, Supabase Pro, testi legali, ente reale, IVA). **§10 ratificata il 21/10 sera**
+  con le proposte (10.1 online + a date, 10.2 account prima, 10.3 export + gestionale,
+  10.5 avvio immediato; 10.6–10.9 proposte; 10.4 IVA configurabile, col commercialista).
 - `docs/visione-multi-ente.md`: appunti con le scelte e le conseguenze (appartenenze
   persona↔ente↔ruolo, indirizzo per ente, referente aziendale, console di piattaforma,
   moduli, email col marchio, database unico vs per ente, privacy/DPA). **Non deciso, non

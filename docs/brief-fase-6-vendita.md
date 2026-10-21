@@ -1,4 +1,4 @@
-# Brief Fase 6 — Vendita dei corsi (catalogo pubblico, registrazione, pagamento) — da ratificare
+# Brief Fase 6 — Vendita dei corsi (catalogo pubblico, registrazione, pagamento) — ratificato (2026-10-21)
 
 > **Cos'è questo documento.** La proposta di mandato operativo per la **Fase 6**, scritta su
 > richiesta dell'utente (2026-10-21): *"noi come ente formativo venderemo corsi che le
@@ -182,6 +182,12 @@ prima edizione: un'offerta si crea su un'edizione, quindi su un corso già conge
 5. Email di conferma d'acquisto col nome dell'ente.
 
 ## 10. Da ratificare prima di iniziare
+
+> **Ratifica (2026-10-21 sera).** L'utente ha scelto le proposte su 10.1 (online + a date),
+> 10.2 (account prima del pagamento), 10.3 (export + gestionale; fattura automatica in una
+> fase successiva) e 10.5 (avvio immediato con perdita del recesso, testo da validare). Per
+> 10.6–10.9 valgono le proposte (nessuna obiezione). 10.4 (IVA) resta da decidere col
+> commercialista: il software la rende configurabile per offerta, non blocca il lavoro.
 
 1. **Cosa si vende all'inizio.** (a) Solo corsi online "sempre disponibili" con accesso di N
    giorni; (b) anche edizioni a date con posti limitati. *Proposta: (b), lo stesso modello
