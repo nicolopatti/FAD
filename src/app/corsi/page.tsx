@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { requireSession } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
-import { computeProgressoPerIscrizioni } from '@/lib/compliance';
+import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni } from '@/lib/compliance';
+import { deriveIdoneita } from '@/lib/report-fondo';
 import { AppShell, StatusChip, Ico } from '@/components/AppShell';
 import { Cover, coverUrl } from '@/components/admin/Atlante';
 import type { IscrizioneListaRow } from '@/lib/db-types';
@@ -27,13 +28,20 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
     .returns<IscrizioneListaRow[]>(), 'i tuoi corsi');
 
   // Progresso di tutte le iscrizioni con un numero fisso di query (Blocco B #2).
-  const progressi = await computeProgressoPerIscrizioni(supabase, iscrizioni.map((i) => i.id));
-  const tutti = iscrizioni.map((i) => ({ iscrizione: i, prog: progressi.get(i.id) ?? null }));
+  const ids = iscrizioni.map((i) => i.id);
+  const [progressi, frequenze] = await Promise.all([computeProgressoPerIscrizioni(supabase, ids), computeFrequenzaPerIscrizioni(supabase, ids)]);
+  // "Completato" con la stessa regola di attestati e report: lezioni E presenza minima.
+  const tutti = iscrizioni.map((i) => {
+    const prog = progressi.get(i.id) ?? null;
+    const freq = frequenze.get(i.id) ?? null;
+    const completato = prog ? deriveIdoneita(prog.obbligatori_totale, prog.idonea, freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza)).idoneo : false;
+    return { iscrizione: i, prog, freq, completato };
+  });
 
-  const inCorso = tutti.filter((r) => r.prog && !r.prog.idonea).length;
-  const idonei = tutti.filter((r) => r.prog?.idonea).length;
+  const inCorso = tutti.filter((r) => r.prog && !r.completato).length;
+  const idonei = tutti.filter((r) => r.completato).length;
   const rows = tutti.filter((r) =>
-    filtro === 'tutti' ? true : filtro === 'in_corso' ? !r.prog?.idonea : Boolean(r.prog?.idonea),
+    filtro === 'tutti' ? true : filtro === 'in_corso' ? !r.completato : r.completato,
   );
 
   const nome = session.nome?.trim().split(' ')[0];
@@ -65,13 +73,13 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
       )}
 
       <div className="stack">
-        {rows.map(({ iscrizione, prog }) => {
+        {rows.map(({ iscrizione, prog, completato }) => {
           const corsoTitolo = iscrizione.edizione?.corso?.titolo ?? 'Corso non disponibile';
           const descrizione = iscrizione.edizione?.corso?.descrizione ?? null;
           const completati = prog?.completati ?? 0;
           const totale = prog?.totale ?? 0;
           const pct = totale > 0 ? Math.round((completati / totale) * 100) : 0;
-          const idonea = prog?.idonea ?? false;
+          const idonea = completato;
           const prossima = prog?.items.find((i) => i.sbloccato && !i.completato);
 
           return (

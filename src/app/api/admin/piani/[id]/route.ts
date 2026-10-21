@@ -67,3 +67,34 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
   return NextResponse.json({ ok: true, piano: data });
 }
+
+// Elimina un piano non usato: niente iscrizioni collegate né report depositati
+// (409 altrimenti: i report sono prove write-once e lo tengono legato). RLS:
+// `piano_delete_admin`. Evento `piano.removed` con il solo titolo.
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const session = await requireAdmin();
+  const supabase = await createSupabaseServerClient();
+  const { data: piano } = await supabase.from('piano_formativo_finanziato').select('id, titolo').eq('id', params.id).maybeSingle();
+  if (!piano) return NextResponse.json({ ok: false, error: 'Piano non trovato.' }, { status: 404 });
+
+  const [{ count: nIscr }, { count: nDep }] = await Promise.all([
+    supabase.from('iscrizione').select('id', { count: 'exact', head: true }).eq('piano_id', piano.id),
+    supabase.from('report_fondo_depositato').select('id', { count: 'exact', head: true }).eq('piano_id', piano.id),
+  ]);
+  if ((nIscr ?? 0) > 0) return NextResponse.json({ ok: false, error: `Il piano è assegnato a ${nIscr} iscritt${nIscr === 1 ? 'o' : 'i'}: toglilo prima dalla scheda Fondo delle edizioni.` }, { status: 409 });
+  if ((nDep ?? 0) > 0) return NextResponse.json({ ok: false, error: 'Per questo piano ci sono report depositati: resta come prova.' }, { status: 409 });
+
+  const { error } = await supabase.from('piano_formativo_finanziato').delete().eq('id', piano.id);
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+
+  await appendEvent({
+    tenantId: session.tenantId,
+    eventType: 'piano.removed',
+    actor: { persona_id: session.personaId, type: 'persona' },
+    subjectType: 'piano_formativo_finanziato',
+    subjectId: piano.id,
+    payload: { titolo: piano.titolo },
+  });
+  return NextResponse.json({ ok: true });
+}

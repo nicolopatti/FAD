@@ -62,15 +62,28 @@ Correzioni (stesso branch):
   `/audit/completamento` dichiaravano "idoneo" guardando solo le lezioni online (Neri
   Carla idonea con 0% di presenza su soglia 80%), mentre attestati e report fondi usano
   `deriveIdoneita` (lezioni E presenza minima). Ora tutte e due usano `deriveIdoneita`.
-  **Resta aperto** (area discente, fuori dalla richiesta): `/corsi` e la pagina del
-  corso del discente mostrano "Completato" con la sola `prog.idonea`; su un corso misto
-  con soglia di presenza il discente vedrebbe il sigillo senza esserlo davvero.
-- Non fatto, segnalato come proposta: riordino delle categorie non atomico (due PATCH),
-  "Persone" come titolo anche della scheda Aziende, sovrapposizione Rendicontazione/
-  scheda Fondo, azioni in blocco su altre liste.
-- **Residui in produzione** del giro completo: corso "Verifica automatica <tag>"
-  archiviato con edizione conclusa e il piano "… · piano" (i piani non si eliminano):
-  compaiono in Rendicontazione. Dati di prova del tenant demo.
+- **Seguito ("vai avanti con le cose in sospeso")**:
+  - *Area discente*: `/corsi` e la pagina del corso usano anch'esse `deriveIdoneita`
+    (prima: sigillo "Completato" con le sole lezioni, e per un corso di sole sessioni
+    subito, con 0 lezioni); la pagina mostra "Presenza alle sessioni N% (minimo S%)" e,
+    a lezioni finite ma presenza insufficiente, lo dice nell'intestazione. Per farlo il
+    discente deve leggere le PROPRIE presenze: migration
+    `20261021000006_evento_read_presenze_discente.sql` (**applicata sul live**, ALTER
+    POLICY `evento_read`: tipi di presenza con `payload.iscrizione_id` di una sua
+    iscrizione; verificato in rollback: proprie 1, altrui 0, nessun altro evento admin).
+  - *Categorie*: riordino atomico con `PUT /api/admin/categorie/ordine {ids}` (un solo
+    upsert con l'ordine completo, 409 se l'elenco è cambiato); l'editor non fa più due PATCH.
+  - *Piani*: si eliminano se non usati (`DELETE /api/admin/piani/[id]`, 409 con iscritti o
+    report depositati, Evento `piano.removed {titolo}`; migration
+    `20261021000007_piano_delete_admin.sql` **applicata sul live**; icona cestino nella
+    tabella dei piani). Il giro completo ora prova il rifiuto (piano assegnato) e
+    **elimina il proprio piano** alla fine.
+  - *Residui*: i 3 piani "Verifica automatica … · piano" dei giri precedenti eliminati via
+    SQL con gli Eventi `iscrizione.updated`/`piano.removed` (`origine: pulizia_verifica`)
+    scritti da `audit_append`; catena integra. Restano, archiviati, i corsi di prova.
+  - Lasciato com'è, voluto: "Persone" è il titolo della sezione con le schede Persone |
+    Aziende (come Rendicontazione | Attestati). Restano proposte non fatte:
+    sovrapposizione Rendicontazione/scheda Fondo, azioni in blocco su altre liste.
 
 ## Manutenzione dopo Next 16 (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` e in produzione** — "vai avanti con le attività previste" e poi "ti approvo tutto")
 

@@ -297,9 +297,18 @@ if (edizione && iscrizione) {
   check('corso concluso e copia archiviati', arch.status === 200 && (arch.json?.fatti?.length ?? 0) === [corso, copia].filter(Boolean).length, breve(arch));
   const cat = await api('GET', '/admin/corsi?stato=archiviato');
   check('catalogo "Archiviati" elenca il corso di prova', cat.status === 200 && cat.testo.includes(NOME), `HTTP ${cat.status}`);
+  if (piano && iscrizione) {
+    const usato = await api('DELETE', `/api/admin/piani/${piano}`);
+    check('piano assegnato a un iscritto: eliminazione rifiutata (409)', usato.status === 409, breve(usato));
+  }
   if (iscrizione) {
     const rim = await api('DELETE', `/api/admin/iscrizioni/${iscrizione}`);
     check('iscritto rimosso (nessun attestato collegato)', rim.status === 200, breve(rim));
+  }
+  if (piano) {
+    // Il piano di prova non resta in Rendicontazione: senza iscritti si elimina.
+    const del = await api('DELETE', `/api/admin/piani/${piano}`);
+    check('piano di prova eliminato (non più assegnato)', del.status === 200, breve(del));
   }
   for (const lo of [loVideo, loQuiz].filter(Boolean)) {
     const a = await api('POST', `/api/admin/learning-objects/${lo}/archive`, {});

@@ -25,7 +25,7 @@ const FONDI: [string, string][] = [['fondimpresa', 'Fondimpresa'], ['foncoop', '
 const VUOTO = { titolo: '', codice: '', fondo: 'fondimpresa', cup: '', avviso: '', canale: '' };
 export function PianiPanel({ piani }: { piani: PianoRow[] }) {
   const router = useRouter();
-  const { toast } = useFeedback();
+  const { toast, confirm } = useFeedback();
   const [aperto, setAperto] = useState(piani.length === 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +39,22 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
     setF({ titolo: p.titolo, codice: p.codice ?? '', fondo: p.fondo ?? 'fondimpresa', cup: p.cup ?? '', avviso: p.avviso ?? '', canale: p.canale ?? '' });
     setErrs({}); setError(null); setAperto(true);
   }
+  async function elimina(p: PianoRow) {
+    if (!(await confirm({ titolo: `Eliminare il piano "${p.titolo}"?`, messaggio: 'Non è assegnato a nessun iscritto: sparisce dall’elenco e dai selettori. L’eliminazione resta nel registro.', conferma: 'Elimina', pericolosa: true }))) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch(`/api/admin/piani/${p.id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      toast(`Piano "${p.titolo}" eliminato.`);
+      if (modifica === p.id) chiudi();
+      router.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg); toast(msg, 'errore');
+    } finally { setBusy(false); }
+  }
+
   function chiudi() { setAperto(false); setModifica(null); setErrs({}); setError(null); }
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -107,7 +123,10 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
                   <td className="muted">{p.canale ?? '—'}</td>
                   <td className="col-r">{p.n_iscritti}</td>
                   <td className="col-r">
-                    <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => apriModifica(p)} aria-label={`Modifica il piano ${p.titolo}`}><Icon name="edit" /> Modifica</button>
+                    <span className="row" style={{ gap: 4, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                      <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => apriModifica(p)} aria-label={`Modifica il piano ${p.titolo}`}><Icon name="edit" /> Modifica</button>
+                      {p.n_iscritti === 0 && <button type="button" className="icon-btn" disabled={busy} onClick={() => elimina(p)} aria-label={`Elimina il piano ${p.titolo}`} title="Elimina (non è assegnato a nessuno)"><Icon name="trash" /></button>}
+                    </span>
                   </td>
                 </tr>
               ))}

@@ -44,10 +44,11 @@ export function CategorieEditor({ categorie, orfane }: { categorie: Riga[]; orfa
   async function sposta(i: number, dir: -1 | 1) {
     const j = i + dir;
     if (j < 0 || j >= categorie.length) return;
-    const a = categorie[i]; const b = categorie[j];
+    // Un solo salvataggio con l'ordine completo: o cambia tutto o niente.
+    const ids = categorie.map((c) => c.id);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
     try {
-      await call('PATCH', `/api/admin/categorie/${a.id}`, { ordine: j + 1 });
-      await call('PATCH', `/api/admin/categorie/${b.id}`, { ordine: i + 1 });
+      await call('PUT', '/api/admin/categorie/ordine', { ids });
     } catch { /* banner */ }
   }
 

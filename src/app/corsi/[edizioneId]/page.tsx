@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { computeProgressoForIscrizione } from '@/lib/compliance';
+import { computeProgressoForIscrizione, computeFrequenzaForIscrizione } from '@/lib/compliance';
+import { deriveIdoneita } from '@/lib/report-fondo';
 import { AppShell, Ico } from '@/components/AppShell';
 import { fmtDataOra, fmtData } from '@/components/admin/Atlante';
 import { linkedInAddToProfileUrl, provaEmissioneAutomatica } from '@/lib/attestati';
@@ -33,8 +34,15 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
     .maybeSingle<{ id: string; edizione: { codice: string; corso: { descrizione: string | null; politica_attestato: PoliticaAttestato | null } | null } | null }>();
   if (!iscrizione) notFound();
 
-  const prog = await computeProgressoForIscrizione(supabase, iscrizione.id);
+  const [prog, freq] = await Promise.all([
+    computeProgressoForIscrizione(supabase, iscrizione.id),
+    computeFrequenzaForIscrizione(supabase, iscrizione.id),
+  ]);
   if (!prog) notFound();
+  // "Completato" con la stessa regola di attestati e report: lezioni obbligatorie
+  // E presenza minima alle sessioni, se il corso la chiede (prima: solo lezioni).
+  const soglia = freq?.soglia ?? null;
+  const completato = deriveIdoneita(prog.obbligatori_totale, prog.idonea, soglia, Boolean(freq?.idoneo_frequenza)).idoneo;
 
   const descrizione = iscrizione.edizione?.corso?.descrizione ?? null;
   const politica: PoliticaAttestato = iscrizione.edizione?.corso?.politica_attestato ?? 'automatica';
@@ -51,7 +59,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
   let { data: attestato } = await caricaAttestato();
   // Solo per i corsi con un percorso FAD (obbligatori > 0): per i corsi di sole
   // sessioni l'idoneità dipende dalla frequenza e l'emissione parte dalle presenze.
-  if (!attestato && prog.idonea && prog.obbligatori_totale > 0 && politica === 'automatica') {
+  if (!attestato && completato && prog.obbligatori_totale > 0 && politica === 'automatica') {
     const emesso = await provaEmissioneAutomatica(iscrizione.id, session.personaId);
     if (emesso) attestato = (await caricaAttestato()).data;
   }
@@ -61,7 +69,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
   const nVideo = prog.items.filter((i) => i.lo_type === 'video').length;
   const minutiTotali = prog.items.reduce((acc, i) => acc + (Number((i.lo_config as { durata_secondi?: unknown }).durata_secondi) || 0), 0) / 60;
   // Data dell'idoneità = completamento dell'ultima lezione obbligatoria.
-  const idoneaIl = prog.idonea
+  const idoneaIl = completato
     ? prog.items.filter((i) => i.obbligatorio && i.completato_il).map((i) => i.completato_il!).sort().at(-1) ?? null
     : null;
 
@@ -71,7 +79,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
         <Ico name="chevL" size={16} /> I miei corsi
       </Link>
 
-      {prog.idonea ? (
+      {completato ? (
         /* Momento di chiusura: il corso è completato e il risultato è registrato. */
         <section className="seal-panel" aria-labelledby="completato">
           <div className="seal-panel__art">
@@ -100,7 +108,12 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
           <div className="course-hero__inner">
             <h1 className="course-hero__title">{prog.corso_titolo}</h1>
             {descrizione && <p className="course-hero__desc">{descrizione}</p>}
-            {next && (
+            {prog.idonea && soglia != null && freq && !freq.idoneo_frequenza ? (
+              <p className="course-hero__desc" style={{ fontWeight: 600 }}>
+                {prog.obbligatori_totale > 0 ? 'Hai finito le lezioni online. ' : ''}
+                Per completare il corso serve la presenza ad almeno il {soglia}% delle sessioni: finora risulti presente al {freq.frequenza_percentuale}%. La presenza si aggiorna dopo ogni sessione.
+              </p>
+            ) : next && (
               <div className="course-hero__actions">
                 <Link className="btn btn--lg" style={{ background: '#fff', color: 'var(--ink)' }} href={`/corsi/${params.edizioneId}/lo/${next.learning_object_id}`}>
                   {next.lo_type === 'quiz' ? 'Vai al test finale' : prog.completati === 0 ? 'Inizia il corso' : `Riprendi: lezione ${next.ordine}`}
@@ -114,7 +127,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
 
       <div className="detail-layout">
         <section>
-          {prog.idonea && attestato && (
+          {completato && attestato && (
             <section className="attestato-card" aria-labelledby="attestato">
               <div className="attestato-card__head">
                 <div className="attestato-card__icon"><Ico name="cap" size={22} /></div>
@@ -138,7 +151,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
             </section>
           )}
 
-          {prog.idonea && (
+          {completato && (
             <div style={{ marginBottom: 28 }}>
               <h2 style={{ marginBottom: 12 }}>E adesso?</h2>
               <div className="next-steps">
@@ -166,7 +179,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
           )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-            <h2>{prog.idonea ? 'Il tuo percorso' : 'Le lezioni'}</h2>
+            <h2>{completato ? 'Il tuo percorso' : 'Le lezioni'}</h2>
             <span className="page-lead">{prog.completati} di {prog.totale} completate</span>
           </div>
 
@@ -218,7 +231,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
               <span style={{ fontSize: 22, color: 'var(--muted-2)', fontWeight: 600 }}>%</span>
             </div>
             <div className="progress progress--lg" style={{ marginBottom: 16 }}>
-              <div className={`progress__bar ${prog.idonea ? 'is-ok' : ''}`} style={{ width: `${pct}%` }} />
+              <div className={`progress__bar ${completato ? 'is-ok' : ''}`} style={{ width: `${pct}%` }} />
             </div>
             <div className="stack-sm" style={{ fontSize: 14 }}>
               <div className="row row--between"><span className="page-lead">Lezioni</span><strong>{prog.totale}{nVideo > 0 && nVideo === prog.totale ? ' video' : ''}</strong></div>
@@ -228,10 +241,13 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
               {prog.obbligatori_totale !== prog.totale && (
                 <div className="row row--between"><span className="page-lead">Obbligatorie</span><strong>{prog.obbligatori_completati} di {prog.obbligatori_totale}</strong></div>
               )}
-              <div className="row row--between"><span className="page-lead">Stato</span><strong className={prog.idonea ? 'status-ok' : ''}>{prog.idonea ? 'Completato' : prog.completati === 0 ? 'Da iniziare' : 'In corso'}</strong></div>
+              {soglia != null && freq && (
+                <div className="row row--between"><span className="page-lead">Presenza alle sessioni</span><strong className={freq.idoneo_frequenza ? 'status-ok' : ''}>{freq.frequenza_percentuale}% <span className="page-lead" style={{ fontWeight: 400 }}>(minimo {soglia}%)</span></strong></div>
+              )}
+              <div className="row row--between"><span className="page-lead">Stato</span><strong className={completato ? 'status-ok' : ''}>{completato ? 'Completato' : prog.completati === 0 && !freq?.presenze ? 'Da iniziare' : 'In corso'}</strong></div>
             </div>
           </div>
-          {prog.sblocco_sequenziale && !prog.idonea && (
+          {prog.sblocco_sequenziale && !completato && (
             <p className="page-lead" style={{ margin: '0 6px', lineHeight: 1.55 }}>
               Le lezioni si aprono una dopo l&apos;altra, nell&apos;ordine del programma.
               {prog.visione_integrale ? ' I video si guardano per intero, a velocità normale.' : ''}
