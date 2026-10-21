@@ -25,16 +25,20 @@ export function AgendaList({ righe, quando: iniziale }: { righe: SessioneAgenda[
   const [quando, setQuando] = useState<Quando>(iniziale);
   const [q, setQ] = useState('');
   const [pagina, setPagina] = useState(1);
+  // C: le sessioni annullate non affollano l'agenda: nascoste, si mostrano a richiesta.
+  const [conAnnullate, setConAnnullate] = useState(false);
   // "Adesso" fissato al primo disegno: basta per separare prossime e passate.
   const [now] = useState(() => Date.now());
 
-  const filtrate = useMemo(() => {
+  const { filtrate, nAnnullate } = useMemo(() => {
     const n = q.trim().toLowerCase();
+    const annullate = righe.filter((s) => s.annullata);
     const out = righe.filter((s) => {
       const t = s.data_ora ? new Date(s.data_ora).getTime() : null;
       if (quando === 'prossime' && !(t == null || t >= now) ) return false;
       if (quando === 'passate' && !(t != null && t < now)) return false;
       if (n && !`${s.titolo} ${s.corso} ${s.edizione} ${s.docente ?? ''}`.toLowerCase().includes(n)) return false;
+      if (s.annullata && !conAnnullate) return false;
       return true;
     });
     out.sort((a, b) => {
@@ -42,8 +46,15 @@ export function AgendaList({ righe, quando: iniziale }: { righe: SessioneAgenda[
       const tb = b.data_ora ? new Date(b.data_ora).getTime() : Number.MAX_SAFE_INTEGER;
       return quando === 'passate' ? tb - ta : ta - tb;
     });
-    return out;
-  }, [righe, quando, q, now]);
+    // Annullate che rispettano gli altri filtri (quando e ricerca): il conteggio del pulsante.
+    const nAnnullate = annullate.filter((s) => {
+      const t = s.data_ora ? new Date(s.data_ora).getTime() : null;
+      if (quando === 'prossime' && !(t == null || t >= now)) return false;
+      if (quando === 'passate' && !(t != null && t < now)) return false;
+      return !n || `${s.titolo} ${s.corso} ${s.edizione} ${s.docente ?? ''}`.toLowerCase().includes(n);
+    }).length;
+    return { filtrate: out, nAnnullate };
+  }, [righe, quando, q, now, conAnnullate]);
 
   const pagine = Math.max(1, Math.ceil(filtrate.length / PER_PAGINA));
   const cur = Math.min(pagina, pagine);
@@ -68,6 +79,11 @@ export function AgendaList({ righe, quando: iniziale }: { righe: SessioneAgenda[
             <input value={q} onChange={(e) => { setQ(e.target.value); setPagina(1); }} placeholder="Cerca per titolo, corso, edizione o docente" aria-label="Cerca una sessione" />
           </div>
           <div className="toolbar__spacer" />
+          {nAnnullate > 0 && (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => { setConAnnullate((v) => !v); setPagina(1); }}>
+              {conAnnullate ? 'Nascondi le annullate' : `Mostra anche ${nAnnullate === 1 ? '1 annullata' : `${nAnnullate} annullate`}`}
+            </button>
+          )}
           <div className="seg seg--mono" role="group" aria-label="Quando">
             {([['prossime', 'Prossime'], ['passate', 'Passate'], ['tutte', 'Tutte']] as [Quando, string][]).map(([v, label]) => (
               <button key={v} type="button" className={quando === v ? 'is-active' : ''} onClick={() => { setQuando(v); setPagina(1); router.replace((v === 'prossime' ? '/admin/agenda' : `/admin/agenda?quando=${v}`) as Route, { scroll: false }); }}>{label}</button>

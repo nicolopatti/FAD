@@ -17,6 +17,12 @@ type SessioneProssima = { id: string; titolo: string; data_ora: string; modalita
 
 const EDIZIONI_IN_DASHBOARD = 12;
 
+/** Saluto in base all'ora di Roma (C: "Buongiorno" anche alle 15). */
+function saluto(): string {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }).format(new Date()));
+  return h >= 5 && h < 13 ? 'Buongiorno' : h >= 13 && h < 18 ? 'Buon pomeriggio' : 'Buonasera';
+}
+
 function activityView(ev: EventoMini): { ico: string; node: React.ReactNode } | null {
   const p = ev.payload ?? {};
   const titolo = typeof p.titolo === 'string' ? p.titolo : null;
@@ -51,7 +57,7 @@ function activityView(ev: EventoMini): { ico: string; node: React.ReactNode } | 
     case 'edizione.cancelled': return { ico: 'x', node: <>Annullata l&apos;edizione <span className="mono">{codice}</span></> };
     case 'iscrizione.created': return { ico: 'users', node: <>Nuovo iscritto a un&apos;edizione</> };
     case 'iscrizione.removed': return { ico: 'x', node: <>Rimosso un iscritto da un&apos;edizione</> };
-    case 'iscrizione.imported': return { ico: 'users', node: <>Importati {n ?? 'più'} iscritti</> };
+    case 'iscrizione.imported': return { ico: 'users', node: <>{n === 1 ? 'Importato 1 iscritto' : <>Importati {n ?? 'più'} iscritti</>}</> };
     case 'persona.invitata': return { ico: 'users', node: <>Inviata un&apos;email di invito</> };
     case 'persona.updated': return { ico: 'edit', node: <>Aggiornata l&apos;anagrafica di una persona</> };
     case 'azienda.created': return { ico: 'building', node: <>Nuova azienda in anagrafica</> };
@@ -137,7 +143,7 @@ export default async function AdminDashboard() {
     <>
       <div className="page-head">
         <div className="page-head__lead">
-          <h1>Buongiorno, {session.nome || 'amministratore'}</h1>
+          <h1>{saluto()}, {session.nome || 'amministratore'}</h1>
           <p>Le edizioni in corso, le sessioni della settimana e quello che aspetta una tua azione.</p>
         </div>
         <div className="page-head__actions">

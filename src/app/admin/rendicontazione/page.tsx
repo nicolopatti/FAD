@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { fmtOre } from '@/lib/formato';
 import type { Route } from 'next';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -227,7 +228,7 @@ export default async function ReportFondoPage(
                         {i.azienda_ragione_sociale ?? <span className="chip chip--ocra">nessuna</span>}
                         {i.azienda_ragione_sociale && !i.azienda_partita_iva && <span className="chip chip--ocra" style={{ marginLeft: 6 }}>no P.IVA</span>}
                       </td>
-                      <td>{i.frequenza_percentuale}% <span className="muted">({i.ore_frequentate}h)</span></td>
+                      <td>{i.frequenza_percentuale.toLocaleString('it-IT')}% <span className="muted">({fmtOre(i.ore_frequentate)})</span></td>
                       <td className="muted">{i.obbligatori_totale > 0 ? `${i.obbligatori_completati}/${i.obbligatori_totale}` : '—'}</td>
                       <td>
                         <span className={`chip ${i.idoneo ? 'chip--teal' : 'chip--ocra'}`}>{i.idoneo ? 'idoneo' : 'non idoneo'}</span>

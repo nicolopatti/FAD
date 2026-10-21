@@ -6,7 +6,7 @@ export function LoginPreview() {
     <section className="login__preview" aria-hidden="true">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 460 }}>
         <h2>Video, ritmo tuo, risultato certo.</h2>
-        <p>Le lezioni si sbloccano una dopo l&apos;altra e ogni completamento resta registrato: a fine corso il risultato è già registrato.</p>
+        <p>Le lezioni si sbloccano una dopo l&apos;altra e ogni completamento resta registrato: a fine corso il risultato è già pronto, senza altri passaggi.</p>
       </div>
       <div className="login__player">
         <span className="login__play">

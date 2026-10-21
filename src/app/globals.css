@@ -1602,3 +1602,8 @@ h2 { font-weight: 700; letter-spacing: -.015em; }
 .bulkbar .btn--secondary { background: #fff; color: var(--deep); }
 .bulkbar .btn--danger { background: color-mix(in srgb, var(--err) 85%, #000); color: #fff; }
 @media (max-width: 640px) { .bulkbar { margin-top: 0; } .lista-corso { min-width: 200px; } }
+
+/* Riquadro "In sintesi" della panoramica del corso: etichetta + valore che vanno a capo. */
+.sintesi { display: grid; grid-template-columns: minmax(84px, max-content) minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: 13.5px; }
+.sintesi dt { color: var(--muted); font-weight: 500; }
+.sintesi dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }

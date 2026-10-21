@@ -10,6 +10,7 @@ import { DocumentoPlayer } from '@/components/DocumentoPlayer';
 import { QuizPlayer } from '@/components/QuizPlayer';
 import { configQuizDa, mescola, semeTentativo } from '@/lib/quiz';
 import { messaggioFinestra } from '@/lib/finestra';
+import { fmtDurata } from '@/lib/formato';
 import type { DomandaPublica } from '@/lib/quiz-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -28,13 +29,7 @@ async function domandeDelTest(supabase: SupabaseClient, loId: string, ordineCasu
   return ordineCasuale ? mescola(pubbliche, seme) : pubbliche;
 }
 
-function durataLabel(config: Record<string, unknown>): string | null {
-  const s = Number(config?.durata_secondi);
-  if (!Number.isFinite(s) || s <= 0) return null;
-  const m = Math.floor(s / 60);
-  const sec = Math.round(s % 60);
-  return `${m} min${sec ? ` ${sec} s` : ''}`;
-}
+const durataLabel = (config: Record<string, unknown>) => fmtDurata(Number(config?.durata_secondi));
 
 export default async function LearningObjectPage(props: { params: Promise<{ edizioneId: string; loId: string }> }) {
   const params = await props.params;
@@ -203,7 +198,7 @@ export default async function LearningObjectPage(props: { params: Promise<{ ediz
                       {lo.completato ? <Ico name="check" size={16} /> : !lo.sbloccato ? <Ico name="lock" size={14} /> : isQuiz(lo) ? <Ico name="quiz" size={15} /> : <span style={{ fontSize: 12, fontWeight: 600 }}>{i + 1}</span>}
                     </span>
                     <span className="outline-row__title">{lo.lo_titolo}</span>
-                    <span className="outline-row__num">{active ? 'ora' : ''}</span>
+                    <span className="outline-row__num">{active ? <span title={lo.lo_type === 'quiz' ? 'Stai facendo questo test' : lo.lo_type === 'documento' ? 'Stai leggendo questa lezione' : 'Stai guardando questa lezione'}><Ico name="eye" size={14} /><span className="sr-only">{lo.lo_type === 'quiz' ? 'Stai facendo questo test' : lo.lo_type === 'documento' ? 'Stai leggendo' : 'Stai guardando'}</span></span> : ''}</span>
                   </>
                 );
                 return (

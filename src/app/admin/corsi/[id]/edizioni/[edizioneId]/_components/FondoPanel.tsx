@@ -24,12 +24,14 @@ export function FondoPanel({ corsoId, edizioneId, attiva, piani, nIscritti, senz
     const piano = piani.find((p) => p.id === pianoId);
     const ok = await confirm({
       titolo: piano ? `Assegnare "${piano.titolo}" a tutti gli iscritti?` : 'Togliere il piano finanziato a tutti gli iscritti?',
-      messaggio: piano ? `Tutti i ${nIscritti} iscritti dell'edizione passano a questo piano, anche chi ne aveva un altro. Le eccezioni per singolo iscritto si fanno nella scheda Iscritti.` : `Nessuno dei ${nIscritti} iscritti avrà più un piano finanziato.`,
+      messaggio: piano
+        ? `${nIscritti === 1 ? "L'unico iscritto dell'edizione passa" : `Tutti i ${nIscritti} iscritti dell'edizione passano`} a questo piano, anche chi ne aveva un altro. Le eccezioni per singolo iscritto si fanno nella scheda Iscritti.`
+        : nIscritti === 1 ? "L'iscritto dell'edizione non avrà più un piano finanziato." : `Nessuno dei ${nIscritti} iscritti avrà più un piano finanziato.`,
       conferma: piano ? 'Assegna a tutti' : 'Togli a tutti',
     });
     if (!ok) return;
     try {
-      await call('POST', `/api/admin/edizioni/${edizioneId}/piano`, { piano_id: pianoId || null }, { successo: piano ? `Piano "${piano.titolo}" assegnato a ${nIscritti} iscritti.` : 'Piano tolto a tutti gli iscritti.', busy: setSalvando });
+      await call('POST', `/api/admin/edizioni/${edizioneId}/piano`, { piano_id: pianoId || null }, { successo: piano ? `Piano "${piano.titolo}" assegnato a ${nIscritti === 1 ? '1 iscritto' : `${nIscritti} iscritti`}.` : 'Piano tolto a tutti gli iscritti.', busy: setSalvando });
     } catch { /* banner */ }
   }
 

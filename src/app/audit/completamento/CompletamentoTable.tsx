@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { fmtOre } from '@/lib/formato';
 import { Icon, fmtDataOra } from '@/components/admin/Atlante';
 import { Pager } from '@/components/admin/Form';
 
@@ -203,8 +204,8 @@ function RigaView({ r, open, pct, onToggle }: { r: RigaCompletamento; open: bool
             </>
           ) : r.frequenza ? (
             <>
-              <span className={`chip ${r.frequenza.idoneo ? 'chip--ok' : 'chip--err'}`}>{r.frequenza.percentuale}%</span>
-              <div className="muted log-sub">soglia {r.frequenza.soglia}% · {r.frequenza.ore} h su {r.frequenza.ore_pianificate} h{r.frequenza.non_parsate > 0 ? ` · ${r.frequenza.non_parsate} durate non lette` : ''}</div>
+              <span className={`chip ${r.frequenza.idoneo ? 'chip--ok' : 'chip--err'}`}>{r.frequenza.percentuale.toLocaleString('it-IT')}%</span>
+              <div className="muted log-sub">soglia {r.frequenza.soglia}% · {fmtOre(r.frequenza.ore)} su {fmtOre(r.frequenza.ore_pianificate)}{r.frequenza.non_parsate > 0 ? ` · ${r.frequenza.non_parsate} durate non lette` : ''}</div>
             </>
           ) : r.presenze > 0 ? <span className="muted">{r.presenze} presenze</span> : <span className="muted">—</span>}
         </td>

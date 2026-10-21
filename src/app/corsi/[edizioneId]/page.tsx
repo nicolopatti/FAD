@@ -9,18 +9,15 @@ import { fmtDataOra, fmtData } from '@/components/admin/Atlante';
 import { linkedInAddToProfileUrl, provaEmissioneAutomatica } from '@/lib/attestati';
 import { appBaseUrl, urlVerifica } from '@/lib/url';
 import { messaggioFinestra } from '@/lib/finestra';
+import { fmtDurata, plurale } from '@/lib/formato';
 import type { AttestatoRow, PoliticaAttestato } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
 
 const TYPE_LABEL: Record<string, string> = { video: 'Video', documento: 'Documento', quiz: 'Test finale' };
 
-function durataLabel(config: Record<string, unknown>): string | null {
-  const s = Number(config?.durata_secondi);
-  if (!Number.isFinite(s) || s <= 0) return null;
-  const m = Math.round(s / 60);
-  return m < 1 ? '1 min' : `${m} min`;
-}
+// Stessa durata della pagina della lezione e dei totali (lib/formato).
+const durataLabel = (config: Record<string, unknown>) => fmtDurata(Number(config?.durata_secondi));
 
 export default async function DettaglioCorsoPage(props: { params: Promise<{ edizioneId: string }> }) {
   const params = await props.params;
@@ -73,7 +70,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
   const currentId = prog.items.find((i) => i.sbloccato && !i.completato)?.learning_object_id;
   const next = prog.items.find((i) => i.sbloccato && !i.completato) ?? prog.items.find((i) => i.sbloccato);
   const nVideo = prog.items.filter((i) => i.lo_type === 'video').length;
-  const minutiTotali = prog.items.reduce((acc, i) => acc + (Number((i.lo_config as { durata_secondi?: unknown }).durata_secondi) || 0), 0) / 60;
+  const durataTotale = fmtDurata(prog.items.reduce((acc, i) => acc + (Number((i.lo_config as { durata_secondi?: unknown }).durata_secondi) || 0), 0));
   // Data dell'idoneità = completamento dell'ultima lezione obbligatoria.
   const idoneaIl = completato
     ? prog.items.filter((i) => i.obbligatorio && i.completato_il).map((i) => i.completato_il!).sort().at(-1) ?? null
@@ -104,7 +101,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
               Il tuo percorso è stato registrato in modo che nessuno possa modificarlo, e il tuo ente può verificarlo in qualsiasi momento.
             </p>
             <div className="seal-panel__meta">
-              <span>{prog.totale} lezion{prog.totale === 1 ? 'e' : 'i'}{minutiTotali > 0 ? ` · ${Math.round(minutiTotali)} min` : ''}</span>
+              <span>{prog.totale} lezion{prog.totale === 1 ? 'e' : 'i'}{durataTotale ? ` · ${durataTotale}` : ''}</span>
               {prog.visione_integrale && <span>visione integrale</span>}
             </div>
           </div>
@@ -117,7 +114,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
             {prog.idonea && soglia != null && freq && !freq.idoneo_frequenza && !presenzaInAttesa ? (
               <p className="course-hero__desc" style={{ fontWeight: 600 }}>
                 {prog.obbligatori_totale > 0 ? 'Hai finito le lezioni online. ' : ''}
-                Per completare il corso serve la presenza ad almeno il {soglia}% delle sessioni: finora risulti presente al {freq.frequenza_percentuale}%. La presenza si aggiorna dopo ogni sessione.
+                Per completare il corso serve la presenza ad almeno il {soglia}% delle sessioni: finora risulti presente al {freq.frequenza_percentuale.toLocaleString('it-IT')}%. La presenza si aggiorna dopo ogni sessione.
               </p>
             ) : !aperta ? (
               <p className="course-hero__desc" style={{ fontWeight: 600 }}>{messaggioFinestra(finestra)}</p>
@@ -190,7 +187,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
             <h2>{completato ? 'Il tuo percorso' : 'Le lezioni'}</h2>
-            <span className="page-lead">{prog.completati} di {prog.totale} completate</span>
+            <span className="page-lead">{prog.completati} di {plurale(prog.totale, 'lezione completata', 'lezioni completate')}</span>
           </div>
 
           <div>
@@ -245,7 +242,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
             </div>
             <div className="stack-sm" style={{ fontSize: 14 }}>
               <div className="row row--between"><span className="page-lead">Lezioni</span><strong>{prog.totale}{nVideo > 0 && nVideo === prog.totale ? ' video' : ''}</strong></div>
-              {minutiTotali > 0 && <div className="row row--between"><span className="page-lead">Durata</span><strong>{Math.round(minutiTotali)} min</strong></div>}
+              {durataTotale && <div className="row row--between"><span className="page-lead">Durata</span><strong>{durataTotale}</strong></div>}
               {prog.visione_integrale && <div className="row row--between"><span className="page-lead">Modalità</span><strong>visione integrale</strong></div>}
               {aperta && finestra.chiude_il && <div className="row row--between"><span className="page-lead">Aperto fino al</span><strong>{fmtData(finestra.chiude_il)}</strong></div>}
               {!aperta && <div className="row row--between"><span className="page-lead">Lezioni</span><strong>{finestra.stato === 'non_aperta' ? `dal ${fmtData(finestra.apre_il!)}` : 'chiuse'}</strong></div>}
@@ -257,7 +254,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
                 <div className="row row--between"><span className="page-lead">Presenza alle sessioni</span><strong>in attesa delle sessioni</strong></div>
               )}
               {soglia != null && freq && !presenzaInAttesa && (
-                <div className="row row--between"><span className="page-lead">Presenza alle sessioni</span><strong className={freq.idoneo_frequenza ? 'status-ok' : ''}>{freq.frequenza_percentuale}% <span className="page-lead" style={{ fontWeight: 400 }}>(minimo {soglia}%)</span></strong></div>
+                <div className="row row--between"><span className="page-lead">Presenza alle sessioni</span><strong className={freq.idoneo_frequenza ? 'status-ok' : ''}>{freq.frequenza_percentuale.toLocaleString('it-IT')}% <span className="page-lead" style={{ fontWeight: 400 }}>(minimo {soglia}%)</span></strong></div>
               )}
               <div className="row row--between"><span className="page-lead">Stato</span><strong className={completato ? 'status-ok' : ''}>{completato ? 'Completato' : prog.completati === 0 && !freq?.presenze ? 'Da iniziare' : 'In corso'}</strong></div>
             </div>

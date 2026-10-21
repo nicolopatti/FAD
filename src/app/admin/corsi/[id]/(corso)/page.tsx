@@ -4,7 +4,8 @@ import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { corsoStato, edizioneStato, STATO_CORSO_LABEL, type CorsoRow, type EdizioneRow } from '@/lib/db-types';
-import { Icon, Cover, coverUrl, fmtData, fmtDurataSec } from '@/components/admin/Atlante';
+import { Icon, Cover, coverUrl, fmtData } from '@/components/admin/Atlante';
+import { fmtDurata } from '@/lib/formato';
 import { edizioneHref } from '../_components/shared';
 
 export const dynamic = 'force-dynamic';
@@ -118,16 +119,15 @@ export default async function CorsoPanoramicaPage(props: { params: Promise<{ id:
         <div className="card">
           <div className="card__head"><h3>In sintesi</h3></div>
           <div className="card__body">
-            <div className="tbl-wrap"><table className="tbl">
-              <tbody>
-                <tr><th style={{ width: 140 }}>Stato</th><td>{STATO_CORSO_LABEL[stato]}</td></tr>
-                <tr><th>Lezioni</th><td><Link href={`${base}/lezioni`}>{struttura.length}</Link>{struttura.length > 0 && <span className="muted"> · {obbligatorie} obbligatori{obbligatorie === 1 ? 'a' : 'e'}</span>}</td></tr>
-                <tr><th>Video</th><td>{durata > 0 ? fmtDurataSec(durata) : <span className="muted">—</span>}</td></tr>
-                <tr><th>Edizioni</th><td><Link href={`${base}/edizioni`}>{edizioni.length}</Link>{attive.length > 0 && <span className="muted"> · {attive.length} attiv{attive.length === 1 ? 'a' : 'e'}</span>}</td></tr>
-                <tr><th>Attestato</th><td>{(corso.politica_attestato ?? 'manuale') === 'nessuna' ? 'Nessuno' : (corso.politica_attestato ?? 'manuale') === 'manuale' ? 'Manuale' : 'Automatico'}{(corso.politica_attestato ?? 'manuale') !== 'nessuna' && corso.ore_totali == null && <div className="muted" style={{ fontSize: 12 }}>Ore totali mancanti: <Link href={`${base}/attestato`}>compilale</Link>.</div>}</td></tr>
-                <tr><th>Creato il</th><td className="muted">{fmtData(corso.creato_il)}</td></tr>
-              </tbody>
-            </table></div>
+            {/* C: una tabella in una colonna stretta faceva scorrere in orizzontale: elenco che va a capo. */}
+            <dl className="sintesi">
+              <dt>Stato</dt><dd>{STATO_CORSO_LABEL[stato]}</dd>
+              <dt>Lezioni</dt><dd><Link href={`${base}/lezioni`}>{struttura.length}</Link>{struttura.length > 0 && <span className="muted"> · {obbligatorie} obbligatori{obbligatorie === 1 ? 'a' : 'e'}</span>}</dd>
+              <dt>Video</dt><dd>{fmtDurata(durata) ?? <span className="muted">—</span>}</dd>
+              <dt>Edizioni</dt><dd><Link href={`${base}/edizioni`}>{edizioni.length}</Link>{attive.length > 0 && <span className="muted"> · {attive.length} attiv{attive.length === 1 ? 'a' : 'e'}</span>}</dd>
+              <dt>Attestato</dt><dd>{(corso.politica_attestato ?? 'manuale') === 'nessuna' ? 'Nessuno' : (corso.politica_attestato ?? 'manuale') === 'manuale' ? 'Manuale' : 'Automatico'}{(corso.politica_attestato ?? 'manuale') !== 'nessuna' && corso.ore_totali == null && <div className="muted" style={{ fontSize: 12 }}>Ore totali mancanti: <Link href={`${base}/attestato`}>compilale</Link>.</div>}</dd>
+              <dt>Creato il</dt><dd className="muted">{fmtData(corso.creato_il)}</dd>
+            </dl>
           </div>
         </div>
 

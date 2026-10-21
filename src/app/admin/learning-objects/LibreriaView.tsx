@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { fmtDurata } from '@/lib/formato';
 import Link from 'next/link';
 import type { LearningObjectType, StatoCorso } from '@/lib/db-types';
 import { STATO_CORSO_CHIP, STATO_CORSO_LABEL } from '@/lib/db-types';
-import { Icon, fmtDurataSec } from '@/components/admin/Atlante';
+import { Icon } from '@/components/admin/Atlante';
 import { useFeedback } from '@/components/ui/Feedback';
 import { useCall } from '@/components/admin/useCall';
 import { BulkBar } from '@/components/admin/Lista';
@@ -42,7 +43,7 @@ function riferimento(r: ContenutoRow): string {
 }
 
 function dettaglio(r: ContenutoRow): string {
-  if (r.type === 'video') { const d = r.config?.durata_secondi; return typeof d === 'number' ? fmtDurataSec(d) : '—'; }
+  if (r.type === 'video') { const d = r.config?.durata_secondi; return typeof d === 'number' ? (fmtDurata(d) ?? '—') : '—'; }
   if (r.type === 'quiz') return '—';
   const size = r.config?.size;
   return typeof size === 'number' ? `${Math.round(size / 1024)} KB` : '—';

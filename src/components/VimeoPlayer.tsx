@@ -51,6 +51,8 @@ const TOLLERANZA_SEEK = 1.5;
 // la perdita di copertura se la pagina si chiude senza un evento di pausa.
 const CHECKPOINT_MS = 60_000;
 
+const MSG_SALTO = 'In questo corso il video va visto per intero: non si può andare oltre il punto già visto.';
+
 export function VimeoPlayer({
   vimeoId, vimeoHash, visioneIntegrale = false, trattiIniziali, coperturaIniziale, corsoHref, nextHref, nextLabel,
   iscrizioneId, learningObjectId,
@@ -60,6 +62,11 @@ export function VimeoPlayer({
   const playerRef = useRef<VimeoPlayerInstance | null>(null);
   const [copertura, setCopertura] = useState<number | null>(coperturaIniziale ?? null);
   const [avviso, setAvviso] = useState<string | null>(null);
+  useEffect(() => {
+    if (!avviso) return;
+    const t = setTimeout(() => setAvviso(null), 6000);
+    return () => clearTimeout(t);
+  }, [avviso]);
   // Schermata finale nostra: copre quella di Vimeo ("More from …", Follow).
   const [finito, setFinito] = useState(false);
   // Esito dell'invio di `video.ended` al server.
@@ -145,7 +152,7 @@ export function VimeoPlayer({
           const limite = limiteAvanzamento();
           if (s > limite + TOLLERANZA_SEEK + CONTINUITA_SECONDI) {
             player?.setCurrentTime(limite).catch(() => undefined);
-            setAvviso('Questo corso richiede la visione integrale: non è possibile saltare avanti.');
+            setAvviso(MSG_SALTO);
             ultimo = null;
             return;
           }
@@ -178,11 +185,11 @@ export function VimeoPlayer({
       player.on('seeked', (d: any) => {
         const to = Number(d?.seconds ?? 0);
         const limite = limiteAvanzamento();
+        // Il messaggio resta qualche secondo (si spegne da solo): prima lo
+        // cancellava subito il "seeked" del riposizionamento e il blocco era muto.
         if (visioneIntegrale && to > limite + TOLLERANZA_SEEK) {
           player?.setCurrentTime(limite).catch(() => undefined);
-          setAvviso('Questo corso richiede la visione integrale: non è possibile saltare avanti.');
-        } else {
-          setAvviso(null);
+          setAvviso(MSG_SALTO);
         }
         ultimo = null;
         send('video.seek', conTratti({ from_secondi: d?.previousSeconds ?? null, to_secondi: to }));
@@ -297,8 +304,12 @@ export function VimeoPlayer({
       </div>
       {visioneIntegrale && ((copertura != null && copertura > 0) || avviso) && (
         <div className="page-lead" style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }} aria-live="polite">
-          {copertura != null && copertura > 0 && <span>Visto finora: {copertura}%</span>}
-          {avviso && <span className="status-now">{avviso}</span>}
+          {copertura != null && copertura > 0 && (
+            <span title="Il valore registrato si calcola sul tempo reale di riproduzione, a ogni pausa e ogni minuto: dopo un ricaricamento può risultare un po' più basso di questa stima.">
+              Visto finora: circa {copertura}% <span style={{ opacity: 0.75 }}>(stima; il registro conta il tempo reale ed è più prudente)</span>
+            </span>
+          )}
+          {avviso && <span className="status-now" role="status" style={{ fontWeight: 600 }}>{avviso}</span>}
         </div>
       )}
     </div>

@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { fmtDurata } from '@/lib/formato';
 import Link from 'next/link';
 import type { CorsoRow, LearningObjectType, StrutturaCorsoConLO } from '@/lib/db-types';
 import { parseDelimited } from '@/lib/csv';
 import { useFeedback } from '@/components/ui/Feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { Icon, fmtDurataSec, regolaLabel } from '@/components/admin/Atlante';
+import { Icon, regolaLabel } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { ErroreCall, useCall, type CallFn } from '@/components/admin/useCall';
 import { leggiDurataVimeo, MSG_VIMEO_NON_VALIDO, parseVimeoRef } from '@/lib/vimeo';
@@ -168,7 +169,7 @@ function Sequenza({
         </div>
         {list.length > 0 && (
           <span className="chip chip--muted">
-            {list.length} {list.length === 1 ? 'lezione' : 'lezioni'}{durataTot > 0 ? ` · ${fmtDurataSec(durataTot)} di video` : ''}
+            {list.length} {list.length === 1 ? 'lezione' : 'lezioni'}{durataTot > 0 ? ` · ${(fmtDurata(durataTot) ?? '—')} di video` : ''}
           </span>
         )}
       </div>
@@ -183,7 +184,7 @@ function Sequenza({
           list.map((s, i) => {
             const lo = s.learning_object;
             const tipo = lo?.type ?? 'video';
-            const durata = tipo === 'video' ? fmtDurataSec(typeof lo?.config?.durata_secondi === 'number' ? (lo!.config.durata_secondi as number) : null) : null;
+            const durata = tipo === 'video' ? (fmtDurata(typeof lo?.config?.durata_secondi === 'number' ? (lo!.config.durata_secondi as number) : null) ?? '—') : null;
             const soglia = tipo === 'quiz' && typeof lo?.config?.soglia_percentuale === 'number' ? (lo!.config.soglia_percentuale as number) : null;
             return (
               <div
@@ -446,7 +447,7 @@ function DallaLibreria({ corsoId, busy, call }: { corsoId: string; busy: boolean
                 <div className="libitem__title">{lo.titolo}</div>
                 <div className="libitem__meta">
                   {TIPO_LABEL[lo.type]}
-                  {lo.type === 'video' && typeof lo.config?.durata_secondi === 'number' ? ` · ${fmtDurataSec(lo.config.durata_secondi as number)}` : ''}
+                  {lo.type === 'video' && typeof lo.config?.durata_secondi === 'number' ? ` · ${(fmtDurata(lo.config.durata_secondi as number) ?? '—')}` : ''}
                   {lo.usato_in > 0 ? ` · in ${lo.usato_in} ${lo.usato_in === 1 ? 'corso' : 'corsi'}` : ' · in nessun corso'}
                 </div>
               </div>

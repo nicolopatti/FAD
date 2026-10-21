@@ -1,10 +1,11 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { fmtDurata } from '@/lib/formato';
 import type { LearningObjectRow } from '@/lib/db-types';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { parseVimeoRef, vimeoEmbedUrl } from '@/lib/vimeo';
-import { Icon, fmtDurataSec } from '@/components/admin/Atlante';
+import { Icon } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { useCall } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
@@ -142,7 +143,7 @@ export function ContenutoForm({ lo, inCorsi }: { lo: LearningObjectRow; inCorsi:
               </Field>
             </div>
             <div className="row row--wrap" style={{ marginBottom: 12 }}>
-              <span className="muted" style={{ fontSize: 13 }}>Video Vimeo <span className="mono">{vimeoId}</span>{durataSec != null && ` · ${fmtDurataSec(durataSec)}`}</span>
+              <span className="muted" style={{ fontSize: 13 }}>Video Vimeo <span className="mono">{vimeoId}</span>{durataSec != null && ` · ${(fmtDurata(durataSec) ?? '—')}`}</span>
               <button type="button" className="btn btn--ghost btn--xs" onClick={() => setAnteprima((v) => !v)}>{anteprima ? 'Nascondi anteprima' : 'Anteprima'}</button>
             </div>
             {anteprima && vimeoId && (

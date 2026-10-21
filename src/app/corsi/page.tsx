@@ -39,15 +39,19 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
     return { iscrizione: i, prog, freq, completato };
   });
 
-  const inCorso = tutti.filter((r) => r.prog && !r.completato).length;
+  // C: "in corso" = iniziato e non completato; "da iniziare" è un'altra cosa.
+  const iniziato = (r: (typeof tutti)[number]) => (r.prog?.completati ?? 0) > 0 || (r.freq?.presenze ?? 0) > 0 || r.prog?.items.some((i) => (i.copertura_percentuale ?? 0) > 0 || (i.quiz?.tentativi ?? 0) > 0);
+  const inCorso = tutti.filter((r) => r.prog && !r.completato && iniziato(r)).length;
+  const daIniziare = tutti.filter((r) => r.prog && !r.completato && !iniziato(r)).length;
   const idonei = tutti.filter((r) => r.completato).length;
   const rows = tutti.filter((r) =>
-    filtro === 'tutti' ? true : filtro === 'in_corso' ? !r.completato : r.completato,
+    filtro === 'tutti' ? true : filtro === 'in_corso' ? !r.completato && iniziato(r) : r.completato,
   );
 
   const nome = session.nome?.trim().split(' ')[0];
   const riepilogo = [
     inCorso > 0 ? `${inCorso} in corso` : null,
+    daIniziare > 0 ? `${daIniziare} da iniziare` : null,
     idonei > 0 ? `${idonei} completat${idonei === 1 ? 'o' : 'i'}` : null,
   ].filter(Boolean).join(' · ');
 
@@ -69,7 +73,7 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
 
       {rows.length === 0 && tutti.length > 0 && (
         <div className="panel page-lead">
-          {filtro === 'in_corso' ? 'Nessun corso in corso: li hai completati tutti.' : 'Nessun corso completato, per ora.'}
+          {filtro === 'in_corso' ? (daIniziare > 0 ? `Nessun corso in corso: ${daIniziare === 1 ? 'uno è' : `${daIniziare} sono`} ancora da iniziare.` : 'Nessun corso in corso: li hai completati tutti.') : 'Nessun corso completato, per ora.'}
         </div>
       )}
 
@@ -86,7 +90,8 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
           const chiuso = finestra ? etichettaFinestra(finestra) : null;
 
           return (
-            <Link key={iscrizione.id} className="corso-card" href={`/corsi/${iscrizione.edizione_id}`}>
+            // C: "Vai al test finale" porta al test, non alla pagina del corso.
+            <Link key={iscrizione.id} className="corso-card" href={!idonea && finestra?.aperta && prossima?.lo_type === 'quiz' ? `/corsi/${iscrizione.edizione_id}/lo/${prossima.learning_object_id}` : `/corsi/${iscrizione.edizione_id}`}>
               <Cover categoria={iscrizione.edizione?.corso?.categoria} src={coverUrl(iscrizione.edizione?.corso?.cover_path)} />
               <div className="corso-card__body">
                 <div className="corso-card__head">
@@ -103,7 +108,7 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
                   <div className="corso-card__progress">
                     <div className="corso-card__progressRow">
                       <span className="corso-card__progressLabel">
-                        {idonea ? 'Completato' : `${completati} di ${totale} lezioni completate`}
+                        {idonea ? 'Completato' : `${completati} di ${totale} ${totale === 1 ? 'lezione completata' : 'lezioni completate'}`}
                       </span>
                       <span className="corso-card__progressValue">{pct}%</span>
                     </div>
