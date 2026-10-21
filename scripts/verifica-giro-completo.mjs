@@ -147,6 +147,11 @@ const struttura = [];
   const path = `${TENANT}/${corso}.png`;
   const up = await fetch(`${SUPA}/storage/v1/object/copertine/${path}`, { method: 'POST', headers: { apikey: ANON, authorization: `Bearer ${admin.access_token}`, 'content-type': 'image/png', 'x-upsert': 'true' }, body: png });
   check('copertina caricata nel bucket (policy admin del tenant)', up.ok, `HTTP ${up.status} ${(await up.text()).slice(0, 80)}`);
+  // Stesso flusso per il bucket `loghi` (logo/firma dell'ente e del modello): carico e tolgo.
+  const logo = `${TENANT}/verifica-${TAG}.png`;
+  const upL = await fetch(`${SUPA}/storage/v1/object/loghi/${logo}`, { method: 'POST', headers: { apikey: ANON, authorization: `Bearer ${admin.access_token}`, 'content-type': 'image/png', 'x-upsert': 'true' }, body: png });
+  check('logo caricato nel bucket loghi (policy admin del tenant)', upL.ok, `HTTP ${upL.status} ${(await upL.text()).slice(0, 80)}`);
+  if (upL.ok) await fetch(`${SUPA}/storage/v1/object/loghi/${logo}`, { method: 'DELETE', headers: { apikey: ANON, authorization: `Bearer ${admin.access_token}` } });
   const pc = await api('PATCH', `/api/admin/corsi/${corso}`, { cover_path: path });
   check('copertina salvata sul corso', pc.status === 200 && pc.json?.corso?.cover_path === path, breve(pc));
   const fuori = await api('PATCH', `/api/admin/corsi/${corso}`, { cover_path: `altro-tenant/${corso}.png` });

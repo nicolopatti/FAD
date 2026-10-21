@@ -22,13 +22,20 @@ facciano quello che devono e cercare errori concettuali di UX. Tre strumenti:
   del workflow `verifica-scritture.yml`): corso di prova dalla creazione
   all'archiviazione (contenuti, test con domande, lezioni, copertina, edizione e D22,
   iscritti, docente, sessione, presenze, piano, report fondo, attestato, conclusione,
-  duplicazione, archiviazione). Primo giro **62/66**, con 4 difetti reali.
+  duplicazione, archiviazione). Primo giro **62/66**, con 4 difetti reali; dopo le
+  correzioni 72/73 (restava l'upload, vedi policy SELECT sotto), poi tutto verde.
 - **Revisione UX** del codice delle pagine (20 difetti certi + 12 opinioni).
 
 Correzioni (stesso branch):
 - *Server*: policy del bucket `copertine` sul tenant della Persona (migration
   `20261021000004_copertine_policy_tenant_fix.sql`, **applicata sul live**: prima
-  l'upload della copertina dal browser era SEMPRE rifiutato); `cover_path` accettato
+  l'upload della copertina dal browser era SEMPRE rifiutato) e **policy SELECT** su
+  `copertine` e `loghi` (`20261021000005_storage_select_copertine_loghi.sql`,
+  **applicata sul live**: l'upload rilegge la riga, INSERT … RETURNING, e senza SELECT
+  la RLS rifiutava anche con la policy INSERT giusta → copertina, logo e firma
+  dell'ente, immagini del modello dell'attestato non si caricavano; verificato in
+  rollback: admin del tenant ok, altro tenant rifiutato, discente 0 righe). **Regola**:
+  ogni bucket in cui si carica dal client vuole INSERT + UPDATE + SELECT; `cover_path` accettato
   solo nella cartella del tenant (`pathNelTenant`); `addIscritto` valida l'email e
   le route iscritti (singolo e CSV) rifiutano con 409 un'edizione conclusa o
   annullata (`motivoEdizioneChiusa` in `lib/iscritti.ts`); concludi e annulla
