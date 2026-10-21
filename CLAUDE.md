@@ -9,7 +9,7 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Next 16 — aggiornamento del framework (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **non ancora su `main`**: serve il via libera esplicito)
+## Next 16 — aggiornamento del framework (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` dal 2026-10-21 mattina** con il via libera dell'utente "Procedi": fast-forward `1aea271..7f1441e`; CI verde; deploy di produzione `dpl_HXRTRjcr…` READY, login e `/verifica/<codice>` verificati sul deploy)
 
 Motivo: `npm audit --omit=dev` segnalava `next` 14.2.15 (critical: DoS via Server
 Actions, origine del dev server) e `postcss` 8.4.31 (high, trascinata da Next); le
@@ -1575,10 +1575,12 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 > 5. **Dipendenze (2026-10-21).** `npm audit fix` (lockfile: `nanoid`, `source-map-js`,
 >    patch transitivi) è su `main` (`1aea271`). Poi, su richiesta dell'utente ("procedi
 >    tu"), **aggiornamento a Next 16.4 / React 19** fatto sul branch (vedi la sezione
->    "Next 16" in testa al file): `npm audit --omit=dev` = **0 vulnerabilità**. Il
->    branch è **da portare su `main` solo con via libera esplicito**; dopo il deploy
->    l'utente provi nel browser login, player video, PDF/badge dell'attestato e l'area
->    admin.
+>    "Next 16" in testa al file): `npm audit --omit=dev` = **0 vulnerabilità**. **Su
+>    `main` e in produzione** dal 2026-10-21 (via libera "Procedi"); dal container
+>    verificati login e verifica pubblica sul deploy. **L'utente provi nel browser**:
+>    login/logout, player video fino a fine lezione, test finale, PDF/badge/LinkedIn
+>    dell'attestato, azioni admin che scrivono, tema scuro. Eventuali rifiniture in
+>    un'unica passata.
 >
 > **Aggiornamento 2026-10-20 sera (leggere per primo).** Tutto il branch
 > `claude/affectionate-hawking-03ev7i` è su `main` (fast-forward autorizzato
