@@ -33,10 +33,35 @@ export function normalizzaPartitaIva(v: string | null | undefined): string | nul
 
 export type PersonaTrovata = { id: string; nome: string; cognome: string };
 
+/**
+ * R3 (stress test 21/10): un codice fiscale appartiene a una sola persona del
+ * tenant. Ritorna la persona che lo ha già (esclusa `escludiId`), o null. Il
+ * blocco è applicativo; l'indice unico nel DB arriva dopo la pulizia dei
+ * doppioni di prova (supabase/pending/persona_codice_fiscale_unico.sql).
+ */
+export async function personaConCodiceFiscale(
+  supabase: SupabaseClient,
+  tenantId: string,
+  cf: string | null | undefined,
+  escludiId?: string,
+): Promise<(PersonaTrovata & { email: string }) | null> {
+  const v = (cf ?? '').trim().toUpperCase();
+  if (!v) return null;
+  let q = supabase.from('persona').select('id, nome, cognome, email').eq('tenant_id', tenantId).ilike('codice_fiscale', v).limit(1);
+  if (escludiId) q = q.neq('id', escludiId);
+  const { data } = await q.maybeSingle<PersonaTrovata & { email: string }>();
+  return data ?? null;
+}
+
+export function messaggioCfDoppio(p: PersonaTrovata & { email: string }): string {
+  return `Questo codice fiscale è già di ${p.nome} ${p.cognome} (${p.email}): ogni persona ha un solo codice fiscale. Se è la stessa persona, usa la sua email.`;
+}
+
 export type AddIscrittoResult =
   | { status: 'created'; iscrizione_id: string; persona_creata: boolean; persona: PersonaTrovata }
   | { status: 'duplicate'; persona: PersonaTrovata }
   | { status: 'conflict'; persona: PersonaTrovata; motivi: MotivoConflitto[]; error: string }
+  | { status: 'cf_doppio'; persona: PersonaTrovata; error: string }
   | { status: 'error'; error: string };
 
 /** Frase per l'admin: "Questa email appartiene già a Mario Rossi (…)". */
@@ -159,13 +184,19 @@ export async function addIscritto(
     // Completa i dati mancanti (rendicontazione e attestato). Il CF solo dopo la
     // conferma esplicita; un CF già presente non si sovrascrive mai.
     const completa: Record<string, string> = {};
-    if (cf && !persona.codice_fiscale && confermata) completa.codice_fiscale = cf;
+    if (cf && !persona.codice_fiscale && confermata) {
+      const altra = await personaConCodiceFiscale(supabase, ctx.tenantId, cf, personaId);
+      if (altra) return { status: 'cf_doppio', persona: altra, error: messaggioCfDoppio(altra) };
+      completa.codice_fiscale = cf;
+    }
     if (dataNascita && !persona.data_nascita) completa.data_nascita = dataNascita;
     if (luogoNascita && !persona.luogo_nascita) completa.luogo_nascita = luogoNascita;
     if (Object.keys(completa).length) {
       await supabase.from('persona').update(completa).eq('id', personaId);
     }
   } else {
+    const altra = await personaConCodiceFiscale(supabase, ctx.tenantId, cf);
+    if (altra) return { status: 'cf_doppio', persona: altra, error: messaggioCfDoppio(altra) };
     const { data: created, error } = await supabase
       .from('persona')
       .insert({ tenant_id: ctx.tenantId, nome, cognome, email, codice_fiscale: cf, data_nascita: dataNascita, luogo_nascita: luogoNascita })

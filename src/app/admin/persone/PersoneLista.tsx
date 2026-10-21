@@ -13,8 +13,12 @@ import { BulkBar, PagerUrl, RicercaUrl, SegUrl } from '@/components/admin/Lista'
 export type AccessoF = 'tutti' | 'si' | 'no';
 
 /** Lista delle persone con filtri nell'URL e invito in blocco. */
-export function PersoneLista({ righe, totale, pagina, perPagina, q, senzaAccesso, totalePersone }: {
+const RUOLO_ACCESSO: Record<string, string> = { admin: 'amministratore', auditor: 'auditor' };
+
+export function PersoneLista({ righe, totale, pagina, perPagina, q, senzaAccesso, totalePersone, ruoli = {} }: {
   righe: PersonaRiepilogo[]; totale: number; pagina: number; perPagina: number; q: string; senzaAccesso: number; totalePersone: number;
+  /** persona_id → ruolo di accesso (app_metadata.role), solo per chi ha l'accesso. */
+  ruoli?: Record<string, string>;
 }) {
   const router = useRouter();
   const { confirm, toast } = useFeedback();
@@ -81,7 +85,11 @@ export function PersoneLista({ righe, totale, pagina, perPagina, q, senzaAccesso
                       <td className="mono">{p.codice_fiscale ?? <span className="muted">—</span>}</td>
                       <td>{p.n_iscrizioni}</td>
                       <td className="muted">{p.n_attestati || '—'}</td>
-                      <td>{p.n_incarichi > 0 ? <span className="chip chip--teal">docente/tutor</span> : <span className="muted">discente</span>}</td>
+                      <td>
+                        {RUOLO_ACCESSO[ruoli[p.id]] && <span className="chip chip--accent">{RUOLO_ACCESSO[ruoli[p.id]]}</span>}
+                        {p.n_incarichi > 0 && <span className="chip chip--teal">docente/tutor</span>}
+                        {!RUOLO_ACCESSO[ruoli[p.id]] && p.n_incarichi === 0 && <span className="muted">{p.n_iscrizioni > 0 ? 'discente' : '—'}</span>}
+                      </td>
                       <td className="muted">{p.ultima_iscrizione_il ? fmtData(p.ultima_iscrizione_il) : '—'}</td>
                       <td><Link className="btn btn--ghost btn--xs" href={href} onClick={(e) => e.stopPropagation()}>Apri <Icon name="arrowRight" /></Link></td>
                     </tr>

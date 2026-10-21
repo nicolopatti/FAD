@@ -45,6 +45,10 @@ export default async function PersonePage(props: { searchParams?: Promise<Params
   ]);
   if (fuoriIntervallo(righeR.error)) redirect(hrefPaginaUno('/admin/persone', sp) as Route);
   const righe = unwrap(righeR, 'le persone');
+  // B6: il ruolo di accesso (admin/auditor/discente) sta nell'utente Auth: RPC per le righe della pagina.
+  const conAccesso = righe.filter((r) => r.accesso).map((r) => r.id);
+  const ruoliR = conAccesso.length ? await supabase.rpc('persone_ruoli', { p_persona_ids: conAccesso }) : { data: [] };
+  const ruoli = Object.fromEntries(((ruoliR.data ?? []) as { persona_id: string; ruolo: string }[]).map((r) => [r.persona_id, r.ruolo]));
 
   return (
     <>
@@ -55,7 +59,7 @@ export default async function PersonePage(props: { searchParams?: Promise<Params
         </div>
       </div>
       <PersoneTabs nPersone={personeTot.count ?? 0} nAziende={aziendeTot.count ?? 0} />
-      <PersoneLista righe={righe} totale={righeR.count ?? righe.length} pagina={pagina} perPagina={PER_PAGINA} q={q} senzaAccesso={senzaAccesso.count ?? 0} totalePersone={personeTot.count ?? 0} />
+      <PersoneLista righe={righe} totale={righeR.count ?? righe.length} pagina={pagina} perPagina={PER_PAGINA} q={q} senzaAccesso={senzaAccesso.count ?? 0} totalePersone={personeTot.count ?? 0} ruoli={ruoli} />
     </>
   );
 }

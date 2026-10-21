@@ -311,6 +311,10 @@ function IscrittoManuale({ edizioneId, piani, busy, call, setError }: { edizione
     } catch (err) {
       // A4: l'email è di una persona già in anagrafica con dati diversi → si chiede.
       const conflitto = err instanceof ErroreCall ? (err.dati?.conflitto as { persona: { id: string; nome: string; cognome: string }; motivi: string[] } | undefined) : undefined;
+      if (!conflitto && err instanceof ErroreCall && err.dati?.campo === 'codice_fiscale') {
+        setErrs({ cf: err.message });
+        return;
+      }
       if (!conflitto) {
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);

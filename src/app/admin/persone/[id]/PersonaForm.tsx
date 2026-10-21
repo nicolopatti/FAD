@@ -5,14 +5,14 @@ import type { PersonaRiepilogo } from '@/lib/db-types';
 import { Icon } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
-import { useCall } from '@/components/admin/useCall';
+import { ErroreCall, useCall } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
 import { isCodiceFiscale, isEmail, type Errori } from '@/lib/validazione';
 
 /** Anagrafica della persona + invito. I dati di nascita servono all'attestato. */
 export function PersonaForm({ persona }: { persona: PersonaRiepilogo }) {
-  const { confirm } = useFeedback();
-  const { call, busy, error } = useCall();
+  const { confirm, toast } = useFeedback();
+  const { call, busy, error, setError } = useCall();
   const [f, setF] = useState({
     nome: persona.nome, cognome: persona.cognome, email: persona.email,
     codice_fiscale: persona.codice_fiscale ?? '', data_nascita: persona.data_nascita ?? '', luogo_nascita: persona.luogo_nascita ?? '',
@@ -38,7 +38,15 @@ export function PersonaForm({ persona }: { persona: PersonaRiepilogo }) {
     }
     const body: Record<string, string | null> = {};
     (Object.keys(f) as (keyof typeof f)[]).forEach((k) => { if (f[k].trim() !== orig[k]) body[k] = f[k].trim() || null; });
-    try { await call('PATCH', `/api/admin/persone/${persona.id}`, body, { successo: 'Anagrafica salvata.', busy: setSalvando }); } catch { /* banner */ }
+    try {
+      await call('PATCH', `/api/admin/persone/${persona.id}`, body, { successo: 'Anagrafica salvata.', busy: setSalvando, quiet: true });
+    } catch (err) {
+      // Email già usata o codice fiscale di un'altra persona: l'errore va sotto il campo.
+      const campo = err instanceof ErroreCall ? (err.dati?.campo as string | undefined) : undefined;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (campo === 'email' || campo === 'codice_fiscale') setErrs({ [campo]: msg });
+      else { setError(msg); toast(msg, 'errore'); }
+    }
   }
 
   return (

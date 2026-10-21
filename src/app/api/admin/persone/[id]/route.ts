@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
+import { messaggioCfDoppio, personaConCodiceFiscale } from '@/lib/iscritti';
 import { isCodiceFiscale, isEmail } from '@/lib/validazione';
 
 type Body = {
@@ -49,6 +50,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   if (!attuale) return NextResponse.json({ ok: false, error: 'persona non trovata' }, { status: 404 });
   if (updates.email === attuale.email) delete updates.email;
   if (!Object.keys(updates).length) return NextResponse.json({ ok: true, invariato: true });
+  // R3: un codice fiscale, una persona.
+  if (updates.codice_fiscale) {
+    const altra = await personaConCodiceFiscale(supabase, session.tenantId, updates.codice_fiscale, params.id);
+    if (altra) return NextResponse.json({ ok: false, error: messaggioCfDoppio(altra), campo: 'codice_fiscale' }, { status: 409 });
+  }
 
   // R4: l'email di accesso segue quella dell'anagrafica.
   const service = updates.email && attuale.auth_user_id ? createSupabaseServiceClient() : null;

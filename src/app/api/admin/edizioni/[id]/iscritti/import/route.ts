@@ -28,7 +28,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const res = await addIscritto(supabase, ctx, params.id, { ...body.rows[i], conferma_persona_id: null });
     if (res.status === 'created') creati += 1;
     else if (res.status === 'duplicate') duplicati += 1;
-    else if (res.status === 'conflict') conflitti.push({ riga: i + 1, error: res.error });
+    else if (res.status === 'conflict' || res.status === 'cf_doppio') conflitti.push({ riga: i + 1, error: res.error });
     else errori.push({ riga: i + 1, error: res.error });
   }
 
