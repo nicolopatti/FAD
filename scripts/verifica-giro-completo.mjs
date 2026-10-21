@@ -184,11 +184,20 @@ let edizione = null;
 let iscrizione = null;
 if (edizione) {
   const email = `verifica-auto-${TAG}@fad.local`;
-  const i = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Verifica', cognome: 'Automatica', email, codice_fiscale: 'VRFATM80A01A794X', azienda: 'Cliente Demo S.r.l.', partita_iva: '01234567890', data_nascita: '1980-01-01', luogo_nascita: 'Bergamo' });
+  // Un codice fiscale diverso a ogni giro (R3: un CF appartiene a una sola persona).
+  const n = String(Date.now() % 100000).padStart(5, '0');
+  const cf = `VRFATM80A${n.slice(0, 2)}A${n.slice(2)}X`;
+  const i = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Verifica', cognome: 'Automatica', email, codice_fiscale: cf, azienda: 'Cliente Demo S.r.l.', partita_iva: '01234567890', data_nascita: '1980-01-01', luogo_nascita: 'Bergamo' });
   iscrizione = i.json?.iscrizione_id ?? null;
   check('iscritto aggiunto (persona nuova, azienda riconosciuta per P.IVA)', i.status === 200 && !!iscrizione, breve(i));
   const dup = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Verifica', cognome: 'Automatica', email });
   check('stessa persona iscritta due volte → 409', dup.status === 409, breve(dup));
+  // A4: stessa email ma nome diverso → conflitto da confermare, nessuna iscrizione.
+  const altroNome = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Giuseppe', cognome: 'Verdi', email });
+  check('email di una persona esistente con un altro nome → 409 con la persona trovata', altroNome.status === 409 && altroNome.json?.conflitto?.persona?.cognome === 'Automatica', breve(altroNome));
+  // R3: lo stesso CF su un'altra persona → rifiutato.
+  const cfDoppio = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Altra', cognome: 'Persona', email: `verifica-auto-${TAG}-b@fad.local`, codice_fiscale: cf });
+  check('codice fiscale già di un\'altra persona → 409', cfDoppio.status === 409 && /codice fiscale/i.test(cfDoppio.json?.error ?? ''), breve(cfDoppio));
   const male = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'X', cognome: 'Y', email: 'non-una-email' });
   check('iscritto con email non valida rifiutato', male.status === 400, breve(male));
   const pg = await pagina(`/admin/corsi/${corso}/edizioni/${edizione}`);
