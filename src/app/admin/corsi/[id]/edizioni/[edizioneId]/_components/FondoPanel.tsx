@@ -10,9 +10,10 @@ import { useCall } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
 
 export type PianoFondo = { id: string; titolo: string; codice: string | null; fondo: string | null; cup: string | null; iscritti: number };
+export type ConformitaPiano = { piano_id: string; bloccanti: number; avvisi: number; messaggi: { severita: 'bloccante' | 'avviso'; messaggio: string }[]; altri: number };
 
 /** Scheda "Fondo" dell'edizione: piano finanziato per tutti gli iscritti, eccezioni e collegamento alla rendicontazione. */
-export function FondoPanel({ corsoId, edizioneId, attiva, piani, nIscritti, senzaPiano, soglia }: { corsoId: string; edizioneId: string; attiva: boolean; piani: PianoFondo[]; nIscritti: number; senzaPiano: number; soglia: number | null }) {
+export function FondoPanel({ corsoId, edizioneId, attiva, piani, nIscritti, senzaPiano, soglia, conformita }: { conformita: ConformitaPiano[]; corsoId: string; edizioneId: string; attiva: boolean; piani: PianoFondo[]; nIscritti: number; senzaPiano: number; soglia: number | null }) {
   const { confirm } = useFeedback();
   const { call, busy, error } = useCall();
   const [pianoId, setPianoId] = useState(piani.length === 1 ? piani[0].id : '');
@@ -75,18 +76,38 @@ export function FondoPanel({ corsoId, edizioneId, attiva, piani, nIscritti, senz
         </div>
         <div>
           <div className="card">
-            <div className="card__head"><h3>Per la rendicontazione</h3></div>
+            <div className="card__head"><div><h3>Per la rendicontazione</h3><div className="sub">Gli stessi controlli del report per il fondo, calcolati adesso.</div></div></div>
             <div className="card__body">
-              <ul className="ready">
-                <li className={conPiano.length > 0 ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={conPiano.length > 0 ? 'check' : 'euro'} /></span>Piano assegnato agli iscritti</li>
-                <li className={conPiano.every((p) => p.cup) && conPiano.length > 0 ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={conPiano.every((p) => p.cup) && conPiano.length > 0 ? 'check' : 'alert'} /></span>
-                  <span>CUP del piano: <strong>obbligatorio</strong> per il deposito{conPiano.some((p) => !p.cup) && <> · <Link href="/admin/rendicontazione">completa il piano</Link></>}</span>
-                </li>
+              {conPiano.length === 0 ? (
+                <div className="muted" style={{ fontSize: 13 }}>Assegna un piano agli iscritti: i controlli per il deposito compaiono qui.</div>
+              ) : conPiano.map((p) => {
+                const c = conformita.find((x) => x.piano_id === p.id);
+                return (
+                  <div key={p.id} style={{ marginBottom: 14 }}>
+                    <div className="row between" style={{ gap: 8, marginBottom: 6 }}>
+                      <strong style={{ fontSize: 13.5 }}>{p.titolo}</strong>
+                      {c && (
+                        <span className="row" style={{ gap: 6 }}>
+                          <span className={`chip ${c.bloccanti > 0 ? 'chip--err' : 'chip--ok'}`}>{c.bloccanti > 0 ? `${c.bloccanti} bloccant${c.bloccanti === 1 ? 'e' : 'i'}` : 'depositabile'}</span>
+                          {c.avvisi > 0 && <span className="chip chip--ocra">{c.avvisi} avvis{c.avvisi === 1 ? 'o' : 'i'}</span>}
+                        </span>
+                      )}
+                    </div>
+                    {c && c.messaggi.length > 0 && (
+                      <ul className="conform-list">
+                        {c.messaggi.map((m, i) => <li key={i} className={m.severita === 'bloccante' ? 'is-err' : 'is-warn'}>{m.messaggio}</li>)}
+                        {c.altri > 0 && <li className="muted">… e altri {c.altri} nel report.</li>}
+                      </ul>
+                    )}
+                    <Link className="btn btn--ghost btn--xs" href={`/admin/rendicontazione?edizione=${edizioneId}&piano=${p.id}` as Route}>Apri il report del piano <Icon name="arrowRight" /></Link>
+                  </div>
+                );
+              })}
+              <ul className="ready" style={{ marginTop: 6 }}>
                 <li className={soglia != null ? 'is-ok' : ''}><span className="ready__dot"><Icon name={soglia != null ? 'check' : 'clock'} /></span>
                   <span>Presenza minima alle sessioni{soglia != null ? `: ${soglia}%` : <>: nessun requisito. Si sceglie nelle <Link href={`/admin/corsi/${corsoId}/impostazioni` as Route}>impostazioni del corso</Link> prima della prima edizione; per questo corso è ormai fissata.</>}</span>
                 </li>
               </ul>
-              <div className="field__hint" style={{ marginTop: 12 }}>I codici fiscali mancanti si vedono nella scheda Iscritti; la rendicontazione li segnala come bloccanti. <Link href="/admin/rendicontazione">Vai a Rendicontazione</Link> per piani, anteprima e deposito.</div>
             </div>
           </div>
         </div>

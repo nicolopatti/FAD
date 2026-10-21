@@ -875,6 +875,9 @@ input[type='text'], input[type='search'] {
 .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; position: relative; } /* relative: gli elementi assoluti (es. .sr-only) restano dentro lo scorrimento */
 .tbl-wrap > .tbl { min-width: 560px; }
 .field--spaced { margin-top: 16px; }
+.conform-list { margin: 0 0 8px; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+.conform-list li.is-err { color: var(--err, #b42318); }
+.conform-list li.is-warn { color: var(--ink-2, inherit); }
 .card__body--flush .tbl-wrap { border-radius: 0; }
 
 /* copertine piccole: niente etichetta (si troncava "FORMAZI") */

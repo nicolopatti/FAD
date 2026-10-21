@@ -3,7 +3,9 @@ import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { edizioneStato } from '@/lib/db-types';
-import { FondoPanel, type PianoFondo } from '../../_components/FondoPanel';
+import { computeReportFondoDataset } from '@/lib/report-fondo';
+import { validateReportFondo, contaSeverita } from '@/lib/report-fondo-validazioni';
+import { FondoPanel, type PianoFondo, type ConformitaPiano } from '../../_components/FondoPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,5 +27,16 @@ export default async function EdizioneFondoPage(props: { params: Promise<{ id: s
   const lista: PianoFondo[] = piani.map((p) => ({ ...p, iscritti: perPiano.get(p.id) ?? 0 }));
   const senzaPiano = iscrizioni.filter((i) => !i.piano_id).length;
 
-  return <FondoPanel corsoId={params.id} edizioneId={ed.id} attiva={edizioneStato(ed) === 'attiva'} piani={lista} nIscritti={iscrizioni.length} senzaPiano={senzaPiano} soglia={ed.corso?.soglia_frequenza_percentuale ?? null} />;
+  // Gli stessi controlli del report fondi, per ogni piano usato in questa edizione:
+  // la scheda dice subito cosa blocca il deposito, senza aprire la rendicontazione.
+  const conformita: ConformitaPiano[] = [];
+  for (const p of lista.filter((x) => x.iscritti > 0)) {
+    const dataset = await computeReportFondoDataset(supabase, ed.id, p.id);
+    if (!dataset) continue;
+    const w = validateReportFondo(dataset);
+    const sev = contaSeverita(w);
+    conformita.push({ piano_id: p.id, ...sev, messaggi: w.map((x) => ({ severita: x.severita, messaggio: x.messaggio })).slice(0, 6), altri: Math.max(0, w.length - 6) });
+  }
+
+  return <FondoPanel corsoId={params.id} edizioneId={ed.id} conformita={conformita} attiva={edizioneStato(ed) === 'attiva'} piani={lista} nIscritti={iscrizioni.length} senzaPiano={senzaPiano} soglia={ed.corso?.soglia_frequenza_percentuale ?? null} />;
 }

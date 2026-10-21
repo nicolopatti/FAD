@@ -82,8 +82,22 @@ Correzioni (stesso branch):
     SQL con gli Eventi `iscrizione.updated`/`piano.removed` (`origine: pulizia_verifica`)
     scritti da `audit_append`; catena integra. Restano, archiviati, i corsi di prova.
   - Lasciato com'è, voluto: "Persone" è il titolo della sezione con le schede Persone |
-    Aziende (come Rendicontazione | Attestati). Restano proposte non fatte:
-    sovrapposizione Rendicontazione/scheda Fondo, azioni in blocco su altre liste.
+    Aziende (come Rendicontazione | Attestati).
+- **Prossimi passi ("procedi con i prossimi passi")**:
+  - *Rendicontazione vs scheda Fondo*: `/admin/rendicontazione` senza parametri = piani
+    + edizioni finanziate (con colonna **Depositati** e link alla scheda Fondo);
+    con `?edizione=&piano=` = **solo il report** di quella coppia (testata, conformità,
+    iscritti, sessioni, file, deposito) con "Tutti i piani e le edizioni" e "Scheda
+    Fondo dell'edizione". La scheda **Fondo** dell'edizione mostra per ogni piano usato
+    gli **stessi controlli** del report (`computeReportFondoDataset` +
+    `validateReportFondo`: bloccanti/avvisi con i messaggi, "depositabile") e "Apri il
+    report del piano"; la vecchia lista di prontezza (solo CUP) è sparita.
+  - *Azioni in blocco nella libreria*: vista Elenco con caselle + barra (Archivia /
+    Ripristina, conferma che dice quanti sono usati come lezione) →
+    `POST /api/admin/learning-objects/archivia {ids, ripristina?}` (max 200, esito
+    fatti/saltati, un Evento `learning_object.archived/unarchived` per contenuto).
+  - Giro completo: nuovi controlli (scheda Fondo con i bloccanti, vista del report
+    senza l'elenco, archivio in blocco + "già archiviati" saltati).
 
 ## Manutenzione dopo Next 16 (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` e in produzione** — "vai avanti con le attività previste" e poi "ti approvo tutto")
 

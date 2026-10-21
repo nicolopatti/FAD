@@ -253,6 +253,9 @@ if (edizione && iscrizione) {
     check('deposito bloccato dai warning bloccanti (CUP mancante) senza override', dep.status === 409 || dep.status === 400, breve(dep));
     const fondo = await pagina(`/admin/corsi/${corso}/edizioni/${edizione}/fondo`);
     check('scheda Fondo mostra il piano con 1 iscritto', fondo.status === 200 && fondo.html.includes(`${NOME} · piano`), `HTTP ${fondo.status}`);
+    check('scheda Fondo: controlli del report (CUP mancante = bloccante)', /bloccant/.test(fondo.html) && /Apri il report del piano/.test(fondo.html), `HTTP ${fondo.status}`);
+    const rep = await pagina(`/admin/rendicontazione?edizione=${edizione}&piano=${piano}`);
+    check('report della coppia in una vista propria (senza l\'elenco dei piani)', rep.status === 200 && /Report —/.test(rep.html) && !/Edizioni finanziate/.test(rep.html) && /Tutti i piani e le edizioni/.test(rep.html), `HTTP ${rep.status}`);
   }
 }
 
@@ -310,9 +313,12 @@ if (edizione && iscrizione) {
     const del = await api('DELETE', `/api/admin/piani/${piano}`);
     check('piano di prova eliminato (non più assegnato)', del.status === 200, breve(del));
   }
-  for (const lo of [loVideo, loQuiz].filter(Boolean)) {
-    const a = await api('POST', `/api/admin/learning-objects/${lo}/archive`, {});
-    check('contenuto di prova archiviato', a.status === 200 || a.status === 409, breve(a));
+  const daArchiviare = [loVideo, loQuiz].filter(Boolean);
+  if (daArchiviare.length) {
+    const a = await api('POST', '/api/admin/learning-objects/archivia', { ids: daArchiviare });
+    check('contenuti di prova archiviati in blocco', a.status === 200 && a.json?.fatti?.length === daArchiviare.length, breve(a));
+    const bis = await api('POST', '/api/admin/learning-objects/archivia', { ids: daArchiviare });
+    check('archivio in blocco: già archiviati saltati con motivo', bis.status === 200 && bis.json?.fatti?.length === 0 && bis.json?.saltati?.length === daArchiviare.length, breve(bis));
   }
 }
 

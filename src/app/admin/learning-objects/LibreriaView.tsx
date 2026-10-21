@@ -7,6 +7,7 @@ import { STATO_CORSO_CHIP, STATO_CORSO_LABEL } from '@/lib/db-types';
 import { Icon, fmtDurataSec } from '@/components/admin/Atlante';
 import { useFeedback } from '@/components/ui/Feedback';
 import { useCall } from '@/components/admin/useCall';
+import { BulkBar } from '@/components/admin/Lista';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
 
 export type ContenutoRow = {
@@ -52,7 +53,8 @@ function dettaglio(r: ContenutoRow): string {
  * usano, con gli orfani in fondo) oppure elenco; archiviati a richiesta.
  */
 export function LibreriaView({ rows, corsi, tabs }: { rows: ContenutoRow[]; corsi: CorsoLibreria[]; tabs?: React.ReactNode }) {
-  const { confirm } = useFeedback();
+  const { confirm, toast } = useFeedback();
+  const [sel, setSel] = useState<Set<string>>(new Set());
   const { call, busy, error } = useCall();
   const [q, setQ] = useState('');
   const [tipo, setTipo] = useState<TipoF>('tutti');
@@ -105,6 +107,29 @@ export function LibreriaView({ rows, corsi, tabs }: { rows: ContenutoRow[]; cors
     }
     try {
       await call('POST', `/api/admin/learning-objects/${r.id}/${r.archiviato ? 'unarchive' : 'archive'}`, undefined, { successo: r.archiviato ? `"${r.titolo}" ripristinato.` : `"${r.titolo}" archiviato.` });
+    } catch { /* banner */ }
+  }
+
+  // Selezione nella vista Elenco: si tiene solo ciò che è ancora visibile coi filtri.
+  const selezionati = elenco.filter((r) => sel.has(r.id));
+  const tuttiSel = elenco.length > 0 && elenco.every((r) => sel.has(r.id));
+  function toggleSel(id: string) { setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }); }
+  function toggleTutti() { setSel(tuttiSel ? new Set() : new Set(elenco.map((r) => r.id))); }
+
+  async function inBlocco(ripristina: boolean) {
+    const target = selezionati.filter((r) => r.archiviato === ripristina);
+    if (!target.length) { toast(ripristina ? 'Nessuno dei selezionati è archiviato.' : 'I selezionati sono già archiviati.', 'errore'); return; }
+    const usati = target.filter((r) => r.corsi.length > 0).length;
+    if (!ripristina && !(await confirm({
+      titolo: `Archiviare ${target.length} contenut${target.length === 1 ? 'o' : 'i'}?`,
+      messaggio: `Spariscono dalla libreria e non si potranno aggiungere a nuovi corsi.${usati ? ` ${usati} ${usati === 1 ? 'è usato' : 'sono usati'} come lezione: quei corsi continuano a funzionare.` : ''} Si possono ripristinare in qualsiasi momento.`,
+      conferma: 'Archivia',
+    }))) return;
+    try {
+      const r = (await call('POST', '/api/admin/learning-objects/archivia', { ids: target.map((x) => x.id), ripristina })) as { fatti?: string[]; saltati?: { titolo: string; motivo: string }[] };
+      const n = r.fatti?.length ?? 0;
+      toast(`${n} contenut${n === 1 ? 'o' : 'i'} ${ripristina ? 'ripristinat' : 'archiviat'}${n === 1 ? 'o' : 'i'}${r.saltati?.length ? `; ${r.saltati.length} saltat${r.saltati.length === 1 ? 'o' : 'i'} (${r.saltati[0].motivo})` : ''}.`, n > 0 ? 'ok' : 'errore');
+      setSel(new Set());
     } catch { /* banner */ }
   }
 
@@ -207,11 +232,17 @@ export function LibreriaView({ rows, corsi, tabs }: { rows: ContenutoRow[]; cors
           )}
         </>
       ) : (
+        <>
+        <BulkBar n={selezionati.length} cosa={selezionati.length === 1 ? 'contenuto selezionato' : 'contenuti selezionati'} onAzzera={() => setSel(new Set())}>
+          {selezionati.some((r) => !r.archiviato) && <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => inBlocco(false)}><Icon name="archive" /> Archivia</button>}
+          {selezionati.some((r) => r.archiviato) && <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => inBlocco(true)}>Ripristina</button>}
+        </BulkBar>
         <div className="card">
           <div className="card__body card__body--flush">
             <div className="tbl-wrap"><table className="tbl tbl--zebra">
               <thead>
                 <tr>
+                  <th className="t-check"><input type="checkbox" checked={tuttiSel} onChange={toggleTutti} aria-label="Seleziona tutti i contenuti visibili" /></th>
                   <th style={{ width: 40 }}></th>
                   <th>Titolo</th>
                   <th style={{ width: 90 }}>Tipo</th>
@@ -223,7 +254,8 @@ export function LibreriaView({ rows, corsi, tabs }: { rows: ContenutoRow[]; cors
               </thead>
               <tbody>
                 {elenco.map((r) => (
-                  <tr key={r.id} style={r.archiviato ? { opacity: 0.65 } : undefined}>
+                  <tr key={r.id} className={sel.has(r.id) ? 'is-selected' : ''} style={r.archiviato ? { opacity: 0.65 } : undefined}>
+                    <td className="t-check"><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggleSel(r.id)} aria-label={`Seleziona ${r.titolo}`} /></td>
                     <td><span className={`type-ico type-ico--${r.type}`}><Icon name={TIPO_ICON[r.type]} /></span></td>
                     <td>
                       <Link href={`/admin/learning-objects/${r.id}`} className="t-title">{r.titolo}</Link>
@@ -244,6 +276,7 @@ export function LibreriaView({ rows, corsi, tabs }: { rows: ContenutoRow[]; cors
             </table></div>
           </div>
         </div>
+        </>
       )}
     </>
   );

@@ -51,6 +51,11 @@ export default async function ReportFondoPage(
     if (!seen.has(k)) { seen.add(k); combos.push(c); }
   }
 
+  // Report già depositati per coppia (edizione, piano): si vedono nella lista.
+  const { data: depRaw } = await supabase.from('report_fondo_depositato').select('edizione_id, piano_id');
+  const depositiPer = new Map<string, number>();
+  for (const d of depRaw ?? []) { const k = `${d.edizione_id}|${d.piano_id}`; depositiPer.set(k, (depositiPer.get(k) ?? 0) + 1); }
+
   const { count: nAttestati } = await supabase.from('attestato').select('id', { count: 'exact', head: true }).is('sostituito_da', null);
 
   const { data: pianiRaw } = await supabase
@@ -104,9 +109,9 @@ export default async function ReportFondoPage(
       </div>
       <RendicontazioneTabs nAttestati={nAttestati ?? 0} />
 
-      <PianiPanel piani={piani} />
+      {!(edizioneId && pianoId) && <PianiPanel piani={piani} />}
 
-      <div className="card">
+      {!(edizioneId && pianoId) && <div className="card">
         <div className="card__head">
           <h3>Edizioni finanziate</h3>
           <span className="chip chip--muted">{combos.length}</span>
@@ -117,23 +122,26 @@ export default async function ReportFondoPage(
           ) : (
             <div className="tbl-wrap"><table className="tbl tbl--zebra">
               <thead>
-                <tr><th>Corso / Edizione</th><th>Piano</th><th>Fondo</th><th>CUP</th><th style={{ width: 120 }}></th></tr>
+                <tr><th>Corso / Edizione</th><th>Piano</th><th>Fondo</th><th>CUP</th><th>Depositati</th><th style={{ width: 120 }}></th></tr>
               </thead>
               <tbody>
                 {combos.map((c) => {
-                  const selected = c.edizione_id === edizioneId && c.piano_id === pianoId;
+                  const nDep = depositiPer.get(`${c.edizione_id}|${c.piano_id}`) ?? 0;
                   return (
                     <tr key={`${c.edizione_id}|${c.piano_id}`}>
                       <td>
                         <span className="t-title">{c.edizione?.corso?.titolo ?? '—'}</span>
-                        <span className="mono muted"> · {c.edizione?.codice ?? '—'}</span>
+                        {c.edizione?.corso ? (
+                          <Link className="mono muted" href={`/admin/corsi/${c.edizione.corso.id}/edizioni/${c.edizione_id}/fondo` as Route} title="Scheda Fondo dell'edizione"> · {c.edizione.codice}</Link>
+                        ) : <span className="mono muted"> · —</span>}
                       </td>
                       <td>{c.piano?.titolo ?? '—'}</td>
                       <td>{c.piano?.fondo ?? <span className="muted">—</span>}</td>
                       <td>{c.piano?.cup ? <span className="mono">{c.piano.cup}</span> : <span className="chip chip--err">assente</span>}</td>
+                      <td>{nDep > 0 ? <span className="chip chip--ok">{nDep}</span> : <span className="muted">—</span>}</td>
                       <td>
-                        <Link className="linklike" href={`/admin/rendicontazione?edizione=${c.edizione_id}&piano=${c.piano_id}&formato=${formato}` as Route}>
-                          {selected ? 'Selezionata' : 'Anteprima →'}
+                        <Link className="btn btn--secondary btn--xs" href={`/admin/rendicontazione?edizione=${c.edizione_id}&piano=${c.piano_id}&formato=${formato}` as Route}>
+                          Apri il report <Icon name="arrowRight" />
                         </Link>
                       </td>
                     </tr>
@@ -143,16 +151,25 @@ export default async function ReportFondoPage(
             </table></div>
           )}
         </div>
-      </div>
+      </div>}
+
+      {edizioneId && pianoId && (
+        <div className="row row--wrap" style={{ gap: 10, marginBottom: 14 }}>
+          <Link className="btn btn--ghost btn--sm" href="/admin/rendicontazione"><Icon name="arrowLeft" /> Tutti i piani e le edizioni</Link>
+          {dataset && combos.find((c) => c.edizione_id === edizioneId)?.edizione?.corso && (
+            <Link className="btn btn--ghost btn--sm" href={`/admin/corsi/${combos.find((c) => c.edizione_id === edizioneId)!.edizione!.corso!.id}/edizioni/${edizioneId}/fondo` as Route}>Scheda Fondo dell&apos;edizione <Icon name="arrowRight" /></Link>
+          )}
+        </div>
+      )}
 
       {edizioneId && pianoId && !dataset && (
-        <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">Edizione/Piano non leggibili (RLS o inesistenti).</div></div>
+        <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">Questa coppia di edizione e piano non esiste o non è visibile: torna all&apos;elenco e riaprila da lì.</div></div>
       )}
 
       {dataset && (
         <>
           <div className="card">
-            <div className="card__head"><h3>Testata — {dataset.testata.corso_titolo} · {dataset.testata.edizione_codice}</h3></div>
+            <div className="card__head"><div><h3>Report — {dataset.testata.corso_titolo} · {dataset.testata.edizione_codice}</h3><div className="sub">Dati calcolati adesso dal registro. Il file si genera in fondo; il deposito congela la copia consegnata al fondo.</div></div></div>
             <div className="card__body">
               <div className="grid-3" style={{ fontSize: 13 }}>
                 <div><div className="lbl">Piano</div>{dataset.testata.piano_titolo}</div>
