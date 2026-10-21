@@ -1,4 +1,19 @@
-# Piano di pulizia dei dati di prova (stress test 21/10/2026) — PROPOSTA, non eseguita
+# Piano di pulizia dei dati di prova (stress test 21/10/2026)
+
+**Esito (21/10/2026, via libera dell'utente "1"):** eseguite le righe **1, 2, 5, 6**
+via SQL in un solo blocco, con 11 Eventi scritti da `audit_append`
+(`origine: 'pulizia_verifica'`, attore l'admin demo): `edizione.updated`
+{updates: [fad_apertura]}, `edizione.cancelled`, `corso.archived {titolo}`,
+`persona.updated {campi: [codice_fiscale]}` ×7, `persona.updated {campi: [email]}`.
+Poi le righe **5 (indice)** e **9**: migration `20261021000011_persona_codice_fiscale_unico`
+e `20261021000012_edizione_date_coerenti` applicate sul live (prove in rollback 5/5:
+CF doppio anche in minuscolo rifiutato, CF vuoti ammessi, date incoerenti rifiutate).
+Catena integra a 728 eventi. **Non eseguite**: riga 3 (facoltativa, l'iscrizione resta
+come storia), riga 4 (serve prima completare i dati dell'ente), riga 8 (scelta
+dell'utente in sospeso). Il CHECK vale già: prolungare le edizioni demo dovrà
+rispettarlo.
+
+Piano originale:
 
 Da eseguire **dopo** le correzioni (branch `claude/new-session-qr4kff`) e solo con
 il via libera dell'utente. Regole: niente DELETE nel registro, nessuna modifica a

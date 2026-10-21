@@ -49,8 +49,8 @@ totale**; **R3** codice fiscale doppio = **blocco**, indice unico solo dopo la p
   risolto) blocca l'emissione manuale (errore) e l'automatica (resta in attesa);
   dashboard: card **Da fare**; Impostazioni: avviso. L'ente demo è incompleto (nessuna
   ragione sociale/firmatario): oggi **nessun attestato si emette** finché non si compila.
-- **B1** `erroriDateEdizione` (form + POST/PATCH edizioni). CHECK nel DB rinviato
-  (TEST-STRESS-01 lo viola). **B2** errori inline + `focusPrimoErrore` (Form.tsx),
+- **B1** `erroriDateEdizione` (form + POST/PATCH edizioni). CHECK nel DB
+  `edizione_date_coerenti` (migration `20261021000012`, **applicata** dopo la pulizia). **B2** errori inline + `focusPrimoErrore` (Form.tsx),
   `ErrorBanner` scorre in vista, `parseOre`/`MSG_ORE`, risposta del server con `campo`.
   **B3** messaggi Vimeo umani (`MSG_VIMEO_NON_VALIDO`, `campoErroreConfig`), validazione
   nel browser, durata da oEmbed (`leggiDurataVimeo`, best effort, non provata da qui).
@@ -59,8 +59,8 @@ totale**; **R3** codice fiscale doppio = **blocco**, indice unico solo dopo la p
   `semeTentativo` + QuizPlayer congela l'ordine del tentativo. **B6/R3**
   `personaConCodiceFiscale` blocca il CF doppio (addIscritto, CSV, PATCH persona); RPC
   `persone_ruoli` (migration `20261021000010`, **applicata**, solo staff del tenant) per
-  la colonna Ruolo; indice unico pronto in `supabase/pending/` (da applicare dopo la
-  pulizia). **B7** `edizioneTerminata` → "terminata — da concludere". **B8** password
+  la colonna Ruolo; indice unico `persona_tenant_codice_fiscale_uq` su
+  `(tenant_id, upper(codice_fiscale))` (migration `20261021000011`, **applicata** dopo la pulizia). **B7** `edizioneTerminata` → "terminata — da concludere". **B8** password
   attuale richiesta se la sessione è da login con password (`richiedePasswordAttuale`
   su `amr` di `getClaims`; i link di invito/reimpostazione no). **B9** "Emetti"
   disabilitato col motivo. **B10** avviso fisso "formato interim". **B11** Lucia Verdi:
@@ -84,8 +84,17 @@ totale**; **R3** codice fiscale doppio = **blocco**, indice unico solo dopo la p
   admin (503 nel container), cambio email con Auth, cambio password, oEmbed Vimeo,
   lezioni PDF aperte (l'unica edizione con un PDF, ED-T4-DEMO, ora è chiusa), import
   presenze CSV (solo la pagina).
-- **Piano di pulizia** dei dati di prova: `docs/pulizia-dati-prova-21-10.md` (proposta,
-  NON eseguita: serve il via libera).
+- **Pulizia dei dati di prova** (`docs/pulizia-dati-prova-21-10.md`, **eseguita** il
+  21/10 col via libera dell'utente, righe 1, 2, 5, 6 via SQL con 11 Eventi
+  `audit_append` `origine: pulizia_verifica`): TEST-STRESS-01 senza `fad_apertura` e
+  **annullata**; corso "TEST stress 21-10" **archiviato**; CF tolto alle 7 persone
+  "Verifica automatica"; email di "Y X" → `verifica-email-non-valida@fad.local`. Poi
+  indice unico del CF e CHECK delle date (prove in rollback 5/5), catena integra a
+  **728 eventi**, E2E correzioni **54/54** (ED_STRESS ora = edizione annullata), smoke
+  97/97, funzionali 50/50. Lasciati: l'iscrizione di Mario a TEST-STRESS-01 (storia),
+  l'attestato 2026/000003 (da riemettere dopo i dati dell'ente), le edizioni demo
+  scadute ED-001/ED-T4-DEMO/ED-WEB-2026 (**decisione dell'utente in sospeso**:
+  prolungare o concludere).
 - **Merge e prova in produzione**: fast-forward `56e742d..3899250` su `main`. **Vercel
   non ha creato da solo il deploy di produzione** dopo il push (nessun deploy per `main`
   dopo 8 minuti; il commit era già stato costruito come anteprima del branch): creato
@@ -1792,10 +1801,11 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 > **Punto di ripartenza (2026-10-21 sera, leggere per primo).** Le correzioni dello
 > stress test sono **su `main` e in produzione** (sezione in testa al file), verificate
-> sul deploy (29/29 + 80/80). Migration applicate sul live fino alla `20261021000010`.
-> Da fare con l'utente: via libera al piano di pulizia (`docs/pulizia-dati-prova-21-10.md`),
-> dopo cui l'indice unico del CF (`supabase/pending/`) e il CHECK sulle date
-> dell'edizione; compilare i dati dell'ente (senza, nessun attestato si emette).
+> sul deploy (29/29 + 80/80). Migration applicate sul live fino alla `20261021000012`
+> (indice unico del CF e CHECK delle date, dopo la pulizia dei dati di prova, eseguita).
+> Da fare con l'utente: decidere le edizioni demo scadute (ED-001, ED-T4-DEMO da
+> prolungare? ED-WEB-2026 da concludere?); compilare i dati dell'ente (senza, nessun
+> attestato si emette), poi riemettere 2026/000003.
 > Il resto di questa nota è lo stato precedente.
 >
 > **Punto di ripartenza precedente (2026-10-21 sera).** Tutto il lavoro è su

@@ -36,8 +36,8 @@ export type PersonaTrovata = { id: string; nome: string; cognome: string };
 /**
  * R3 (stress test 21/10): un codice fiscale appartiene a una sola persona del
  * tenant. Ritorna la persona che lo ha già (esclusa `escludiId`), o null. Il
- * blocco è applicativo; l'indice unico nel DB arriva dopo la pulizia dei
- * doppioni di prova (supabase/pending/persona_codice_fiscale_unico.sql).
+ * blocco è applicativo (409 con la persona); l'indice unico nel DB
+ * (migration 20261021000011) è la rete contro le scritture concorrenti.
  */
 export async function personaConCodiceFiscale(
   supabase: SupabaseClient,

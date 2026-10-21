@@ -8,7 +8,7 @@ import { accedi, apriBrowser, check, nuovaPagina, overflow, riepilogo, vai } fro
 const ED_001 = 'ed011111-ed01-ed01-ed01-ed01ed01ed01';         // fine 20/07/2026 → chiusa
 const ISCR_001 = '15c11111-15c1-15c1-15c1-15c115c115c1';
 const LO_001 = '10101111-1010-1010-1010-101010101010';
-const ED_STRESS = '8fe0efdf-b5b7-40f8-bbf6-ec67a824b7fe';      // FAD dal 01/03/2027 → non aperta
+const ED_STRESS = '8fe0efdf-b5b7-40f8-bbf6-ec67a824b7fe';      // annullata nella pulizia del 21/10
 const CORSO_STRESS = '84fd63f6-f608-4d31-8512-f8a19f918dce';
 const ED_FIN = '6d2ef44e-2a5e-4804-9a98-dc0422c28a33';         // corso a 6 video, aperto
 const ED_SOLO_TEST = 'baff688e-3c96-4253-8854-1d8931dd052b';
@@ -27,7 +27,6 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   await vai(page, '/corsi');
   const elenco = await testo(page);
   check(`${tag} /corsi: edizione scaduta segnata "Chiuso"`, elenco.includes('Chiuso'), '');
-  check(`${tag} /corsi: edizione futura segnata "Non ancora aperto"`, elenco.includes('Non ancora aperto') || elenco.includes('Si apre il'), '');
   check(`${tag} /corsi: "da iniziare" separato da "in corso"`, !/\b\d+ in corso\b/.test(elenco) || /da iniziare|completat/.test(elenco), elenco.slice(0, 120));
   check(`${tag} /corsi: niente sforamento`, !(await overflow(page)));
 
@@ -41,8 +40,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
 
   await vai(page, `/corsi/${ED_STRESS}`);
   const stress = await testo(page);
-  if (/non trovata/i.test(stress)) salta(`${tag} edizione non ancora aperta`, 'fixture TEST-STRESS-01 assente');
-  else check(`${tag} edizione non ancora aperta: "si aprono il 01/03/2027"`, stress.includes('01/03/2027'), '');
+  if (/non trovata/i.test(stress)) salta(`${tag} edizione annullata`, 'fixture TEST-STRESS-01 assente');
+  else check(`${tag} edizione annullata: lo dice e niente lezioni aperte`, /stata annullata/.test(stress) && (await page.locator('.lo-row__action a').count()) === 0, '');
 
   await vai(page, `/corsi/${ED_FIN}`);
   const fin = await testo(page);

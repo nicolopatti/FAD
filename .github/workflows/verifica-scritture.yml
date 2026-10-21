@@ -7,6 +7,8 @@
 # sessione Claude non può avviare i workflow: il push è il grilletto).
 # Va lanciato DOPO che il deploy di produzione ha il codice da provare: con il
 # codice vecchio i controlli nuovi falliscono (e possono lasciare residui).
+# 2026-10-21: rilanciato dopo la pulizia dei dati di prova (indice unico del CF e
+# CHECK delle date dell'edizione appena applicati sul live).
 name: Verifica scritture admin
 
 on:
