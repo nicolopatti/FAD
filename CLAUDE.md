@@ -9,6 +9,84 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
+## Correzioni dallo stress test del 21/10 (2026-10-21 pomeriggio, branch `claude/new-session-qr4kff`, **NON su `main`**)
+
+Mandato: brief dell'utente "correzioni dallo stress test del 21/10/2026" (giro su
+produzione come discente e admin). Ratifiche dell'utente prima del codice:
+**R1** attestato di default `manuale` (D10); **R2** fuori finestra FAD = **blocco
+totale**; **R3** codice fiscale doppio = **blocco**, indice unico solo dopo la pulizia;
+**R4** il cambio email dall'admin aggiorna **anche l'utente Auth**. Un commit per punto.
+
+- **A1 finestra** — `src/lib/finestra.ts` (`finestraEdizione`, `giornoRoma`,
+  `messaggioFinestra`) = `public.edizione_finestra_stato` (migration
+  `20261021000008_finestra_fruizione.sql`, **applicata sul live**): apertura =
+  `fad_apertura` ?? `data_inizio`, chiusura = `fad_chiusura` ?? `data_fine`, giorni
+  interi a Roma, annullata/conclusa = chiusa. `evento_player_registra` rifiuta fuori
+  finestra; route video/documento/quiz e signed-url PDF → 403 col motivo;
+  `ProgressoIscrizione.finestra`. Pagine: "Le lezioni si aprono il …", "erano
+  disponibili fino al …", chip Chiuso / Non ancora aperto. pgTAP
+  `supabase/tests/finestra_fruizione.sql` 10/10 sul live (DO block chiuso da RAISE).
+  **Conseguenza**: ED-001, ED-T4-DEMO, ED-WEB-2026 (date passate) sono chiuse per i
+  discenti demo; la ricetta "Re-verifica rapida di M1" sotto non funziona finché
+  ED-001 non viene prolungata (vedi piano di pulizia).
+- **A2 presenza senza sessioni** — `deriveIdoneita(…, sessioniPianificate)`: soglia
+  impostata e 0 sessioni non annullate = requisito "in attesa di sessioni", non si
+  applica (decidono le lezioni); con ≥1 sessione vale come prima.
+  `FrequenzaIscrizione.in_attesa_sessioni`; l'automatico non parte in attesa; avvisi in
+  Stato, report fondo (`presenza_senza_sessioni`), auditor, discente, conferma prima
+  edizione.
+- **A3** `src/lib/prontezza-corso.ts`: test obbligatorio senza domande valide blocca la
+  PRIMA edizione (409 + UI); video senza ID/durata e PDF senza file = avvisi; badge
+  "0 domande — da completare"; testi allineati (dopo la prima edizione domande e regole
+  del test NON si modificano). La "domanda vuota" era solo un segnaposto dell'editor.
+- **A4** `conflittiIdentita` (validazione.ts) + `addIscritto` → `conflict` se l'email
+  esiste con nome/cognome (anche invertiti) o CF diversi: 409 con la persona, conferma
+  "iscrivere lui?" (`conferma_persona_id`), CF copiato solo dopo conferma; CSV: righe
+  "da controllare". `useCall` ha `quiet` (errore al chiamante, `ErroreCall`) e
+  `successo` come funzione.
+- **A5/R1** default `manuale` (migration `20261021000009`, **applicata**; corsi
+  esistenti invariati); `datiEnteMancanti` (ragione sociale + firmatario del modello
+  risolto) blocca l'emissione manuale (errore) e l'automatica (resta in attesa);
+  dashboard: card **Da fare**; Impostazioni: avviso. L'ente demo è incompleto (nessuna
+  ragione sociale/firmatario): oggi **nessun attestato si emette** finché non si compila.
+- **B1** `erroriDateEdizione` (form + POST/PATCH edizioni). CHECK nel DB rinviato
+  (TEST-STRESS-01 lo viola). **B2** errori inline + `focusPrimoErrore` (Form.tsx),
+  `ErrorBanner` scorre in vista, `parseOre`/`MSG_ORE`, risposta del server con `campo`.
+  **B3** messaggi Vimeo umani (`MSG_VIMEO_NON_VALIDO`, `campoErroreConfig`), validazione
+  nel browser, durata da oEmbed (`leggiDurataVimeo`, best effort, non provata da qui).
+  **B4/R4** PATCH persona: prima `auth.admin.updateUserById` (email_confirm), poi
+  anagrafica, rollback dell'Auth se fallisce; Evento con `auth_aggiornato`. **B5**
+  `semeTentativo` + QuizPlayer congela l'ordine del tentativo. **B6/R3**
+  `personaConCodiceFiscale` blocca il CF doppio (addIscritto, CSV, PATCH persona); RPC
+  `persone_ruoli` (migration `20261021000010`, **applicata**, solo staff del tenant) per
+  la colonna Ruolo; indice unico pronto in `supabase/pending/` (da applicare dopo la
+  pulizia). **B7** `edizioneTerminata` → "terminata — da concludere". **B8** password
+  attuale richiesta se la sessione è da login con password (`richiedePasswordAttuale`
+  su `amr` di `getClaims`; i link di invito/reimpostazione no). **B9** "Emetti"
+  disabilitato col motivo. **B10** avviso fisso "formato interim". **B11** Lucia Verdi:
+  presenza dal seed del 29/05 (prima della Fase 5), corso di sole sessioni → l'emissione
+  pigra (solo con lezioni) non ripartiva mai: ora vale anche senza lezioni, e salvare
+  l'ente completo fa partire gli automatici in attesa delle edizioni attive.
+- **C** `src/lib/formato.ts` (`fmtDurata` "8 min 39 s", `fmtOre` "1,83 h"); in corso ≠
+  da iniziare; card del test → test; icona "stai guardando"; messaggio del salto in
+  avanti che resta 6 s; "Visto finora: circa N%" spiegato; `/verifica` con campo;
+  agenda senza annullate di default; singolari (Pager `singolare`); saluto per ora di
+  Roma; "In sintesi" come `<dl class="sintesi">`.
+- **Giro completo**: CF diverso a ogni giro (prima creava sempre `VRFATM80A01A794X`: da
+  lì i 7 doppioni) + controlli 409 per conflitto email e CF doppio. Il commit è stato
+  pushato con `[skip ci]`: **lanciare `verifica-scritture.yml` solo dopo il deploy di
+  questo codice** (con il codice vecchio il controllo del CF creerebbe un doppione).
+- *Verifiche*: typecheck 0, lint 0, unit **79/79** (file nuovi: finestra, idoneita,
+  prontezza, formato; estesi validazione, vimeo, quiz, attestato), fase4 **16/16**,
+  build ok, E2E sul dev server: smoke **97/97**, funzionali **50/50**, nuovo
+  `tests/e2e/correzioni.mjs` (`npm run test:e2e:correzioni`) **56/56**, 0 errori JS a
+  1440/390. Non provati da qui (servono chiave di servizio o vimeo.com): scritture
+  admin (503 nel container), cambio email con Auth, cambio password, oEmbed Vimeo,
+  lezioni PDF aperte (l'unica edizione con un PDF, ED-T4-DEMO, ora è chiusa), import
+  presenze CSV (solo la pagina).
+- **Piano di pulizia** dei dati di prova: `docs/pulizia-dati-prova-21-10.md` (proposta,
+  NON eseguita: serve il via libera).
+
 ## Verifica complessiva dell'area admin (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, "ti approvo tutto" vale anche per il merge)
 
 Richiesta dell'utente: verificare che tutti i pulsanti e le funzioni dell'area admin
@@ -1702,7 +1780,16 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
-> **Punto di ripartenza (2026-10-21 sera, leggere per primo).** Tutto il lavoro è su
+> **Punto di ripartenza (2026-10-21 tardo pomeriggio, leggere per primo).** Le
+> correzioni dello stress test sono sul branch `claude/new-session-qr4kff` (sezione in
+> testa al file), **non su `main`**; migration applicate sul live fino alla
+> `20261021000010` (la RPC del player blocca già gli eventi fuori finestra anche per la
+> produzione). Da fare con l'utente: via libera al merge; poi `verifica-scritture.yml`
+> sul deploy; poi il piano di pulizia (`docs/pulizia-dati-prova-21-10.md`), dopo cui
+> l'indice unico del CF (`supabase/pending/`) e il CHECK sulle date dell'edizione.
+> Il resto di questa nota è lo stato precedente.
+>
+> **Punto di ripartenza precedente (2026-10-21 sera).** Tutto il lavoro è su
 > `main` e in produzione (ultimo commit applicativo `12facb8`, funzioni in `fra1`), il
 > branch `claude/affectionate-hawking-03ev7i` coincide con `main`. Migration applicate
 > sul live fino alla `20261021000007`. Ultime prove in produzione: giro completo
