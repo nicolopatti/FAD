@@ -67,7 +67,8 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
     if (emesso) attestato = (await caricaAttestato()).data;
   }
   const pct = prog.totale > 0 ? Math.round((prog.completati / prog.totale) * 100) : 0;
-  const currentId = prog.items.find((i) => i.sbloccato && !i.completato)?.learning_object_id;
+  // Fuori finestra non c'è una lezione "da fare": il corso è chiuso (o non ancora aperto).
+  const currentId = prog.finestra.aperta ? prog.items.find((i) => i.sbloccato && !i.completato)?.learning_object_id : undefined;
   const next = prog.items.find((i) => i.sbloccato && !i.completato) ?? prog.items.find((i) => i.sbloccato);
   const nVideo = prog.items.filter((i) => i.lo_type === 'video').length;
   const durataTotale = fmtDurata(prog.items.reduce((acc, i) => acc + (Number((i.lo_config as { durata_secondi?: unknown }).durata_secondi) || 0), 0));
@@ -211,7 +212,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
                       )}
                       {isCurrent && !it.completato && <span className="status-now">· da fare</span>}
                       {!it.completato && it.sbloccato && it.copertura_percentuale != null && it.copertura_percentuale > 0 && (
-                        <span>· vista al {it.copertura_percentuale}%</span>
+                        <span>· vista al {it.copertura_percentuale.toLocaleString('it-IT')}%</span>
                       )}
                       {!it.sbloccato && <span>· si apre dopo la precedente</span>}
                     </div>
@@ -245,7 +246,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
               {durataTotale && <div className="row row--between"><span className="page-lead">Durata</span><strong>{durataTotale}</strong></div>}
               {prog.visione_integrale && <div className="row row--between"><span className="page-lead">Modalità</span><strong>visione integrale</strong></div>}
               {aperta && finestra.chiude_il && <div className="row row--between"><span className="page-lead">Aperto fino al</span><strong>{fmtData(finestra.chiude_il)}</strong></div>}
-              {!aperta && <div className="row row--between"><span className="page-lead">Lezioni</span><strong>{finestra.stato === 'non_aperta' ? `dal ${fmtData(finestra.apre_il!)}` : 'chiuse'}</strong></div>}
+              {!aperta && <div className="row row--between"><span className="page-lead">Accesso</span><strong>{finestra.stato === 'non_aperta' ? `dal ${fmtData(finestra.apre_il!)}` : 'chiuso'}</strong></div>}
               <div className="row row--between"><span className="page-lead">Completate</span><strong>{prog.completati} di {prog.totale}</strong></div>
               {prog.obbligatori_totale !== prog.totale && (
                 <div className="row row--between"><span className="page-lead">Obbligatorie</span><strong>{prog.obbligatori_completati} di {prog.obbligatori_totale}</strong></div>
@@ -259,7 +260,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
               <div className="row row--between"><span className="page-lead">Stato</span><strong className={completato ? 'status-ok' : ''}>{completato ? 'Completato' : prog.completati === 0 && !freq?.presenze ? 'Da iniziare' : 'In corso'}</strong></div>
             </div>
           </div>
-          {prog.sblocco_sequenziale && !completato && (
+          {prog.sblocco_sequenziale && !completato && aperta && (
             <p className="page-lead" style={{ margin: '0 6px', lineHeight: 1.55 }}>
               Le lezioni si aprono una dopo l&apos;altra, nell&apos;ordine del programma.
               {prog.visione_integrale ? ' I video si guardano per intero, a velocità normale.' : ''}

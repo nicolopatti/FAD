@@ -16,6 +16,7 @@
     "test:unit": "vitest run tests/unit",
     "test:e2e": "node tests/e2e/smoke.mjs",
     "test:e2e:funzionali": "node tests/e2e/funzionali.mjs",
+    "test:e2e:correzioni": "node tests/e2e/correzioni.mjs",
     "test:carico": "k6 run tests/carico/player.js"
   },
   "dependencies": {

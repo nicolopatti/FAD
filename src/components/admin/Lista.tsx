@@ -6,6 +6,7 @@
 // pagina. Ricerca con attesa di 300 ms, segmenti e paginatore come link.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { singolare } from '@/components/admin/Form';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -90,7 +91,7 @@ export function PagerUrl({ pagina, totale, perPagina = PER_PAGINA, cosa = 'righe
   const a = Math.min(totale, pagina * perPagina);
   return (
     <div className="pager">
-      <span className="pager__info">{totale <= perPagina ? `${totale} ${cosa}` : `${da}–${a} di ${totale} ${cosa}`}</span>
+      <span className="pager__info">{totale <= perPagina ? `${totale} ${totale === 1 ? singolare(cosa) : cosa}` : `${da}–${a} di ${totale} ${cosa}`}</span>
       {pagine > 1 && (
         <span className="pager__nav">
           {pagina > 1 ? <Link className="icon-btn" aria-label="Pagina precedente" href={href({ pagina: pagina - 1 > 1 ? String(pagina - 1) : null }, false)}>‹</Link> : <button type="button" className="icon-btn" disabled aria-label="Pagina precedente">‹</button>}

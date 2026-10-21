@@ -37,6 +37,15 @@ export function Field({
   );
 }
 
+const SINGOLARI: Record<string, string> = {
+  righe: 'riga', iscritti: 'iscritto', iscrizioni: 'iscrizione', sessioni: 'sessione', persone: 'persona',
+  aziende: 'azienda', corsi: 'corso', attestati: 'attestato', eventi: 'evento', contenuti: 'contenuto',
+};
+/** "1 iscritto", non "1 iscritti" (C, stress test 21/10). */
+export function singolare(plurale: string): string {
+  return SINGOLARI[plurale] ?? plurale;
+}
+
 export function Pager({
   page,
   pages,
@@ -58,7 +67,7 @@ export function Pager({
   return (
     <div className="pager">
       <span className="pager__info">
-        {total <= perPage ? `${total} ${cosa}` : `${from}–${to} di ${total} ${cosa}`}
+        {total <= perPage ? `${total} ${total === 1 ? singolare(cosa) : cosa}` : `${from}–${to} di ${total} ${cosa}`}
       </span>
       {pages > 1 && (
         <span className="pager__nav">
