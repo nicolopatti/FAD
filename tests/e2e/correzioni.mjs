@@ -5,10 +5,10 @@
 // Avvio: npm run test:e2e:correzioni (stesse variabili della smoke, lib.mjs).
 import { accedi, apriBrowser, check, nuovaPagina, overflow, riepilogo, vai } from './lib.mjs';
 
-const ED_001 = 'ed011111-ed01-ed01-ed01-ed01ed01ed01';         // fine 20/07/2026 → chiusa
-const ISCR_001 = '15c11111-15c1-15c1-15c1-15c115c115c1';
-const LO_001 = '10101111-1010-1010-1010-101010101010';
+const ED_001 = 'ed011111-ed01-ed01-ed01-ed01ed01ed01';         // prolungata al 31/07/2027 → aperta
 const ED_STRESS = '8fe0efdf-b5b7-40f8-bbf6-ec67a824b7fe';      // annullata nella pulizia del 21/10
+const ISCR_STRESS = '7551fadc-8644-4e89-aaaa-91b96aca8a3b';
+const LO_STRESS = 'b4a644d4-e823-418a-8b4e-9ca89df25892';
 const CORSO_STRESS = '84fd63f6-f608-4d31-8512-f8a19f918dce';
 const ED_FIN = '6d2ef44e-2a5e-4804-9a98-dc0422c28a33';         // corso a 6 video, aperto
 const ED_SOLO_TEST = 'baff688e-3c96-4253-8854-1d8931dd052b';
@@ -26,22 +26,21 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
 
   await vai(page, '/corsi');
   const elenco = await testo(page);
-  check(`${tag} /corsi: edizione scaduta segnata "Chiuso"`, elenco.includes('Chiuso'), '');
+  check(`${tag} /corsi: edizione chiusa segnata "Chiuso"`, elenco.includes('Chiuso'), '');
   check(`${tag} /corsi: "da iniziare" separato da "in corso"`, !/\b\d+ in corso\b/.test(elenco) || /da iniziare|completat/.test(elenco), elenco.slice(0, 120));
   check(`${tag} /corsi: niente sforamento`, !(await overflow(page)));
 
   await vai(page, `/corsi/${ED_001}`);
-  const corso = await testo(page);
-  check(`${tag} corso scaduto: spiega da quando è chiuso`, /disponibili fino al 20\/07\/2026/.test(corso), '');
-  check(`${tag} corso scaduto: nessun pulsante "Apri" sulle lezioni`, (await page.locator('.lo-row__action a').count()) === 0);
-
-  await vai(page, `/corsi/${ED_001}/lo/${LO_001}`);
-  check(`${tag} lezione di un'edizione chiusa: niente player`, (await page.locator('iframe').count()) === 0 && /Le lezioni sono chiuse/.test(await testo(page)));
+  { const t = await testo(page); check(`${tag} edizione prolungata: aperta fino al 2027`, /Aperto fino al 31 lug 2027/.test(t), (t.match(/Aperto fino al.{0,20}/) ?? [''])[0]); }
 
   await vai(page, `/corsi/${ED_STRESS}`);
   const stress = await testo(page);
   if (/non trovata/i.test(stress)) salta(`${tag} edizione annullata`, 'fixture TEST-STRESS-01 assente');
-  else check(`${tag} edizione annullata: lo dice e niente lezioni aperte`, /stata annullata/.test(stress) && (await page.locator('.lo-row__action a').count()) === 0, '');
+  else {
+    check(`${tag} edizione annullata: lo dice e niente lezioni aperte`, /stata annullata/.test(stress) && (await page.locator('.lo-row__action a').count()) === 0, '');
+    await vai(page, `/corsi/${ED_STRESS}/lo/${LO_STRESS}`);
+    check(`${tag} lezione di un'edizione chiusa: niente player`, (await page.locator('iframe').count()) === 0 && /Le lezioni sono chiuse/.test(await testo(page)));
+  }
 
   await vai(page, `/corsi/${ED_FIN}`);
   const fin = await testo(page);
@@ -58,8 +57,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   const r = await page.evaluate(async ([isc, lo]) => {
     const res = await fetch('/api/events/video', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event_type: 'video.play', iscrizione_id: isc, learning_object_id: lo }) });
     return { status: res.status, body: await res.json().catch(() => null) };
-  }, [ISCR_001, LO_001]);
-  check(`${tag} API video fuori finestra → 403 con il motivo`, r.status === 403 && /disponibili fino al/.test(r.body?.error ?? ''), JSON.stringify(r));
+  }, [ISCR_STRESS, LO_STRESS]);
+  check(`${tag} API video fuori finestra → 403 con il motivo`, r.status === 403 && /annullata/.test(r.body?.error ?? ''), JSON.stringify(r));
 
   await vai(page, '/verifica');
   check(`${tag} /verifica senza codice: pagina con il campo`, (await page.locator('input[name="codice"]').count()) === 1);

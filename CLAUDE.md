@@ -26,9 +26,9 @@ totale**; **R3** codice fiscale doppio = **blocco**, indice unico solo dopo la p
   `ProgressoIscrizione.finestra`. Pagine: "Le lezioni si aprono il …", "erano
   disponibili fino al …", chip Chiuso / Non ancora aperto. pgTAP
   `supabase/tests/finestra_fruizione.sql` 10/10 sul live (DO block chiuso da RAISE).
-  **Conseguenza**: ED-001, ED-T4-DEMO, ED-WEB-2026 (date passate) sono chiuse per i
-  discenti demo; la ricetta "Re-verifica rapida di M1" sotto non funziona finché
-  ED-001 non viene prolungata (vedi piano di pulizia).
+  **Conseguenza**: le edizioni demo con date passate si chiudono per i discenti;
+  ED-001 ed ED-T4-DEMO sono state **prolungate al 31/07/2027** (vedi pulizia), quindi
+  la ricetta "Re-verifica rapida di M1" e le lezioni PDF tornano a funzionare.
 - **A2 presenza senza sessioni** — `deriveIdoneita(…, sessioniPianificate)`: soglia
   impostata e 0 sessioni non annullate = requisito "in attesa di sessioni", non si
   applica (decidono le lezioni); con ≥1 sessione vale come prima.
@@ -93,9 +93,14 @@ totale**; **R3** codice fiscale doppio = **blocco**, indice unico solo dopo la p
   **728 eventi**, E2E correzioni **54/54** (ED_STRESS ora = edizione annullata), smoke
   97/97, funzionali 50/50; poi `verifica-scritture.yml` in produzione **29/29 + 80/80**,
   catena integra a **781 eventi**, 0 CF doppi. Lasciati: l'iscrizione di Mario a TEST-STRESS-01 (storia),
-  l'attestato 2026/000003 (da riemettere dopo i dati dell'ente), le edizioni demo
-  scadute ED-001/ED-T4-DEMO/ED-WEB-2026 (**decisione dell'utente in sospeso**:
-  prolungare o concludere).
+  l'attestato 2026/000003 (da riemettere dopo i dati dell'ente). Riga 8 ("fai la cosa
+  che ritieni migliore"): **ED-001 ed ED-T4-DEMO prolungate al 31/07/2027** (2 Eventi
+  `edizione.updated`, `origine: pulizia_verifica`); **ED-WEB-2026 lasciata attiva**
+  apposta: è l'unica edizione webinar demo, ospita l'attestato automatico in attesa di
+  Lucia Verdi (parte solo su edizioni attive quando si completa l'ente) ed è la fixture
+  "terminata — da concludere" della dashboard; si conclude dalla scheda Stato quando
+  non serve più. E2E correzioni ora **52/52** (fuori finestra = TEST-STRESS-01
+  annullata, ED-001 = aperta), smoke 99/99, funzionali 50/50; catena integra a **783 eventi**.
 - **Merge e prova in produzione**: fast-forward `56e742d..3899250` su `main`. **Vercel
   non ha creato da solo il deploy di produzione** dopo il push (nessun deploy per `main`
   dopo 8 minuti; il commit era già stato costruito come anteprima del branch): creato
@@ -1804,9 +1809,9 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 > stress test sono **su `main` e in produzione** (sezione in testa al file), verificate
 > sul deploy (29/29 + 80/80). Migration applicate sul live fino alla `20261021000012`
 > (indice unico del CF e CHECK delle date, dopo la pulizia dei dati di prova, eseguita).
-> Da fare con l'utente: decidere le edizioni demo scadute (ED-001, ED-T4-DEMO da
-> prolungare? ED-WEB-2026 da concludere?); compilare i dati dell'ente (senza, nessun
-> attestato si emette), poi riemettere 2026/000003.
+> ED-001 ed ED-T4-DEMO prolungate al 31/07/2027, ED-WEB-2026 lasciata attiva (vedi
+> la sezione in testa). Da fare con l'utente: compilare i dati dell'ente (senza,
+> nessun attestato si emette), poi riemettere 2026/000003 e concludere ED-WEB-2026.
 > Il resto di questa nota è lo stato precedente.
 >
 > **Punto di ripartenza precedente (2026-10-21 sera).** Tutto il lavoro è su

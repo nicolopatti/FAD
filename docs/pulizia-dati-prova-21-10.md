@@ -9,8 +9,11 @@ Poi le righe **5 (indice)** e **9**: migration `20261021000011_persona_codice_fi
 e `20261021000012_edizione_date_coerenti` applicate sul live (prove in rollback 5/5:
 CF doppio anche in minuscolo rifiutato, CF vuoti ammessi, date incoerenti rifiutate).
 Catena integra a 728 eventi. **Non eseguite**: riga 3 (facoltativa, l'iscrizione resta
-come storia), riga 4 (serve prima completare i dati dell'ente), riga 8 (scelta
-dell'utente in sospeso). Il CHECK vale già: prolungare le edizioni demo dovrà
+come storia), riga 4 (serve prima completare i dati dell'ente). **Riga 8** (l'utente: "fai la cosa
+che ritieni migliore"): ED-001 ed ED-T4-DEMO prolungate al 31/07/2027 (`edizione.updated`
+×2); ED-WEB-2026 **lasciata attiva**: è l'unica edizione webinar demo, deve restare attiva
+perché parta l'attestato automatico di Lucia Verdi quando si completa l'ente, ed è la
+fixture "terminata — da concludere" della dashboard. Si conclude dalla scheda Stato dopo. Il CHECK vale già: prolungare le edizioni demo dovrà
 rispettarlo.
 
 Piano originale:
