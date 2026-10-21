@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
+import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import { isCodiceFiscale, isEmail } from '@/lib/validazione';
 
 type Body = {
@@ -11,9 +12,12 @@ type Body = {
 
 /**
  * Anagrafica di una persona dall'area admin. L'Evento `persona.updated` porta
- * solo i nomi dei campi cambiati (mai i valori: D18). L'email cambia anche
- * l'identità di accesso solo nella nostra anagrafica: l'utente Auth, se c'è,
- * resta collegato per id e continua a entrare con la sua email.
+ * solo i nomi dei campi cambiati (mai i valori: D18).
+ *
+ * R4 (stress test 21/10): se la persona ha già un accesso, cambiare l'email
+ * cambia anche quella con cui entra (utente Auth via service role, senza email
+ * di conferma: la modifica la fa l'admin). Prima l'Auth, poi l'anagrafica; se
+ * l'anagrafica fallisce l'Auth torna com'era. L'Evento dice `auth_aggiornato`.
  */
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -40,12 +44,28 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   if (!Object.keys(updates).length) return NextResponse.json({ ok: false, error: 'nessun campo da aggiornare' }, { status: 400 });
 
   const supabase = await createSupabaseServerClient();
+  const { data: attuale, error: errAtt } = await supabase.from('persona').select('id, email, auth_user_id').eq('id', params.id).maybeSingle<{ id: string; email: string; auth_user_id: string | null }>();
+  if (errAtt) return NextResponse.json({ ok: false, error: errAtt.message }, { status: 400 });
+  if (!attuale) return NextResponse.json({ ok: false, error: 'persona non trovata' }, { status: 404 });
+  if (updates.email === attuale.email) delete updates.email;
+  if (!Object.keys(updates).length) return NextResponse.json({ ok: true, invariato: true });
+
+  // R4: l'email di accesso segue quella dell'anagrafica.
+  const service = updates.email && attuale.auth_user_id ? createSupabaseServiceClient() : null;
+  if (service) {
+    const { error: errAuth } = await service.auth.admin.updateUserById(attuale.auth_user_id!, { email: updates.email!, email_confirm: true });
+    if (errAuth) {
+      const giaUsata = /already|registered|exists/i.test(errAuth.message);
+      return NextResponse.json({ ok: false, error: giaUsata ? 'Questa email è già usata da un altro accesso.' : `Email di accesso non aggiornata: ${errAuth.message}`, campo: 'email' }, { status: giaUsata ? 409 : 400 });
+    }
+  }
   const { data, error } = await supabase.from('persona').update(updates).eq('id', params.id).select('id').maybeSingle();
-  if (error) {
-    const msg = error.code === '23505' ? 'Esiste già una persona con questa email.' : error.message;
+  if (error || !data) {
+    if (service) await service.auth.admin.updateUserById(attuale.auth_user_id!, { email: attuale.email, email_confirm: true });
+    if (!data && !error) return NextResponse.json({ ok: false, error: 'persona non trovata' }, { status: 404 });
+    const msg = error!.code === '23505' ? 'Esiste già una persona con questa email.' : error!.message;
     return NextResponse.json({ ok: false, error: msg }, { status: 400 });
   }
-  if (!data) return NextResponse.json({ ok: false, error: 'persona non trovata' }, { status: 404 });
 
   await appendEvent({
     tenantId: session.tenantId,
@@ -53,7 +73,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     actor: { persona_id: session.personaId, type: 'persona' },
     subjectType: 'persona',
     subjectId: params.id,
-    payload: { campi: Object.keys(updates) },
+    payload: { campi: Object.keys(updates), auth_aggiornato: Boolean(service) },
   });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, auth_aggiornato: Boolean(service) });
 }

@@ -33,7 +33,7 @@ export function PersonaForm({ persona }: { persona: PersonaRiepilogo }) {
     setErrs(ve);
     if (Object.keys(ve).length) return;
     if (f.email.trim().toLowerCase() !== persona.email && persona.accesso) {
-      const ok = await confirm({ titolo: 'Cambiare l\'email in anagrafica?', messaggio: 'La persona continua a entrare con l\'email del suo accesso (quella con cui ha scelto la password): qui cambia solo il dato in anagrafica, attestati futuri compresi.', conferma: 'Cambia' });
+      const ok = await confirm({ titolo: 'Cambiare l\'email di accesso?', messaggio: `La persona ha già l'accesso: da questo momento entra con ${f.email.trim().toLowerCase()} (la password resta la stessa) e non più con ${persona.email}. Avvisala del cambio.`, conferma: 'Cambia email' });
       if (!ok) return;
     }
     const body: Record<string, string | null> = {};
@@ -57,7 +57,7 @@ export function PersonaForm({ persona }: { persona: PersonaRiepilogo }) {
         <div className="grid-3">
           <Field id="p-cognome" label="Cognome" required error={errs.cognome}><input id="p-cognome" className="input" value={f.cognome} onChange={set('cognome')} disabled={busy} aria-invalid={Boolean(errs.cognome)} /></Field>
           <Field id="p-nome" label="Nome" required error={errs.nome}><input id="p-nome" className="input" value={f.nome} onChange={set('nome')} disabled={busy} aria-invalid={Boolean(errs.nome)} /></Field>
-          <Field id="p-email" label="Email" required error={errs.email}><input id="p-email" className="input" type="email" value={f.email} onChange={set('email')} disabled={busy} aria-invalid={Boolean(errs.email)} /></Field>
+          <Field id="p-email" label="Email" required error={errs.email} hint={persona.accesso ? 'Ha già l’accesso: se la cambi, da quel momento entra con la nuova email.' : 'È l’indirizzo a cui arriva l’invito.'}><input id="p-email" className="input" type="email" value={f.email} onChange={set('email')} disabled={busy} aria-invalid={Boolean(errs.email)} /></Field>
         </div>
         <div className="grid-3">
           <Field id="p-cf" label="Codice fiscale" error={errs.codice_fiscale}><input id="p-cf" className="input mono" value={f.codice_fiscale} onChange={set('codice_fiscale')} disabled={busy} aria-invalid={Boolean(errs.codice_fiscale)} /></Field>
