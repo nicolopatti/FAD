@@ -9,6 +9,23 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
+## Fase 6 — vendita dei corsi: brief da ratificare (2026-10-21 sera) e appunti multi-ente
+
+Richiesta dell'utente: rendere la piattaforma uno strumento **multi-ente** gestito da voi e
+dato in dotazione a enti e clienti, e poter **vendere i corsi** sul sito (registrazione +
+pagamento, "come Coursera", non un marketplace). Decisione dell'utente: **partire dalla
+vendita**; il multi-ente tocca la base dell'infrastruttura e va prima capito.
+- `docs/brief-fase-6-vendita.md`: brief della Fase 6 (offerta su un'edizione, accesso per
+  iscrizione, catalogo pubblico, registrazione, Stripe Checkout + webhook idempotente,
+  area Vendite, gate M6a/M6, **§10 da ratificare**, §11 prerequisiti lato utente: Stripe,
+  SMTP bloccante, Supabase Pro, testi legali, ente reale, IVA). **Nessun codice finché la
+  §10 non è ratificata.**
+- `docs/visione-multi-ente.md`: appunti con le scelte e le conseguenze (appartenenze
+  persona↔ente↔ruolo, indirizzo per ente, referente aziendale, console di piattaforma,
+  moduli, email col marchio, database unico vs per ente, privacy/DPA). **Non deciso, non
+  costruito.** Oggi un account appartiene a un solo ente (`persona.auth_user_id` unico) e il
+  ruolo sta in `app_metadata.role` (vale ovunque): è il punto da cambiare per primo.
+
 ## Correzioni dallo stress test del 21/10 (2026-10-21 pomeriggio, branch `claude/new-session-qr4kff`, **su `main` e in produzione** dal via libera dell'utente "fai merge")
 
 Mandato: brief dell'utente "correzioni dallo stress test del 21/10/2026" (giro su
