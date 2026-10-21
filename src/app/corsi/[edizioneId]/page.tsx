@@ -61,9 +61,11 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
     .is('sostituito_da', null)
     .maybeSingle<AttestatoRow>();
   let { data: attestato } = await caricaAttestato();
-  // Solo per i corsi con un percorso FAD (obbligatori > 0): per i corsi di sole
-  // sessioni l'idoneità dipende dalla frequenza e l'emissione parte dalle presenze.
-  if (!attestato && completato && prog.obbligatori_totale > 0 && politica === 'automatica') {
+  // B11: anche per i corsi di sole sessioni (idoneità dalla frequenza, con la
+  // stessa deriveIdoneita): chi era idoneo prima della Fase 5 o prima che l'ente
+  // fosse completo non riceveva mai l'attestato, perché nessuna presenza nuova
+  // faceva ripartire l'emissione.
+  if (!attestato && completato && politica === 'automatica') {
     const emesso = await provaEmissioneAutomatica(iscrizione.id, session.personaId);
     if (emesso) attestato = (await caricaAttestato()).data;
   }

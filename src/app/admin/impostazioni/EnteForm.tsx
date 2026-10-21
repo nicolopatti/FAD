@@ -44,7 +44,8 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
       const res = await fetch('/api/admin/ente', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      toast(successo);
+      const n = Number(json.attestati_emessi) || 0;
+      toast(n > 0 ? `${successo} Emess${n === 1 ? 'o 1 attestato' : `i ${n} attestati`} che aspettavano i dati dell’ente.` : successo);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

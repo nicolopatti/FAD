@@ -110,7 +110,8 @@ export default async function AdminDashboard() {
     const mie = inAttesa.filter((a) => a.edizione_id === e.id);
     return {
       edizione: e,
-      daEmettere: mie.filter((a) => a.politica === 'manuale' && !a.frequenza_in_attesa).length,
+      // Manuali, e automatici non partiti (es. idonei prima che l'ente fosse completo, B11).
+      daEmettere: mie.filter((a) => !a.frequenza_in_attesa && (a.politica === 'manuale' || enteMancano.length === 0)).length,
       attesaEnte: enteMancano.length ? mie.filter((a) => a.politica === 'automatica' && !a.frequenza_in_attesa).length : 0,
       attesaPresenza: mie.filter((a) => a.frequenza_in_attesa).length,
     };

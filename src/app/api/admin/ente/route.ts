@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
-import { normalizzaParziale, pathNelTenant } from '@/lib/attestato-modello';
+import { datiEnteMancanti, ENTE_SELECT, normalizzaParziale, pathNelTenant, type EnteTenantRow } from '@/lib/attestato-modello';
+import { emettiPerEdizioneSeIdonee } from '@/lib/attestati';
 
 type Body = {
   ragione_sociale?: string | null;
@@ -43,6 +44,8 @@ export async function PATCH(request: Request) {
   }
   if (Object.keys(updates).length === 0) return NextResponse.json({ ok: false, error: 'nessun campo' }, { status: 400 });
   const supabase = await createSupabaseServerClient();
+  const prima = await supabase.from('tenant').select(ENTE_SELECT).eq('id', session.tenantId).maybeSingle<EnteTenantRow>();
+  const mancavano = datiEnteMancanti(prima.data ?? null).length > 0;
   const { data, error } = await supabase.from('tenant').update(updates).eq('id', session.tenantId).select('id').maybeSingle();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   if (!data) return NextResponse.json({ ok: false, error: 'ente non aggiornato' }, { status: 403 });
@@ -54,5 +57,23 @@ export async function PATCH(request: Request) {
     subjectId: session.tenantId,
     payload: { campi: Object.keys(updates) },
   });
-  return NextResponse.json({ ok: true });
+
+  // B11/A5: se l'ente è appena diventato completo, partono gli attestati
+  // automatici rimasti in attesa (corsi con politica automatica, edizioni attive).
+  let emessi = 0;
+  if (mancavano) {
+    const dopo = await supabase.from('tenant').select(ENTE_SELECT).eq('id', session.tenantId).maybeSingle<EnteTenantRow>();
+    if (dopo.data && datiEnteMancanti(dopo.data).length === 0) {
+      const { data: edizioni } = await supabase
+        .from('edizione')
+        .select('id, corso:corso_id!inner ( politica_attestato )')
+        .is('concluso_at', null).is('annullato_at', null)
+        .eq('corso.politica_attestato', 'automatica')
+        .returns<{ id: string }[]>();
+      for (const e of edizioni ?? []) {
+        try { emessi += (await emettiPerEdizioneSeIdonee(e.id, session.personaId)).length; } catch (err) { console.error('[ente] emissione attestati in attesa', e.id, err); }
+      }
+    }
+  }
+  return NextResponse.json({ ok: true, attestati_emessi: emessi });
 }
