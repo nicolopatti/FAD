@@ -201,6 +201,15 @@ export function edizioneStato(e: Pick<EdizioneRow, 'concluso_at' | 'annullato_at
 }
 
 /**
+ * B7 (stress test 21/10): un'edizione attiva la cui data di fine è passata
+ * (giorno di Roma, `oggi` YYYY-MM-DD) è "terminata — da concludere": non è più
+ * in corso, aspetta che l'admin la concluda. Stato derivato, nessuna colonna.
+ */
+export function edizioneTerminata(e: Pick<EdizioneRow, 'concluso_at' | 'annullato_at' | 'data_fine'>, oggi: string): boolean {
+  return edizioneStato(e) === 'attiva' && Boolean(e.data_fine) && String(e.data_fine).slice(0, 10) < oggi;
+}
+
+/**
  * Stato del corso derivato dalle edizioni (niente colonna): bozza = nessuna
  * edizione (modificabile), attivo = almeno un'edizione aperta, concluso = solo
  * edizioni concluse o annullate. "Congelato" (D22) resta il termine tecnico del

@@ -3,7 +3,8 @@ import type { Route } from 'next';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
-import type { EdizioneRiepilogo } from '@/lib/db-types';
+import { edizioneTerminata, type EdizioneRiepilogo } from '@/lib/db-types';
+import { giornoRoma } from '@/lib/finestra';
 import { Icon, fmtData, fmtDataOra, fmtTempoRelativo } from '@/components/admin/Atlante';
 import { attestatiInAttesa } from '@/lib/attestati';
 import { datiEnteMancanti, ENTE_SELECT, type EnteTenantRow } from '@/lib/attestato-modello';
@@ -96,11 +97,15 @@ export default async function AdminDashboard() {
   // nelle edizioni attive, e perché (manuale, dati dell'ente, presenza in attesa).
   const [enteR, attiveR] = await Promise.all([
     supabase.from('tenant').select(ENTE_SELECT).eq('id', session.tenantId).maybeSingle<EnteTenantRow>(),
-    supabase.from('edizione').select('id, codice, corso_id').is('concluso_at', null).is('annullato_at', null).limit(200).returns<{ id: string; codice: string; corso_id: string }[]>(),
+    supabase.from('edizione').select('id, codice, corso_id, data_fine, concluso_at, annullato_at').is('concluso_at', null).is('annullato_at', null).limit(200).returns<{ id: string; codice: string; corso_id: string; data_fine: string | null; concluso_at: null; annullato_at: null }[]>(),
   ]);
   const enteMancano = datiEnteMancanti(enteR.data ?? null);
   const attive = unwrap(attiveR, 'le edizioni attive');
   const inAttesa = await attestatiInAttesa(supabase, attive.map((e) => e.id));
+  // B7: edizioni attive con la data di fine passata = terminate, da concludere.
+  const oggi = giornoRoma();
+  const daConcludere = attive.filter((e) => edizioneTerminata(e, oggi));
+  const nDaConcludere = daConcludere.length;
   const daFare = attive.map((e) => {
     const mie = inAttesa.filter((a) => a.edizione_id === e.id);
     return {
@@ -122,7 +127,7 @@ export default async function AdminDashboard() {
 
   const kpi: { label: string; value: number; icon: string; sub: string; href: Route }[] = [
     { label: 'Corsi attivi', value: corsiAttiviR.count ?? 0, icon: 'corsi', sub: `${corsiR.count ?? 0} nel catalogo`, href: '/admin/corsi?stato=attivo' as Route },
-    { label: 'Edizioni in corso', value: nEdizioniAttive, icon: 'layers', sub: 'Aperte alla fruizione', href: '/admin#edizioni' as Route },
+    { label: 'Edizioni in corso', value: nEdizioniAttive - nDaConcludere, icon: 'layers', sub: nDaConcludere ? `più ${nDaConcludere} terminat${nDaConcludere === 1 ? 'a' : 'e'} da concludere` : 'Aperte alla fruizione', href: '/admin#edizioni' as Route },
     { label: 'Iscritti', value: personeR.count ?? 0, icon: 'users', sub: 'Persone con almeno un’iscrizione', href: '/admin/persone' as Route },
     { label: 'Sessioni nei prossimi 7 giorni', value: prossime7R.count ?? prossime.length, icon: 'calendar', sub: prossime[0] ? `Prossima il ${fmtData(prossime[0].data_ora)}` : 'Nessuna in programma', href: '/admin/agenda' as Route },
   ];
@@ -158,11 +163,14 @@ export default async function AdminDashboard() {
         </div>
       )}
 
-      {(enteMancano.length > 0 || daFare.length > 0) && (
+      {(enteMancano.length > 0 || daFare.length > 0 || nDaConcludere > 0) && (
         <div className="card">
-          <div className="card__head"><div><h3>Da fare</h3><div className="sub">Attestati che aspettano una tua azione.</div></div></div>
+          <div className="card__head"><div><h3>Da fare</h3><div className="sub">Edizioni da chiudere e attestati che aspettano una tua azione.</div></div></div>
           <div className="card__body">
             <ul className="stack-sm" style={{ margin: 0, paddingLeft: 18 }}>
+              {daConcludere.map((e) => (
+                <li key={`c-${e.id}`}><Link className="mono" href={`/admin/corsi/${e.corso_id}/edizioni/${e.id}/stato` as Route}>{e.codice}</Link>: terminata il {fmtData(e.data_fine)} — <Link href={`/admin/corsi/${e.corso_id}/edizioni/${e.id}/stato` as Route}>concludi l&apos;edizione</Link></li>
+              ))}
               {enteMancano.length > 0 && (
                 <li><strong>Dati dell&apos;ente incompleti</strong> (manca{enteMancano.length > 1 ? 'no' : ''} {enteMancano.join(' e ')}): finché non li completi nessun attestato può essere emesso. <Link href="/admin/impostazioni">Completa in Impostazioni</Link></li>
               )}
@@ -198,7 +206,7 @@ export default async function AdminDashboard() {
                     <tr key={e.id}>
                       <td><Link className="t-link mono" href={href}>{e.codice}</Link></td>
                       <td>{e.corso ? <Link href={`/admin/corsi/${e.corso.id}`}>{e.corso.titolo}</Link> : '—'}</td>
-                      <td className="muted">{e.data_inizio || e.data_fine ? `${fmtData(e.data_inizio)} → ${fmtData(e.data_fine)}` : '—'}</td>
+                      <td className="muted">{e.data_inizio || e.data_fine ? `${fmtData(e.data_inizio)} → ${fmtData(e.data_fine)}` : '—'}{edizioneTerminata(e, oggi) && <> <Link className="chip chip--ocra" href={`${href}/stato` as Route}>da concludere</Link></>}</td>
                       <td>{e.n_iscritti === 0 ? <span className="chip chip--ocra">nessuno</span> : e.n_iscritti}</td>
                       <td className="muted">{e.n_con_piano > 0 ? `${e.n_con_piano}/${e.n_iscritti}` : '—'}</td>
                       <td className="muted">{e.n_sessioni}</td>

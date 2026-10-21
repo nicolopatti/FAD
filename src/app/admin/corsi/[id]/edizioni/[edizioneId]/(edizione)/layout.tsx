@@ -1,7 +1,9 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { giornoRoma } from '@/lib/finestra';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { edizioneStato, type EdizioneRow } from '@/lib/db-types';
+import { edizioneStato, edizioneTerminata, type EdizioneRow } from '@/lib/db-types';
 import { Crumb } from '@/components/AppShell';
 import { Tabs } from '@/components/admin/Tabs';
 import { fmtData } from '@/components/admin/Atlante';
@@ -39,6 +41,7 @@ export default async function EdizioneLayout(
     supabase.from('incarico').select('id', { count: 'exact', head: true }).eq('edizione_id', ed.id),
   ]);
   const stato = edizioneStato(ed);
+  const terminata = edizioneTerminata(ed, giornoRoma());
   const base = `/admin/corsi/${ed.corso.id}/edizioni/${ed.id}` as const;
   const tabs = [
     { label: 'Iscritti', href: base, exact: true, count: iscritti.count ?? 0 },
@@ -55,7 +58,9 @@ export default async function EdizioneLayout(
           <Crumb items={[{ label: 'Corsi', href: '/admin/corsi' }, { label: ed.corso.titolo, href: `/admin/corsi/${ed.corso.id}` }, { label: ed.codice }]} />
           <h1>Edizione <span className="mono" style={{ fontSize: "0.8em" }}>{ed.codice}</span></h1>
           <div className="head-chips">
-            <span className={`chip ${stato === 'attiva' ? 'chip--ok' : stato === 'conclusa' ? 'chip--muted' : 'chip--err'}`}>{stato === 'attiva' && <span className="dot" />}{stato}</span>
+            {terminata
+              ? <Link className="chip chip--ocra" href={`${base}/stato`} title="La data di fine è passata: concludi l'edizione dalla scheda Stato">terminata — da concludere</Link>
+              : <span className={`chip ${stato === 'attiva' ? 'chip--ok' : stato === 'conclusa' ? 'chip--muted' : 'chip--err'}`}>{stato === 'attiva' && <span className="dot" />}{stato}</span>}
             <span>{ed.data_inizio || ed.data_fine ? `${fmtData(ed.data_inizio)} → ${fmtData(ed.data_fine)}` : 'senza date'}</span>
             <span>· lezioni online {ed.fad_apertura || ed.fad_chiusura ? `${fmtData(ed.fad_apertura)} → ${fmtData(ed.fad_chiusura)}` : 'sempre aperte'}</span>
           </div>

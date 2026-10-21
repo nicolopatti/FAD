@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { edizioneStato, type EdizioneRow } from '@/lib/db-types';
+import { edizioneStato, edizioneTerminata, type EdizioneRow } from '@/lib/db-types';
+import { giornoRoma } from '@/lib/finestra';
 import { Icon, fmtData } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
@@ -59,6 +60,7 @@ export function EdizioniPanel({ corsoId, edizioni, apriNuova = false, archiviato
   const [errs, setErrs] = useState<Errori>({});
   const [mostraForm, setMostraForm] = useState(!archiviato && (apriNuova || edizioni.length === 0));
   const [soloAttive, setSoloAttive] = useState(true);
+  const [oggi] = useState(() => giornoRoma());
 
   // A3: test obbligatori senza domande → la prima edizione non si crea.
   const bloccata = edizioni.length === 0 && Boolean(prontezza?.bloccanti.length);
@@ -127,9 +129,11 @@ export function EdizioniPanel({ corsoId, edizioni, apriNuova = false, archiviato
                     <tr key={e.id} className="is-link" onClick={() => router.push(href)}>
                       <td><Link className="t-link mono" href={href} onClick={(ev) => ev.stopPropagation()}>{e.codice}</Link></td>
                       <td>
-                        <span className={`chip ${stato === 'attiva' ? 'chip--ok' : stato === 'conclusa' ? 'chip--muted' : 'chip--err'}`}>
-                          {stato === 'attiva' && <span className="dot" />}{stato}
-                        </span>
+                        {edizioneTerminata(e, oggi) ? <span className="chip chip--ocra">terminata — da concludere</span> : (
+                          <span className={`chip ${stato === 'attiva' ? 'chip--ok' : stato === 'conclusa' ? 'chip--muted' : 'chip--err'}`}>
+                            {stato === 'attiva' && <span className="dot" />}{stato}
+                          </span>
+                        )}
                       </td>
                       <td className="muted">{e.data_inizio || e.data_fine ? `${fmtData(e.data_inizio)} → ${fmtData(e.data_fine)}` : '—'}</td>
                       <td className="muted">{e.fad_apertura || e.fad_chiusura ? `${fmtData(e.fad_apertura)} → ${fmtData(e.fad_chiusura)}` : 'sempre aperte'}</td>

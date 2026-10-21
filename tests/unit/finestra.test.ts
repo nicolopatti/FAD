@@ -42,3 +42,15 @@ describe('finestraEdizione (R2)', () => {
     expect(etichettaFinestra(finestraEdizione(e, '2026-11-10'))).toBeNull();
   });
 });
+
+describe('edizioneTerminata (B7)', () => {
+  it('attiva con data di fine passata → da concludere; conclusa, annullata o senza fine no', async () => {
+    const { edizioneTerminata } = await import('../../src/lib/db-types');
+    const e = { concluso_at: null, annullato_at: null, data_fine: '2026-07-20' };
+    expect(edizioneTerminata(e, '2026-10-21')).toBe(true);
+    expect(edizioneTerminata(e, '2026-07-20')).toBe(false);
+    expect(edizioneTerminata({ ...e, concluso_at: '2026-08-01T00:00:00Z' }, '2026-10-21')).toBe(false);
+    expect(edizioneTerminata({ ...e, annullato_at: '2026-08-01T00:00:00Z' }, '2026-10-21')).toBe(false);
+    expect(edizioneTerminata({ ...e, data_fine: null }, '2026-10-21')).toBe(false);
+  });
+});
