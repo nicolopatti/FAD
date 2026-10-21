@@ -333,6 +333,17 @@ if (edizione && iscrizione) {
   check('registro: catena integra dopo il giro completo', r.status === 200 && j?.ok === true, `HTTP ${r.status} eventi=${j?.eventi ?? '?'}`);
 }
 
+// Tempi di risposta (solo informativi, non sono controlli): mediana di 5 richieste
+// per pagina, dal runner GitHub. Servono a confrontare le regioni delle funzioni.
+{
+  const mediana = (xs) => { const v = [...xs].sort((x, y) => x - y); return v[Math.floor(v.length / 2)]; };
+  for (const path of ['/admin', '/admin/corsi', '/admin/rendicontazione']) {
+    const tempi = [];
+    for (let i = 0; i < 5; i++) { const t0 = performance.now(); await pagina(path); tempi.push(performance.now() - t0); }
+    console.log(`tempo ${path}: mediana ${Math.round(mediana(tempi))} ms (min ${Math.round(Math.min(...tempi))}, max ${Math.round(Math.max(...tempi))})`);
+  }
+}
+
 const ko = esiti.filter(([ok]) => !ok);
 console.log(`\n${esiti.length - ko.length}/${esiti.length} ok`);
 process.exit(ko.length ? 1 : 0);
