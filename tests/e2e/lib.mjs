@@ -30,10 +30,11 @@ export async function apriBrowser() {
   return chromium.launch({ executablePath });
 }
 
-export async function nuovaPagina(browser, viewport = { width: 1440, height: 900 }) {
+export async function nuovaPagina(browser, viewport = { width: 1440, height: 900 }, opzioni = {}) {
   // Anteprime Vercel protette: il "Protection Bypass for Automation" passa come header.
+  // `opzioni` va a `newContext` (es. `permissions`, `colorScheme`).
   const bypass = process.env.E2E_VERCEL_BYPASS;
-  const ctx = await browser.newContext({ viewport, locale: 'it-IT', ...(bypass ? { extraHTTPHeaders: { 'x-vercel-protection-bypass': bypass } } : {}) });
+  const ctx = await browser.newContext({ viewport, locale: 'it-IT', ...(bypass ? { extraHTTPHeaders: { 'x-vercel-protection-bypass': bypass } } : {}), ...opzioni });
   if (process.env.E2E_PROXY_SUPABASE === '1') {
     await ctx.route(/supabase\.co/, async (route) => {
       const req = route.request();

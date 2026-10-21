@@ -370,6 +370,18 @@ lanciare con `NODE_USE_ENV_PROXY=1` (Chromium non passa dal proxy). Richiede
 `playwright` (devDependency) e un browser: in CI `npx playwright install
 chromium` prima di lanciarlo, con un deploy di anteprima come `E2E_BASE_URL`.
 
+`npm run test:e2e:funzionali` (stesse variabili) aggiunge i controlli più
+specifici, sempre di sola lettura: auditor (ordine e date del log, riga espansa
+con copia dell'hash, filtri famiglia/evento/data, export CSV filtrato, sigillo
+della catena, totali e filtri del completamento, download CSV, tema scuro
+persistente), admin (tipo "Test" nel nuovo contenuto, editor del test in sola
+lettura a corso attivo, libreria per corso ed elenco, pagine di video/PDF/test,
+API di ricerca GET e POST, pannello "Dalla libreria" e suggerimento CSV su un
+corso in bozza), discente (corso di prova del test finale, test senza risposte
+corrette nel markup, PDF e badge dell'attestato). I controlli legati ai corsi
+di prova del tenant demo (`supabase/seed/corso_prova_quiz.sql`) vengono
+segnati come saltati se la fixture manca.
+
 ### Test di carico (k6)
 
 `tests/carico/player.js` simula N discenti che guardano un video e mandano gli
