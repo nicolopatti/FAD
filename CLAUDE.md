@@ -1702,7 +1702,33 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
-> **Aggiornamento 2026-10-20 notte, area admin (leggere per primo).** Le tre ondate
+> **Punto di ripartenza (2026-10-21 sera, leggere per primo).** Tutto il lavoro è su
+> `main` e in produzione (ultimo commit applicativo `12facb8`, funzioni in `fra1`), il
+> branch `claude/affectionate-hawking-03ev7i` coincide con `main`. Migration applicate
+> sul live fino alla `20261021000007`. Ultime prove in produzione: giro completo
+> **78/78**, scritture **29/29**, CI verde, registro integro. Nulla di aperto nel codice.
+> **Le attività dell'utente** stanno nella checklist per non esperti
+> **"FAD — Le tue attività"** (doc Claude
+> `https://claude.ai/artifact/KX4AhGuc3N3oaKSdiVHvr9`): 1) prima dei clienti veri:
+> Supabase Pro, controllo dei backup, leaked password protection, Vercel Pro, SMTP
+> (es. Brevo), togliere `NEXT_PUBLIC_TENANT_ID` da Vercel; 2) prove nel browser con gli
+> account demo; 3) materiali: tracciati ufficiali dei fondi per avviso, Teams tramite
+> l'IT; 4) facoltative: staging, prova di carico, secret GitHub
+> `VERCEL_AUTOMATION_BYPASS_SECRET` + `E2E_*_PASSWORD`, fine video Vimeo "Empty",
+> dominio proprio; 5) sicurezza: ente vero separato dai dati demo, chiavi mai in chat,
+> DB mai a mano, niente inviti veri prima dell'SMTP.
+> **Cosa fare io quando l'utente torna**, a seconda di cosa ha fatto: dopo l'SMTP →
+> modelli email in italiano (invito, reset) e prova di un invito; dopo Supabase Pro →
+> staging (runbook nel README) e rimozione del keepalive giornaliero; con
+> `SUPABASE_SERVICE_ROLE_KEY` nei secret dell'ambiente cloud → `npm run nuovo-ente` per
+> l'ente vero (mai chiedere la chiave in chat); con i documenti dei fondi → adattatori
+> ufficiali in `report-fondo-formati.ts` (`ufficiale:true`); per Teams → istruzioni per
+> l'IT (Azure AD) e Task 6 Fase 3; dominio proprio → passi su Vercel e Supabase Auth
+> (Site URL/Redirect) e domini consentiti su Vimeo. Riscontri dal browser → una passata
+> unica di rifiniture, poi di nuovo `verifica-scritture.yml` (push su `main` prima,
+> deploy READY, poi push del branch).
+
+> **Aggiornamento 2026-10-20 notte, area admin.** Le tre ondate
 > dell'area admin (A orientamento, B libreria, C scala: dettagli nella sezione in testa al
 > file) sono su `main` dal commit `cdcda87` (fast-forward autorizzato dall'utente "Vai") e
 > in produzione; migration applicate sul live fino alla `20261021000002`. Le scritture
