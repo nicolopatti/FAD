@@ -110,7 +110,7 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
               <span className="switch__track" />
             </label>
           </div>
-          <Field id="nc-soglia" label="Presenza minima alle sessioni (%)" error={errSoglia} hint="Per i corsi con sessioni live: sotto questa presenza il discente non completa il corso. Vuoto = nessun requisito.">
+          <Field id="nc-soglia" label="Presenza minima alle sessioni (%)" error={errSoglia} hint="Solo per i corsi con sessioni live (webinar o aula): sotto questa presenza il discente non completa il corso. Per un corso solo online lascia vuoto.">
             <input id="nc-soglia" className="input" inputMode="decimal" value={soglia} onChange={(e) => { setSoglia(e.target.value); if (errSoglia) setErrSoglia(null); }} disabled={busy} placeholder="es. 80" style={{ maxWidth: 160 }} aria-invalid={Boolean(errSoglia)} />
           </Field>
           <h4 style={{ margin: '4px 0 8px' }}>Attestato</h4>

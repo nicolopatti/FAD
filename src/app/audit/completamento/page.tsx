@@ -94,9 +94,9 @@ export default async function CompletamentoPage(props: { searchParams?: Promise<
         obbligatori_totale: prog?.obbligatori_totale ?? 0,
         obbligatori_completati: prog?.obbligatori_completati ?? 0,
         // Stessa regola di attestati e report fondi: lezioni obbligatorie E presenza minima (se il corso la chiede).
-        idonea: deriveIdoneita(prog?.obbligatori_totale ?? 0, Boolean(prog?.idonea), freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza)).idoneo,
+        idonea: deriveIdoneita(prog?.obbligatori_totale ?? 0, Boolean(prog?.idonea), freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza), freq?.sessioni_totali).idoneo,
         frequenza: freq && freq.soglia != null
-          ? { percentuale: freq.frequenza_percentuale, soglia: freq.soglia, ore: freq.ore_frequentate, ore_pianificate: round1(freq.minuti_pianificati / 60), idoneo: freq.idoneo_frequenza, non_parsate: freq.durate_non_parsate }
+          ? { percentuale: freq.frequenza_percentuale, soglia: freq.soglia, ore: freq.ore_frequentate, ore_pianificate: round1(freq.minuti_pianificati / 60), idoneo: freq.idoneo_frequenza, non_parsate: freq.durate_non_parsate, in_attesa: freq.in_attesa_sessioni }
           : null,
         presenze: freq?.presenze ?? 0,
         attestato: (() => { const a = attestatoDi.get(i.id); return a ? { id: a.id, numero: a.numero, emesso_at: a.emesso_at, automatico: a.emesso_da == null } : null; })(),

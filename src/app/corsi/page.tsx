@@ -35,7 +35,7 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
   const tutti = iscrizioni.map((i) => {
     const prog = progressi.get(i.id) ?? null;
     const freq = frequenze.get(i.id) ?? null;
-    const completato = prog ? deriveIdoneita(prog.obbligatori_totale, prog.idonea, freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza)).idoneo : false;
+    const completato = prog ? deriveIdoneita(prog.obbligatori_totale, prog.idonea, freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza), freq?.sessioni_totali).idoneo : false;
     return { iscrizione: i, prog, freq, completato };
   });
 

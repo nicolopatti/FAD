@@ -51,7 +51,7 @@ export function EdizioneCampi({ v, errs, onChange, busy, prefix }: { v: Edizione
 }
 
 /** Scheda "Edizioni" del corso: elenco (ogni riga apre la pagina dell'edizione) + nuova edizione. */
-export function EdizioniPanel({ corsoId, edizioni, apriNuova = false, archiviato = false }: { corsoId: string; edizioni: EdizioneLista[]; apriNuova?: boolean; archiviato?: boolean }) {
+export function EdizioniPanel({ corsoId, edizioni, apriNuova = false, archiviato = false, soglia = null }: { corsoId: string; edizioni: EdizioneLista[]; apriNuova?: boolean; archiviato?: boolean; soglia?: number | null }) {
   const router = useRouter();
   const { confirm } = useFeedback();
   const { call, busy, error } = useCall();
@@ -72,7 +72,7 @@ export function EdizioniPanel({ corsoId, edizioni, apriNuova = false, archiviato
     if (edizioni.length === 0) {
       const ok = await confirm({
         titolo: 'Creare la prima edizione?',
-        messaggio: <>Da questo momento il corso è <strong>attivo</strong>: titolo, categoria, regole di fruizione e sequenza delle lezioni non si modificano più, perché le persone iscritte devono seguire sempre lo stesso percorso. Restano modificabili la descrizione, la copertina e i contenuti delle singole lezioni. Non si può tornare indietro.</>,
+        messaggio: <>Da questo momento il corso è <strong>attivo</strong>: titolo, categoria, regole di fruizione e sequenza delle lezioni non si modificano più, perché le persone iscritte devono seguire sempre lo stesso percorso. Restano modificabili la descrizione, la copertina e i contenuti delle singole lezioni. Non si può tornare indietro.{soglia != null && <><br /><br /><strong>Attenzione:</strong> il corso chiede una presenza minima del {soglia}% alle sessioni live. Se è un corso solo online, torna nelle impostazioni e togli la presenza minima prima di creare l&apos;edizione; altrimenti ricordati di pianificare le sessioni.</>}</>,
         conferma: 'Crea la prima edizione',
       });
       if (!ok) return;

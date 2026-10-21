@@ -18,6 +18,7 @@ import type { ReportFondoDataset } from './report-fondo';
 //   • azienda senza partita IVA         → avviso
 //   • avviso del Piano non valorizzato  → avviso (il tracciato si parametrizza
 //        sull'avviso; in assenza l'adattatore usa il default)
+//   • presenza minima senza sessioni    → avviso (A2, stress test 21/10)
 // ===========================================================================
 
 export type WarningSeverita = 'bloccante' | 'avviso';
@@ -50,6 +51,16 @@ export function validateReportFondo(dataset: ReportFondoDataset): ReportFondoWar
       codice: 'avviso_mancante',
       severita: 'avviso',
       messaggio: `Avviso non valorizzato sul Piano "${t.piano_titolo}": il tracciato del formato userà l'impostazione di default.`,
+    });
+  }
+
+  // Presenza minima senza sessioni (A2): il requisito resta "in attesa" e non
+  // si applica all'idoneità; l'operatore deve saperlo prima di depositare.
+  if (t.soglia_frequenza_percentuale != null && !dataset.sessioni.some((s) => !s.annullata)) {
+    warnings.push({
+      codice: 'presenza_senza_sessioni',
+      severita: 'avviso',
+      messaggio: `Presenza minima impostata (${t.soglia_frequenza_percentuale}%) ma nessuna sessione pianificata: finché non ci sono sessioni la presenza non conta per l'idoneità.`,
     });
   }
 

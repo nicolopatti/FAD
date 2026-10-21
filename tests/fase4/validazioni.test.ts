@@ -63,7 +63,7 @@ function dataset(
   return {
     testata: testata(testataOver),
     iscritti,
-    sessioni: [],
+    sessioni: [{ sessione_id: 's1', titolo: 'Sessione 1', data_ora: null, durata_minuti: 120, modalita: 'vcs', annullata: false, docente: null }],
     generato_at: '2026-05-29T00:00:00.000Z',
   };
 }
@@ -109,6 +109,16 @@ describe('validateReportFondo (D33, policy §10)', () => {
   it('avviso del Piano non valorizzato → avviso', () => {
     const w = validateReportFondo(dataset({ avviso: null }, [iscritto()]));
     expect(w.find((x) => x.codice === 'avviso_mancante')?.severita).toBe('avviso');
+  });
+
+  it('presenza minima senza sessioni pianificate → avviso (A2)', () => {
+    const d = dataset({}, [iscritto()]);
+    expect(validateReportFondo({ ...d, sessioni: [] }).find((x) => x.codice === 'presenza_senza_sessioni')?.severita).toBe('avviso');
+    // solo sessioni annullate = nessuna sessione pianificata
+    expect(validateReportFondo({ ...d, sessioni: d.sessioni.map((s) => ({ ...s, annullata: true })) }).some((x) => x.codice === 'presenza_senza_sessioni')).toBe(true);
+    // senza soglia o con una sessione valida non scatta
+    expect(validateReportFondo({ ...dataset({ soglia_frequenza_percentuale: null }, [iscritto()]), sessioni: [] }).some((x) => x.codice === 'presenza_senza_sessioni')).toBe(false);
+    expect(validateReportFondo(d).some((x) => x.codice === 'presenza_senza_sessioni')).toBe(false);
   });
 
   it('conteggio severità con più problemi insieme', () => {

@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Icon } from '@/components/admin/Atlante';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
@@ -52,9 +54,9 @@ export default async function EdizioneStatoPage(props: { params: Promise<{ id: s
       obbligatori_totale: prog?.obbligatori_totale ?? 0,
       obbligatori_completati: prog?.obbligatori_completati ?? 0,
       // Stessa regola di attestati e report fondi: lezioni obbligatorie E presenza minima (se il corso la chiede).
-        idonea: deriveIdoneita(prog?.obbligatori_totale ?? 0, Boolean(prog?.idonea), freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza)).idoneo,
+        idonea: deriveIdoneita(prog?.obbligatori_totale ?? 0, Boolean(prog?.idonea), freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza), freq?.sessioni_totali).idoneo,
       frequenza: freq && freq.soglia != null
-        ? { percentuale: freq.frequenza_percentuale, soglia: freq.soglia, ore: freq.ore_frequentate, ore_pianificate: round1(freq.minuti_pianificati / 60), idoneo: freq.idoneo_frequenza, non_parsate: freq.durate_non_parsate }
+        ? { percentuale: freq.frequenza_percentuale, soglia: freq.soglia, ore: freq.ore_frequentate, ore_pianificate: round1(freq.minuti_pianificati / 60), idoneo: freq.idoneo_frequenza, non_parsate: freq.durate_non_parsate, in_attesa: freq.in_attesa_sessioni }
         : null,
       presenze: freq?.presenze ?? 0,
       attestato: (() => { const a = attestatoDi.get(i.id); return a ? { id: a.id, numero: a.numero, emesso_at: a.emesso_at, automatico: a.emesso_da == null } : null; })(),
@@ -78,6 +80,14 @@ export default async function EdizioneStatoPage(props: { params: Promise<{ id: s
   return (
     <>
       <p className="muted" style={{ margin: '0 0 14px', fontSize: 13.5 }}>Avanzamento degli iscritti, ricalcolato adesso dal registro degli eventi come nella vista dell&apos;auditor: lezioni completate, frequenza alle sessioni, idoneità, attestato.</p>
+      {Array.from(frequenze.values()).some((f) => f.in_attesa_sessioni) && (
+        <div className="banner banner--ocra" style={{ marginBottom: 14 }}>
+          <Icon name="alert" className="banner__icon" />
+          <div className="banner__body">
+            <strong>Presenza minima impostata ma nessuna sessione pianificata.</strong> Finché l&apos;edizione non ha sessioni la presenza non conta: l&apos;idoneità dipende dalle sole lezioni e gli attestati non partono in automatico. <Link href={`/admin/corsi/${params.id}/edizioni/${ed.id}/sessioni`}>Pianifica le sessioni</Link> oppure, se il corso non ne prevede, togli la presenza minima prima della prima edizione.
+          </div>
+        </div>
+      )}
       <CompletamentoTable righe={righe} />
       <EdizioneModifica edizione={ed} altre={altre} />
       <EdizioneAzioni edizione={ed} />

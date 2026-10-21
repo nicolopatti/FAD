@@ -43,7 +43,8 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
   // "Completato" con la stessa regola di attestati e report: lezioni obbligatorie
   // E presenza minima alle sessioni, se il corso la chiede (prima: solo lezioni).
   const soglia = freq?.soglia ?? null;
-  const completato = deriveIdoneita(prog.obbligatori_totale, prog.idonea, soglia, Boolean(freq?.idoneo_frequenza)).idoneo;
+  const completato = deriveIdoneita(prog.obbligatori_totale, prog.idonea, soglia, Boolean(freq?.idoneo_frequenza), freq?.sessioni_totali).idoneo;
+  const presenzaInAttesa = Boolean(freq?.in_attesa_sessioni);
 
   const finestra = prog.finestra;
   const aperta = finestra.aperta;
@@ -111,7 +112,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
           <div className="course-hero__inner">
             <h1 className="course-hero__title">{prog.corso_titolo}</h1>
             {descrizione && <p className="course-hero__desc">{descrizione}</p>}
-            {prog.idonea && soglia != null && freq && !freq.idoneo_frequenza ? (
+            {prog.idonea && soglia != null && freq && !freq.idoneo_frequenza && !presenzaInAttesa ? (
               <p className="course-hero__desc" style={{ fontWeight: 600 }}>
                 {prog.obbligatori_totale > 0 ? 'Hai finito le lezioni online. ' : ''}
                 Per completare il corso serve la presenza ad almeno il {soglia}% delle sessioni: finora risulti presente al {freq.frequenza_percentuale}%. La presenza si aggiorna dopo ogni sessione.
@@ -250,7 +251,10 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
               {prog.obbligatori_totale !== prog.totale && (
                 <div className="row row--between"><span className="page-lead">Obbligatorie</span><strong>{prog.obbligatori_completati} di {prog.obbligatori_totale}</strong></div>
               )}
-              {soglia != null && freq && (
+              {soglia != null && freq && presenzaInAttesa && (
+                <div className="row row--between"><span className="page-lead">Presenza alle sessioni</span><strong>in attesa delle sessioni</strong></div>
+              )}
+              {soglia != null && freq && !presenzaInAttesa && (
                 <div className="row row--between"><span className="page-lead">Presenza alle sessioni</span><strong className={freq.idoneo_frequenza ? 'status-ok' : ''}>{freq.frequenza_percentuale}% <span className="page-lead" style={{ fontWeight: 400 }}>(minimo {soglia}%)</span></strong></div>
               )}
               <div className="row row--between"><span className="page-lead">Stato</span><strong className={completato ? 'status-ok' : ''}>{completato ? 'Completato' : prog.completati === 0 && !freq?.presenze ? 'Da iniziare' : 'In corso'}</strong></div>

@@ -428,6 +428,8 @@ export type FrequenzaIscrizione = {
   presenze: number;
   durate_non_parsate: number;
   idoneo_frequenza: boolean;
+  /** Soglia impostata ma nessuna sessione pianificata: requisito "in attesa di sessioni" (A2). */
+  in_attesa_sessioni: boolean;
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -504,6 +506,7 @@ export function calcolaFrequenza(
     presenze: eventi.length,
     durate_non_parsate: durateNonParsate,
     idoneo_frequenza: idoneo,
+    in_attesa_sessioni: soglia != null && plannedBySessione.size === 0,
   };
 }
 

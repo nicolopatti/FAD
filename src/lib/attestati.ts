@@ -98,7 +98,7 @@ export async function costruisciSnapshot(
   service: SupabaseClient,
   iscrizioneId: string,
   precalcolato?: Precalcolato,
-): Promise<{ idoneo: boolean; contenuto: AttestatoContenuto } | null> {
+): Promise<{ idoneo: boolean; frequenza_in_attesa: boolean; contenuto: AttestatoContenuto } | null> {
   const iscr = await caricaIscrizione(service, iscrizioneId);
   if (!iscr?.edizione?.corso || !iscr.persona) return null;
   const corso = iscr.edizione.corso;
@@ -114,7 +114,7 @@ export async function costruisciSnapshot(
 
   const obbligatoriTot = prog?.obbligatori_totale ?? 0;
   const soglia = corso.soglia_frequenza_percentuale != null ? Number(corso.soglia_frequenza_percentuale) : null;
-  const { criterio, idoneo } = deriveIdoneita(obbligatoriTot, prog?.idonea ?? false, soglia, freq?.idoneo_frequenza ?? false);
+  const { criterio, idoneo, frequenza_in_attesa: frequenzaInAttesa } = deriveIdoneita(obbligatoriTot, prog?.idonea ?? false, soglia, freq?.idoneo_frequenza ?? false, freq?.sessioni_totali);
 
   const quizItem = prog?.items.find((i) => i.lo_type === 'quiz' && i.obbligatorio) ?? prog?.items.find((i) => i.lo_type === 'quiz');
   const soglie = quizItem ? Number((quizItem.lo_config as { soglia_percentuale?: unknown }).soglia_percentuale) : NaN;
@@ -157,14 +157,14 @@ export async function costruisciSnapshot(
         superato_il: quizItem.quiz?.superato_il ?? null,
       }
       : null,
-    frequenza: freq && freq.soglia != null
+    frequenza: freq && freq.soglia != null && !frequenzaInAttesa
       ? { ore_frequentate: freq.ore_frequentate, percentuale: freq.frequenza_percentuale, soglia: freq.soglia }
       : null,
     criterio_idoneita: criterio,
     completato_il: completatoIl,
     registro: { seq: testa?.seq ?? null, hash: testa?.hash != null ? bytesToHex(testa.hash as string) : null },
   };
-  return { idoneo, contenuto };
+  return { idoneo, frequenza_in_attesa: frequenzaInAttesa, contenuto };
 }
 
 export type EsitoEmissione = { attestato_id: string; numero: string; codice_verifica: string; hash: string };
@@ -195,7 +195,8 @@ export async function emettiAttestatoSeIdonea(iscrizioneId: string, attorePerson
   if (iscr.edizione.corso.politica_attestato !== 'automatica') return null;
   if (await attestatoValido(service, iscrizioneId)) return null;
   const snap = await costruisciSnapshot(service, iscrizioneId);
-  if (!snap || !snap.idoneo) return null;
+  // A2: presenza minima impostata ma nessuna sessione → niente automatico, decide l'admin.
+  if (!snap || !snap.idoneo || snap.frequenza_in_attesa) return null;
   const { data, error } = await service.rpc('attestato_emetti', {
     p_iscrizione_id: iscrizioneId,
     p_contenuto: snap.contenuto,
@@ -262,11 +263,11 @@ export async function emettiPerEdizioneSeIdonee(edizioneId: string, attorePerson
     if (conAttestato.has(id)) continue;
     const prog = progressi.get(id) ?? null;
     const freq = frequenze.get(id) ?? null;
-    const { idoneo } = deriveIdoneita(prog?.obbligatori_totale ?? 0, prog?.idonea ?? false, soglia, freq?.idoneo_frequenza ?? false);
-    if (!idoneo) continue;
+    const { idoneo, frequenza_in_attesa } = deriveIdoneita(prog?.obbligatori_totale ?? 0, prog?.idonea ?? false, soglia, freq?.idoneo_frequenza ?? false, freq?.sessioni_totali);
+    if (!idoneo || frequenza_in_attesa) continue;
     try {
       const snap = await costruisciSnapshot(service, id, { prog, freq });
-      if (!snap?.idoneo) continue;
+      if (!snap?.idoneo || snap.frequenza_in_attesa) continue;
       const { data, error } = await service.rpc('attestato_emetti', {
         p_iscrizione_id: id, p_contenuto: snap.contenuto, p_attore: attorePersonaId, p_emesso_da: null, p_sostituisce: null, p_motivazione: null,
       });

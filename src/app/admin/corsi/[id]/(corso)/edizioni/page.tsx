@@ -14,7 +14,7 @@ export default async function CorsoEdizioniPage(
   const params = await props.params;
   await requireAdmin();
   const supabase = await createSupabaseServerClient();
-  const { data: corso } = await supabase.from('corso').select('id, archiviato_at').eq('id', params.id).maybeSingle<{ id: string; archiviato_at: string | null }>();
+  const { data: corso } = await supabase.from('corso').select('id, archiviato_at, soglia_frequenza_percentuale').eq('id', params.id).maybeSingle<{ id: string; archiviato_at: string | null; soglia_frequenza_percentuale: number | string | null }>();
   if (!corso) notFound();
 
   // Conteggi dalla vista di riepilogo: una query sola, qualunque sia il numero di edizioni.
@@ -26,5 +26,5 @@ export default async function CorsoEdizioniPage(
     .returns<EdizioneRiepilogo[]>(), 'le edizioni');
   const lista: EdizioneLista[] = edizioni.map((e) => ({ ...e, iscritti: e.n_iscritti, sessioni: e.n_sessioni, attestati: e.n_attestati }));
 
-  return <EdizioniPanel corsoId={corso.id} edizioni={lista} apriNuova={searchParams?.nuova === '1' && !corso.archiviato_at} archiviato={Boolean(corso.archiviato_at)} />;
+  return <EdizioniPanel corsoId={corso.id} edizioni={lista} apriNuova={searchParams?.nuova === '1' && !corso.archiviato_at} archiviato={Boolean(corso.archiviato_at)} soglia={corso.soglia_frequenza_percentuale != null ? Number(corso.soglia_frequenza_percentuale) : null} />;
 }

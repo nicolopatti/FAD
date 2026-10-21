@@ -31,7 +31,7 @@ export type RigaCompletamento = {
   obbligatori_totale: number;
   obbligatori_completati: number;
   idonea: boolean;
-  frequenza: { percentuale: number; soglia: number; ore: number; ore_pianificate: number; idoneo: boolean; non_parsate: number } | null;
+  frequenza: { percentuale: number; soglia: number; ore: number; ore_pianificate: number; idoneo: boolean; non_parsate: number; in_attesa?: boolean } | null;
   presenze: number;
   attestato: { id: string; numero: string; emesso_at: string; automatico: boolean } | null;
   items: LoRiga[];
@@ -73,7 +73,7 @@ export function CompletamentoTable({ righe }: { righe: RigaCompletamento[] }) {
     iscrizioni: filtrate.length,
     idonei: filtrate.filter((r) => r.idonea).length,
     inCorso: filtrate.filter((r) => !r.idonea).length,
-    sottoSoglia: filtrate.filter((r) => r.frequenza && !r.frequenza.idoneo).length,
+    sottoSoglia: filtrate.filter((r) => r.frequenza && !r.frequenza.idoneo && !r.frequenza.in_attesa).length,
   };
 
   const pagine = Math.max(1, Math.ceil(filtrate.length / PER_PAGINA));
@@ -196,7 +196,12 @@ function RigaView({ r, open, pct, onToggle }: { r: RigaCompletamento; open: bool
         </td>
         <td>{r.idonea ? <span className="chip chip--ok"><span className="dot" />idoneo</span> : <span className="chip chip--accent">in corso</span>}</td>
         <td>
-          {r.frequenza ? (
+          {r.frequenza?.in_attesa ? (
+            <>
+              <span className="chip chip--ghost">in attesa di sessioni</span>
+              <div className="muted log-sub">soglia {r.frequenza.soglia}% · nessuna sessione pianificata</div>
+            </>
+          ) : r.frequenza ? (
             <>
               <span className={`chip ${r.frequenza.idoneo ? 'chip--ok' : 'chip--err'}`}>{r.frequenza.percentuale}%</span>
               <div className="muted log-sub">soglia {r.frequenza.soglia}% · {r.frequenza.ore} h su {r.frequenza.ore_pianificate} h{r.frequenza.non_parsate > 0 ? ` · ${r.frequenza.non_parsate} durate non lette` : ''}</div>

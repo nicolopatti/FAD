@@ -105,21 +105,35 @@ type SessioneFondoRow = {
   incarico: { persona: { nome: string; cognome: string } | null } | null;
 };
 
+/**
+ * Idoneità = lezioni obbligatorie completate E presenza minima, se il corso la chiede.
+ *
+ * Presenza minima senza sessioni (stress test 21/10, A2): con una soglia impostata
+ * e ZERO sessioni pianificate (non annullate) il requisito di presenza è "in
+ * attesa di sessioni" e NON si applica: decide il solo percorso online. Appena
+ * l'edizione ha almeno una sessione la soglia torna a valere per intero (sessioni
+ * presenti e frequenza bassa = non idoneo, come prima). `sessioniPianificate`
+ * non passato = comportamento di sempre. L'emissione automatica dell'attestato
+ * non parte finché il requisito è in attesa (lib/attestati.ts): decide l'admin.
+ */
 export function deriveIdoneita(
   obbligatoriTotale: number,
   fadIdonea: boolean,
   soglia: number | null,
   frequenzaIdonea: boolean,
-): { criterio: CriterioIdoneita; idoneo: boolean } {
+  sessioniPianificate?: number,
+): { criterio: CriterioIdoneita; idoneo: boolean; frequenza_in_attesa: boolean } {
+  const frequenzaInAttesa = soglia != null && sessioniPianificate === 0;
+  const sogliaEff = frequenzaInAttesa ? null : soglia;
   const fadOk = obbligatoriTotale === 0 || fadIdonea;
-  const freqOk = soglia == null || frequenzaIdonea;
+  const freqOk = sogliaEff == null || frequenzaIdonea;
   let criterio: CriterioIdoneita;
-  if (obbligatoriTotale > 0 && soglia != null) criterio = 'misto';
-  else if (soglia != null) criterio = 'frequenza';
+  if (obbligatoriTotale > 0 && sogliaEff != null) criterio = 'misto';
+  else if (sogliaEff != null) criterio = 'frequenza';
   else if (obbligatoriTotale > 0) criterio = 'completamento';
   else criterio = 'nessuno';
   const idoneo = criterio === 'nessuno' ? false : fadOk && freqOk;
-  return { criterio, idoneo };
+  return { criterio, idoneo, frequenza_in_attesa: frequenzaInAttesa };
 }
 
 export async function computeReportFondoDataset(
@@ -179,6 +193,7 @@ export async function computeReportFondoDataset(
       prog?.idonea ?? false,
       soglia,
       freq?.idoneo_frequenza ?? false,
+      freq?.sessioni_totali,
     );
     iscritti.push({
       iscrizione_id: i.id,

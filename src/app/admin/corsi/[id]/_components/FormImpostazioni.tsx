@@ -169,7 +169,7 @@ export function FormImpostazioni({ corso, frozen, nEdizioni, categorie }: { cors
               <span className="switch__track" />
             </label>
           </div>
-          <Field id="corso-soglia" className="field--spaced" label="Presenza minima alle sessioni (%)" error={errSoglia} hint="Per i corsi con sessioni live: sotto questa presenza il discente non completa il corso. Vuoto = nessun requisito.">
+          <Field id="corso-soglia" className="field--spaced" label="Presenza minima alle sessioni (%)" error={errSoglia} hint="Solo per i corsi con sessioni live (webinar o aula): sotto questa presenza il discente non completa il corso. Per un corso solo online lascia vuoto.">
             <input id="corso-soglia" className="input" inputMode="decimal" value={soglia} onChange={(e) => { setSoglia(e.target.value); if (errSoglia) setErrSoglia(null); }} disabled={busy || frozen} placeholder="es. 80" style={{ maxWidth: 160 }} aria-invalid={Boolean(errSoglia)} />
           </Field>
           <div style={{ marginTop: 16 }}>
