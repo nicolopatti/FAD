@@ -9,6 +9,42 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
+## Manutenzione dopo Next 16 (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **non su `main`**: "adesso non riesco a controllare, vai avanti con le attività previste")
+
+Quattro attività di piano eseguibili dal container, in quattro commit sul branch:
+- **Advisor Supabase** (security + performance riletti): unico rilievo azionabile era
+  `attestato_block_mutations` senza `search_path` (0011) → migration
+  `20261021000003_attestato_block_mutations_search_path.sql` (**applicata sul live**,
+  rilievo sparito). Intenzionali e lasciati: `attestato_verifica` eseguibile da `anon`
+  (verifica pubblica), le 21 RPC SECURITY DEFINER per `authenticated` (controllano
+  tenant/ruolo al loro interno), `attestato_contatore` con RLS senza policy (la tocca
+  solo la RPC); lato utente: "leaked password protection"; 21 indici "mai usati"
+  (INFO, dataset piccolo: si tengono).
+- **Debito `datiEnteDa`**: `src/lib/attestato-modello.ts` esporta `ENTE_SELECT`,
+  `EnteTenantRow`, `datiEnteDa(tenant)` (ragione sociale → nome → "Ente di
+  formazione", vuoti → null); usati da `/admin/impostazioni`, scheda Attestato del
+  corso, `POST /api/admin/attestati/anteprima` e `costruisciSnapshot`. Comportamento
+  invariato.
+- **E2E funzionali nel repo**: `tests/e2e/funzionali.mjs` (`npm run
+  test:e2e:funzionali`, **50 controlli** di sola lettura, 0 errori JS) porta nel repo
+  `func4` (auditor), `func5_ro` (test finale), `funcB` (libreria) e la prova PDF/badge;
+  le fixture mancanti sono "saltate", non fallite; `lib.mjs` `nuovaPagina(browser,
+  viewport, opzioni)` passa `permissions`/`colorScheme` al contesto. Gli script dello
+  scratchpad restano solo come storia.
+- **devDependencies**: vitest 2 → **5** (con `vite` 8 esplicito: senza, npm non
+  risolve il peer), playwright 1.56 → **1.64** (il Chromium 1194 del container va
+  ancora bene), `@types/node` 20 → **24** (Vercel ha Node 24), tsx, pg, `@types/pg`,
+  `@types/qrcode`. TypeScript resta 5.9 (la 7 è il port nativo), ESLint 9. Verifiche:
+  typecheck 0, lint 0, unit 39/39, fase4 15/15, m1a gated, smoke 99/99, funzionali
+  50/50, build Turbopack ok. **`npm audit` completo**: 5 "high" tutti = `braces`
+  3.0.3 (GHSA-vfj7-8cjw-p6xm, solo lint via `@next/eslint-plugin-next` → `fast-glob`
+  3.3.1 pinnata): **nessuna versione corretta pubblicata**, il "fix" di npm sarebbe
+  tornare a eslint-config-next 14 → si ignora; `npm audit --omit=dev` resta **0**.
+- Nota sulla build nel container: la Turbopack build da `.next` pulita fallisce
+  **a intermittenza** con "next/font/google queries have exactly one entry" (i font
+  Google si scaricano via proxy a ogni build pulita); basta rilanciare. Su Vercel
+  non si è mai visto.
+
 ## Next 16 — aggiornamento del framework (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` dal 2026-10-21 mattina** con il via libera dell'utente "Procedi": fast-forward `1aea271..7f1441e`; CI verde; deploy di produzione `dpl_HXRTRjcr…` READY, login e `/verifica/<codice>` verificati sul deploy)
 
 Motivo: `npm audit --omit=dev` segnalava `next` 14.2.15 (critical: DoS via Server
@@ -1581,6 +1617,13 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 >    login/logout, player video fino a fine lezione, test finale, PDF/badge/LinkedIn
 >    dell'attestato, azioni admin che scrivono, tema scuro. Eventuali rifiniture in
 >    un'unica passata.
+> 6. **Manutenzione dopo Next 16 (2026-10-21, vedi sezione in testa)**: advisor
+>    Supabase sistemato (migration applicata), `datiEnteDa` unico, suite E2E
+>    funzionale nel repo (50 controlli), devDependencies aggiornate. **Quattro commit
+>    sul branch, non su `main`**: portarli su `main` con via libera esplicito
+>    (fast-forward). Resta non eseguibile da qui: Blocco D (tracciati fondi, Teams),
+>    test di carico a 300 VU dall'Europa, configurazioni lato utente (SMTP, secret
+>    `VERCEL_AUTOMATION_BYPASS_SECRET`, Pro, backup, leaked password protection).
 >
 > **Aggiornamento 2026-10-20 sera (leggere per primo).** Tutto il branch
 > `claude/affectionate-hawking-03ev7i` è su `main` (fast-forward autorizzato
