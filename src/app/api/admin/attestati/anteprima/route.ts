@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { contenutoEsempio, generaAttestatoPdf } from '@/lib/attestato-pdf';
 import { immaginiPer } from '@/lib/attestato-serve';
-import { normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
+import { datiEnteDa, ENTE_SELECT, normalizzaParziale, risolviModello, type EnteTenantRow } from '@/lib/attestato-modello';
 import type { AttestatoContenuto } from '@/lib/attestati';
 
 export const dynamic = 'force-dynamic';
@@ -17,17 +17,9 @@ export async function POST(request: Request) {
   const session = await requireAdmin();
   const body = (await request.json().catch(() => ({}))) as Body;
   const supabase = await createSupabaseServerClient();
-  const { data: t } = await supabase
-    .from('tenant')
-    .select('nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, linkedin_organization_id, attestato_modello')
-    .eq('id', session.tenantId)
-    .maybeSingle<{ nome: string; ragione_sociale: string | null; citta: string | null; firmatario_nome: string | null; firmatario_ruolo: string | null; logo_path: string | null; firma_path: string | null; linkedin_organization_id: string | null; attestato_modello: unknown }>();
+  const { data: t } = await supabase.from('tenant').select(ENTE_SELECT).eq('id', session.tenantId).maybeSingle<EnteTenantRow>();
   if (!t) return NextResponse.json({ ok: false }, { status: 404 });
-  const ente: AttestatoContenuto['ente'] = {
-    ragione_sociale: t.ragione_sociale?.trim() || t.nome,
-    citta: t.citta, firmatario_nome: t.firmatario_nome, firmatario_ruolo: t.firmatario_ruolo,
-    logo_path: t.logo_path, firma_path: t.firma_path, linkedin_organization_id: t.linkedin_organization_id,
-  };
+  const ente: AttestatoContenuto['ente'] = datiEnteDa(t);
   const bozza = normalizzaParziale(body.modello);
   let corso: AttestatoContenuto['corso'] | undefined;
   if (body.corso_id) {

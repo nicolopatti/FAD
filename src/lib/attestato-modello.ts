@@ -116,6 +116,40 @@ export type DatiEnte = {
   firma_path: string | null;
 };
 
+/** Colonne di `tenant` che servono per intestare un attestato (con il modello salvato). */
+export const ENTE_SELECT = 'nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, linkedin_organization_id, attestato_modello';
+
+/** Riga di `tenant` letta con `ENTE_SELECT`. */
+export type EnteTenantRow = {
+  nome: string;
+  ragione_sociale: string | null;
+  citta: string | null;
+  firmatario_nome: string | null;
+  firmatario_ruolo: string | null;
+  logo_path: string | null;
+  firma_path: string | null;
+  linkedin_organization_id?: string | null;
+  attestato_modello?: unknown;
+};
+
+/**
+ * Dati dell'ente come entrano nello snapshot dell'attestato: la ragione sociale
+ * se compilata, altrimenti il nome del tenant; i campi vuoti diventano null.
+ * Unico punto che fa questa traduzione (pagina Ente, scheda Attestato del
+ * corso, anteprima, emissione).
+ */
+export function datiEnteDa(t: EnteTenantRow | null | undefined): DatiEnte & { linkedin_organization_id: string | null } {
+  return {
+    ragione_sociale: t?.ragione_sociale?.trim() || t?.nome || 'Ente di formazione',
+    citta: t?.citta ?? null,
+    firmatario_nome: t?.firmatario_nome ?? null,
+    firmatario_ruolo: t?.firmatario_ruolo ?? null,
+    logo_path: t?.logo_path ?? null,
+    firma_path: t?.firma_path ?? null,
+    linkedin_organization_id: t?.linkedin_organization_id ?? null,
+  };
+}
+
 /**
  * Modello risolto: predefinito ← modello dell'ente ← modello del corso, e poi
  * i vuoti riempiti con i dati anagrafici dell'ente (intestazione, città, logo,

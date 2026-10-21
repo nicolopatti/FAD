@@ -6,7 +6,7 @@ import {
 } from './compliance';
 import { deriveIdoneita } from './report-fondo';
 import { bytesToHex } from './audit-filtri';
-import { risolviModello, type ModelloAttestato } from './attestato-modello';
+import { datiEnteDa, ENTE_SELECT, risolviModello, type EnteTenantRow, type ModelloAttestato } from './attestato-modello';
 import type { AttestatoRow, PoliticaAttestato } from './db-types';
 
 /**
@@ -106,10 +106,10 @@ export async function costruisciSnapshot(
   const [prog, freq, enteRes, testaRes] = await Promise.all([
     precalcolato ? precalcolato.prog : computeProgressoForIscrizione(service, iscrizioneId),
     precalcolato ? precalcolato.freq : computeFrequenzaForIscrizione(service, iscrizioneId),
-    service.from('tenant').select('nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, linkedin_organization_id, attestato_modello').eq('id', iscr.tenant_id).maybeSingle(),
+    service.from('tenant').select(ENTE_SELECT).eq('id', iscr.tenant_id).maybeSingle(),
     service.from('evento').select('seq, hash').eq('tenant_id', iscr.tenant_id).order('seq', { ascending: false }).limit(1).maybeSingle(),
   ]);
-  const ente = (enteRes.data ?? null) as { nome: string; ragione_sociale: string | null; citta: string | null; firmatario_nome: string | null; firmatario_ruolo: string | null; logo_path: string | null; firma_path: string | null; linkedin_organization_id: string | null; attestato_modello: unknown } | null;
+  const ente = (enteRes.data ?? null) as EnteTenantRow | null;
   const testa = (testaRes.data ?? null) as { seq: number; hash: unknown } | null;
 
   const obbligatoriTot = prog?.obbligatori_totale ?? 0;
@@ -120,15 +120,7 @@ export async function costruisciSnapshot(
   const soglie = quizItem ? Number((quizItem.lo_config as { soglia_percentuale?: unknown }).soglia_percentuale) : NaN;
   const completatoIl = prog?.items.filter((i) => i.obbligatorio && i.completato_il).map((i) => i.completato_il!).sort().at(-1) ?? null;
 
-  const datiEnte = {
-    ragione_sociale: ente?.ragione_sociale?.trim() || ente?.nome || 'Ente di formazione',
-    citta: ente?.citta ?? null,
-    firmatario_nome: ente?.firmatario_nome ?? null,
-    firmatario_ruolo: ente?.firmatario_ruolo ?? null,
-    logo_path: ente?.logo_path ?? null,
-    firma_path: ente?.firma_path ?? null,
-    linkedin_organization_id: ente?.linkedin_organization_id ?? null,
-  };
+  const datiEnte = datiEnteDa(ente);
   const contenuto: AttestatoContenuto = {
     versione: SNAPSHOT_VERSIONE,
     ente: datiEnte,

@@ -2,13 +2,11 @@ import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { CorsoRow } from '@/lib/db-types';
-import { normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
+import { datiEnteDa, ENTE_SELECT, normalizzaParziale, risolviModello, type EnteTenantRow } from '@/lib/attestato-modello';
 import { ModelloEditor } from '@/components/admin/ModelloEditor';
 import { FormAttestato } from '../../_components/FormAttestato';
 
 export const dynamic = 'force-dynamic';
-
-type EnteMini = { nome: string; ragione_sociale: string | null; citta: string | null; firmatario_nome: string | null; firmatario_ruolo: string | null; logo_path: string | null; firma_path: string | null; attestato_modello: unknown };
 
 /** Scheda "Attestato" del corso: dati (ore, riferimento, rilascio) e modello grafico. */
 export default async function CorsoAttestatoPage(props: { params: Promise<{ id: string }> }) {
@@ -25,14 +23,10 @@ export default async function CorsoAttestatoPage(props: { params: Promise<{ id: 
 
   const [{ count }, { data: ente }] = await Promise.all([
     supabase.from('edizione').select('id', { count: 'exact', head: true }).eq('corso_id', corso.id),
-    supabase.from('tenant').select('nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, attestato_modello').eq('id', corso.tenant_id).maybeSingle<EnteMini>(),
+    supabase.from('tenant').select(ENTE_SELECT).eq('id', corso.tenant_id).maybeSingle<EnteTenantRow>(),
   ]);
   const frozen = (count ?? 0) > 0;
-  const modelloEnte = risolviModello(
-    { ragione_sociale: ente?.ragione_sociale?.trim() || ente?.nome || 'Ente di formazione', citta: ente?.citta ?? null, firmatario_nome: ente?.firmatario_nome ?? null, firmatario_ruolo: ente?.firmatario_ruolo ?? null, logo_path: ente?.logo_path ?? null, firma_path: ente?.firma_path ?? null },
-    ente?.attestato_modello ?? null,
-    null,
-  );
+  const modelloEnte = risolviModello(datiEnteDa(ente), ente?.attestato_modello ?? null, null);
   const modelloCorso = corso.attestato_modello ? normalizzaParziale(corso.attestato_modello) : null;
 
   return (

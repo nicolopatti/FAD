@@ -1,7 +1,7 @@
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { EnteRow } from '@/lib/db-types';
-import { normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
+import { datiEnteDa, normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
 import { ModelloEditor } from '@/components/admin/ModelloEditor';
 import { EnteForm } from './EnteForm';
 import { ImpostazioniTabs } from '@/components/admin/SezioneTabs';
@@ -21,7 +21,7 @@ export default async function EntePage() {
   if (!ente) {
     return <div className="banner banner--err"><div className="banner__body">Dati dell&apos;ente non leggibili.</div></div>;
   }
-  const datiEnte = { ragione_sociale: ente.ragione_sociale?.trim() || ente.nome, citta: ente.citta, firmatario_nome: ente.firmatario_nome, firmatario_ruolo: ente.firmatario_ruolo, logo_path: ente.logo_path, firma_path: ente.firma_path };
+  const datiEnte = datiEnteDa(ente);
   const salvato = ente.attestato_modello ? normalizzaParziale(ente.attestato_modello) : null;
   const { count: nCategorie } = await supabase.from('categoria').select('id', { count: 'exact', head: true });
 
