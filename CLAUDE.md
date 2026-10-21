@@ -1516,6 +1516,15 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 > 4. Dal doc di analisi restano idee non pianificate (non richieste): selettori a ricerca
 >    nei form della rendicontazione, azioni in blocco su altre liste. Niente altro di
 >    aperto sull'area admin. Il resto delle note qui sotto resta valido.
+> 5. **Dipendenze (2026-10-21).** `npm audit fix` applicato sul branch (solo lockfile:
+>    `nanoid` 3.3.12→3.3.20, `source-map-js`→1.2.2, `esbuild` 0.28.2 e altri patch;
+>    typecheck/lint/unit 39/fase4 15/build invariati). **Restano 2 vulnerabilità** che
+>    si chiudono solo passando a **Next 16.4** (`next` 14.2.15 critical: DoS via Server
+>    Actions + origine del dev server; `postcss` 8.4.31 high, trascinata da Next):
+>    è un aggiornamento con rotture (App Router: `params`/`searchParams` asincroni,
+>    `middleware` → `proxy`, caching esplicito, ESLint 9+, `@supabase/ssr` 0.12) → va
+>    fatto in una **sessione dedicata** con la smoke E2E 99/99 come rete, non in coda a
+>    un'altra attività. Da non fare da soli: `npm audit fix --force`.
 >
 > **Aggiornamento 2026-10-20 sera (leggere per primo).** Tutto il branch
 > `claude/affectionate-hawking-03ev7i` è su `main` (fast-forward autorizzato
