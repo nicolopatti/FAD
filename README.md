@@ -335,8 +335,18 @@ a ogni apertura (D8); le colonne-cache sull'Iscrizione non vengono lette.
 
 ## CI / pipeline
 
+Stack (dal 2026-10-21): **Next 16.4** (App Router, Turbopack, `typedRoutes`),
+React 19, `@supabase/ssr` 0.12, ESLint 9 con config piatta (`eslint.config.mjs`).
+Conseguenze pratiche: `params`/`searchParams`/`cookies()` sono Promise (sempre
+`await`, anche su `createSupabaseServerClient()`); il middleware si chiama
+`src/proxy.ts` (`export function proxy`); `next-env.d.ts` è generato e non
+versionato; `npm run typecheck` lancia prima `next typegen` (tipi delle route);
+`npm run lint` è `eslint .` (`next lint` non esiste più). Per usare webpack al
+posto di Turbopack: `next build --webpack`.
+
 `.github/workflows/ci.yml` esegue su ogni PR:
 - `npm run typecheck`
+- `npm run lint`
 - `npm run test:unit` (librerie pure: Vimeo, visione integrale, test finale,
   attestato e modello PDF) e `npm run test:fase4` (validazioni e formati del
   report fondo)

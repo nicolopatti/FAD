@@ -6,7 +6,7 @@ import { appendEvent } from '@/lib/audit';
 // email). L'aggiornamento è su Supabase Auth con la sessione dell'utente; poi
 // un Evento `auth.password_aggiornata` senza alcun dato sensibile.
 export async function POST(request: Request) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: 'Sessione scaduta: riapri il link o accedi di nuovo.' }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { password?: unknown } | null;

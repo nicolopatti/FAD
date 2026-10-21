@@ -25,9 +25,10 @@ export function AgendaList({ righe, quando: iniziale }: { righe: SessioneAgenda[
   const [quando, setQuando] = useState<Quando>(iniziale);
   const [q, setQ] = useState('');
   const [pagina, setPagina] = useState(1);
+  // "Adesso" fissato al primo disegno: basta per separare prossime e passate.
+  const [now] = useState(() => Date.now());
 
   const filtrate = useMemo(() => {
-    const now = Date.now();
     const n = q.trim().toLowerCase();
     const out = righe.filter((s) => {
       const t = s.data_ora ? new Date(s.data_ora).getTime() : null;
@@ -42,7 +43,7 @@ export function AgendaList({ righe, quando: iniziale }: { righe: SessioneAgenda[
       return quando === 'passate' ? tb - ta : ta - tb;
     });
     return out;
-  }, [righe, quando, q]);
+  }, [righe, quando, q, now]);
 
   const pagine = Math.max(1, Math.ceil(filtrate.length / PER_PAGINA));
   const cur = Math.min(pagina, pagine);

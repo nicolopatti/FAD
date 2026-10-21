@@ -22,9 +22,12 @@ type IscrittoDb = { id: string; persona: { nome: string; cognome: string; email:
  * Pagina della sessione, sotto l'edizione: dettagli e docente, report importati,
  * coda di riconciliazione, presenze, import CSV.
  */
-export default async function SessioneDetailPage({ params }: { params: { id: string; edizioneId: string; sessioneId: string } }) {
+export default async function SessioneDetailPage(
+  props: { params: Promise<{ id: string; edizioneId: string; sessioneId: string }> }
+) {
+  const params = await props.params;
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: sessione } = await supabase
     .from('sessione')

@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'durata_minuti non valida' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   // L'edizione deve esistere ed essere del tenant (RLS la nasconde altrimenti).
   const { data: edizione } = await supabase

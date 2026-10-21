@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: { typedRoutes: true },
+  typedRoutes: true,
+  // Next 16 genera un AGENTS.md all'avvio del dev server: il progetto usa CLAUDE.md.
+  agentRules: false,
   // Indirizzi dell'area admin prima dell'ondata A (menu per tabella): i
   // collegamenti salvati continuano a funzionare. La query resta.
   async redirects() {

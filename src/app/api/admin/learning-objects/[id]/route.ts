@@ -17,7 +17,7 @@ type UpdateBody = {
 
 // Il LO è usato in un corso con almeno un'edizione? (freeze D22, calcolato con
 // il client RLS dell'admin: struttura → corso → edizioni)
-async function loCongelato(supabase: ReturnType<typeof createSupabaseServerClient>, loId: string): Promise<boolean> {
+async function loCongelato(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, loId: string): Promise<boolean> {
   const { data: righe } = await supabase.from('struttura_corso').select('corso_id').eq('learning_object_id', loId);
   const corsi = Array.from(new Set((righe ?? []).map((r) => r.corso_id as string)));
   if (corsi.length === 0) return false;
@@ -25,17 +25,15 @@ async function loCongelato(supabase: ReturnType<typeof createSupabaseServerClien
   return (count ?? 0) > 0;
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } },
-) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as UpdateBody | null;
   if (!body) {
     return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const updates: Record<string, unknown> = {};
   if (typeof body.titolo === 'string') {
     const t = body.titolo.trim();

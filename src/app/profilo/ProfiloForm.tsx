@@ -11,6 +11,8 @@ export function ProfiloForm({ dataNascita, luogoNascita }: { dataNascita: string
   const { toast } = useFeedback();
   const [data, setData] = useState(dataNascita ?? '');
   const [luogo, setLuogo] = useState(luogoNascita ?? '');
+  // Età minima 14 anni; il limite è fissato al primo disegno (niente Date.now() a ogni resa).
+  const [maxData] = useState(() => new Date(Date.now() - 14 * 365.25 * 86400000).toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
   const dirty = data !== (dataNascita ?? '') || luogo.trim() !== (luogoNascita ?? '');
@@ -38,7 +40,7 @@ export function ProfiloForm({ dataNascita, luogoNascita }: { dataNascita: string
       <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
         <label className="field">
           <span>Data di nascita</span>
-          <input className="input" type="date" value={data} onChange={(e) => setData(e.target.value)} disabled={busy} max={new Date(Date.now() - 14 * 365.25 * 86400000).toISOString().slice(0, 10)} />
+          <input className="input" type="date" value={data} onChange={(e) => setData(e.target.value)} disabled={busy} max={maxData} />
         </label>
         <label className="field">
           <span>Luogo di nascita</span>

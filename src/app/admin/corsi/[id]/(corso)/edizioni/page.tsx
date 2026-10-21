@@ -7,9 +7,13 @@ import { EdizioniPanel, type EdizioneLista } from '../../_components/EdizioniPan
 
 export const dynamic = 'force-dynamic';
 
-export default async function CorsoEdizioniPage({ params, searchParams }: { params: { id: string }; searchParams?: { nuova?: string } }) {
+export default async function CorsoEdizioniPage(
+  props: { params: Promise<{ id: string }>; searchParams?: Promise<{ nuova?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: corso } = await supabase.from('corso').select('id, archiviato_at').eq('id', params.id).maybeSingle<{ id: string; archiviato_at: string | null }>();
   if (!corso) notFound();
 

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   // Conteggi per le voci di sidebar (head: solo count, niente righe).
   const [corsi, persone, agenda] = await Promise.all([

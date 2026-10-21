@@ -5,7 +5,8 @@ import { emettiAttestatoSeIdonea } from '@/lib/attestati';
 
 // Risoluzione manuale di un match (ambiguo/assente): scrive
 // presenza_webinar_registrata + match_risolto_manualmente via RPC (mai UPDATE).
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as
     | { iscrizione_id?: string; motivazione?: string }
@@ -18,7 +19,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ ok: false, error: 'motivazione obbligatoria' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc('riconcilia_risolvi_match', {
     p_coda_id: params.id,
     p_iscrizione_id: body.iscrizione_id,

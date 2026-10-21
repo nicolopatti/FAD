@@ -4,7 +4,8 @@ import { requireAdmin } from '@/lib/auth-context';
 
 // "Ignora definitivamente" una riga della coda: scrive
 // partecipante_non_riconciliato via RPC (mai UPDATE). Motivazione obbligatoria.
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin();
   const body = (await request.json().catch(() => null)) as { motivazione?: string } | null;
   const motivazione = body?.motivazione?.trim();
@@ -12,7 +13,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ ok: false, error: 'motivazione obbligatoria' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc('riconcilia_ignora', {
     p_coda_id: params.id,
     p_motivazione: motivazione,

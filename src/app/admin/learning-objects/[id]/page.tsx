@@ -17,9 +17,10 @@ type UsoRow = { corso_id: string; ordine: number; corso: { id: string; titolo: s
 type EdMini = { corso_id: string; concluso_at: string | null; annullato_at: string | null };
 
 /** Pagina di un contenuto della libreria: dati reali, corsi che lo usano, archiviazione. */
-export default async function EditLearningObjectPage({ params }: { params: { id: string } }) {
+export default async function EditLearningObjectPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: lo } = await supabase
     .from('learning_object')

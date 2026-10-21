@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (ids.length > 200) return NextResponse.json({ ok: false, error: 'al massimo 200 corsi per volta' }, { status: 400 });
   const ripristina = body?.ripristina === true;
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: corsi, error } = await supabase
     .from('corso_riepilogo')
     .select('id, titolo, archiviato_at, n_edizioni_attive')

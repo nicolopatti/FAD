@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic';
 
 // PDF pubblico: chi conosce il codice di verifica (24 caratteri casuali, non
 // enumerabile) può scaricare il documento, come dalla pagina /verifica.
-export async function GET(_request: Request, { params }: { params: { codice: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ codice: string }> }) {
+  const params = await props.params;
   const codice = params.codice.toLowerCase();
   if (!/^[0-9a-f]{24}$/.test(codice)) return NextResponse.json({ ok: false }, { status: 404 });
   let service;

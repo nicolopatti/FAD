@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const nextRaw = url.searchParams.get('next') ?? '/auth/reimposta';
   const next = nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : '/';
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   let ok = false;
   if (code) ok = !(await supabase.auth.exchangeCodeForSession(code)).error;
   else if (tokenHash && type) ok = !(await supabase.auth.verifyOtp({ token_hash: tokenHash, type })).error;

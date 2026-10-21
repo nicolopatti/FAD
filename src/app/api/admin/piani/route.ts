@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
   const opt = (v: string | null | undefined) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from('piano_formativo_finanziato')
     .insert({

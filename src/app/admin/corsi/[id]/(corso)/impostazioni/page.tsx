@@ -6,9 +6,10 @@ import { FormImpostazioni } from '../../_components/FormImpostazioni';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CorsoImpostazioniPage({ params }: { params: { id: string } }) {
+export default async function CorsoImpostazioniPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: corso } = await supabase
     .from('corso')
     .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, creato_il')

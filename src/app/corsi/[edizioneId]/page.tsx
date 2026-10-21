@@ -20,9 +20,10 @@ function durataLabel(config: Record<string, unknown>): string | null {
   return m < 1 ? '1 min' : `${m} min`;
 }
 
-export default async function DettaglioCorsoPage({ params }: { params: { edizioneId: string } }) {
+export default async function DettaglioCorsoPage(props: { params: Promise<{ edizioneId: string }> }) {
+  const params = await props.params;
   const session = await requireSession();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: iscrizione } = await supabase
     .from('iscrizione')

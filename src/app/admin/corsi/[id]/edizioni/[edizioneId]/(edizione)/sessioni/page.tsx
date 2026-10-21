@@ -7,9 +7,10 @@ import { SessioniList, type SessioneLista } from '../../_components/SessioniList
 
 export const dynamic = 'force-dynamic';
 
-export default async function EdizioneSessioniPage({ params }: { params: { id: string; edizioneId: string } }) {
+export default async function EdizioneSessioniPage(props: { params: Promise<{ id: string; edizioneId: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: ed } = await supabase.from('edizione').select('id, concluso_at, annullato_at').eq('id', params.edizioneId).eq('corso_id', params.id).maybeSingle<{ id: string; concluso_at: string | null; annullato_at: string | null }>();
   if (!ed) notFound();
 

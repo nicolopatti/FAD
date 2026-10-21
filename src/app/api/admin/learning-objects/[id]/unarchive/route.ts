@@ -3,12 +3,10 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 
-export async function POST(
-  _request: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('learning_object')

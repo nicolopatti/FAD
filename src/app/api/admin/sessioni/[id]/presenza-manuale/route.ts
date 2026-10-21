@@ -4,7 +4,8 @@ import { requireAdmin } from '@/lib/auth-context';
 import { emettiPerSessioneSeIdonee } from '@/lib/attestati';
 
 // Inserimento manuale di una presenza mancante (Task 5). Evento, non UPDATE.
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as
     | { iscrizione_id?: string; durata?: string; motivazione?: string }
@@ -17,7 +18,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const motivazione = body.motivazione?.trim();
   if (!motivazione) return NextResponse.json({ ok: false, error: 'motivazione obbligatoria' }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc('presenza_inserisci_manuale', {
     p_sessione_id: params.id,
     p_iscrizione_id: body.iscrizione_id,

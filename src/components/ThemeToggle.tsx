@@ -28,6 +28,8 @@ export function applicaTema(t: Tema) {
 // inline nel layout radice, così non c'è lampo chiaro/scuro.
 export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const [tema, setTema] = useState<Tema>('auto');
+  // Il tema vive in localStorage: si legge dopo il montaggio per non divergere dal server.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setTema(leggi()); }, []);
 
   function cicla() {

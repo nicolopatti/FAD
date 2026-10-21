@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic';
 
 // PDF dell'attestato. Autorizzazione via RLS: la riga è leggibile solo dal
 // titolare e dallo staff del tenant (policy attestato_read_*).
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const supabase = createSupabaseServerClient();
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
   const { data: att } = await supabase.from('attestato').select('*').eq('id', params.id).maybeSingle<AttestatoRow>();

@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 // Profilo del discente: chi sei, dati per l'attestato, i tuoi attestati, uscita.
 export default async function ProfiloPage() {
   const session = await requireSession();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const [{ data: persona }, { data: attestati }] = await Promise.all([
     supabase.from('persona').select('data_nascita, luogo_nascita').eq('id', session.personaId).maybeSingle<{ data_nascita: string | null; luogo_nascita: string | null }>(),
     supabase.from('attestato').select('*').eq('persona_id', session.personaId).order('emesso_at', { ascending: false }).returns<AttestatoRow[]>(),

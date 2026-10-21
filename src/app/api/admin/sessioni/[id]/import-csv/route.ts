@@ -11,14 +11,15 @@ type ImportBody = { csv?: string; mapping?: ColumnMapping };
 // opzionale, lo normalizza e lo passa alla pipeline (Task 2) con fonte='csv' e
 // importato_da = Persona admin. Errore ESPLICITO se manca una colonna chiave,
 // PRIMA di toccare il grezzo (la write avviene solo dentro pipeline_ingest_grezzo).
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as ImportBody | null;
   if (!body || typeof body.csv !== 'string' || !body.csv.trim()) {
     return NextResponse.json({ ok: false, error: 'CSV mancante' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   // La sessione deve esistere ed essere del tenant (RLS la nasconde altrimenti).
   const { data: sessione } = await supabase

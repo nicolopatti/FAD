@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 /** Categorie dei corsi: l'elenco che compare nei selettori e nei filtri del catalogo. */
 export default async function CategoriePage() {
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const [categorie, corsi] = await Promise.all([
     supabase.from('categoria').select('id, tenant_id, nome, ordine, creato_il').order('ordine').order('nome').returns<CategoriaRow[]>().then((r) => unwrap(r, 'le categorie')),
     supabase.from('corso').select('categoria').not('categoria', 'is', null).then((r) => unwrap(r, 'i corsi')),

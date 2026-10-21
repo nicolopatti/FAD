@@ -181,7 +181,7 @@ export function ModelloEditor({ ambito, tenantId, corsoId, valore, ereditato }: 
           <h4 style={{ margin: '18px 0 8px' }}>Loghi</h4>
           <div className="loghi-ed">
             <div className="loghi-ed__slot">
-              <div className="loghi-ed__box">{loghiUrl(m.logo_path) ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={loghiUrl(m.logo_path)!} alt="Logo principale" /> : <span className="muted">Logo principale</span>}</div>
+              <div className="loghi-ed__box">{loghiUrl(m.logo_path) ?   <img src={loghiUrl(m.logo_path)!} alt="Logo principale" /> : <span className="muted">Logo principale</span>}</div>
               <div className="row" style={{ gap: 6 }}>
                 <button type="button" className="btn btn--secondary btn--xs" disabled={busy} onClick={() => apriFile({ tipo: 'logo' })}><Icon name="upload" /> {m.logo_path ? 'Sostituisci' : 'Carica'}</button>
                 {m.logo_path && <button type="button" className="btn btn--ghost btn--xs" disabled={busy} onClick={() => set('logo_path', null)}>Togli</button>}
@@ -190,7 +190,7 @@ export function ModelloEditor({ ambito, tenantId, corsoId, valore, ereditato }: 
             </div>
             {[0, 1, 2].map((i) => (
               <div key={i} className="loghi-ed__slot">
-                <div className="loghi-ed__box loghi-ed__box--sm">{m.loghi_secondari[i] ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={loghiUrl(m.loghi_secondari[i])!} alt={`Logo secondario ${i + 1}`} /> : <span className="muted">Logo {i + 1}</span>}</div>
+                <div className="loghi-ed__box loghi-ed__box--sm">{m.loghi_secondari[i] ?   <img src={loghiUrl(m.loghi_secondari[i])!} alt={`Logo secondario ${i + 1}`} /> : <span className="muted">Logo {i + 1}</span>}</div>
                 <div className="row" style={{ gap: 6 }}>
                   <button type="button" className="btn btn--secondary btn--xs" disabled={busy || (i > m.loghi_secondari.length)} onClick={() => apriFile({ tipo: 'secondario', indice: i })}><Icon name="upload" /> {m.loghi_secondari[i] ? 'Sostituisci' : 'Carica'}</button>
                   {m.loghi_secondari[i] && <button type="button" className="btn btn--ghost btn--xs" disabled={busy} onClick={() => set('loghi_secondari', m.loghi_secondari.filter((_, j) => j !== i))}>Togli</button>}
@@ -213,7 +213,7 @@ export function ModelloEditor({ ambito, tenantId, corsoId, valore, ereditato }: 
               <div className="field">
                 <label>Firma</label>
                 <div className="row" style={{ gap: 6, alignItems: 'center' }}>
-                  {loghiUrl(f.firma_path) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={loghiUrl(f.firma_path)!} alt="" style={{ height: 34, maxWidth: 120, objectFit: 'contain', background: '#fff', borderRadius: 6 }} />}
+                  {loghiUrl(f.firma_path) &&   <img src={loghiUrl(f.firma_path)!} alt="" style={{ height: 34, maxWidth: 120, objectFit: 'contain', background: '#fff', borderRadius: 6 }} />}
                   <button type="button" className="btn btn--secondary btn--xs" disabled={busy} onClick={() => apriFile({ tipo: 'firma', indice: i })}><Icon name="upload" /> {f.firma_path ? 'Sostituisci' : 'Immagine'}</button>
                   {f.firma_path && <button type="button" className="btn btn--ghost btn--xs" disabled={busy} onClick={() => set('firmatari', m.firmatari.map((x, j) => (j === i ? { ...x, firma_path: null } : x)))}>Togli</button>}
                   <button type="button" className="icon-btn" title="Rimuovi firmatario" aria-label={`Rimuovi firmatario ${i + 1}`} disabled={busy} onClick={() => set('firmatari', m.firmatari.filter((_, j) => j !== i))}><Icon name="trash" /></button>

@@ -14,9 +14,17 @@ type EdizioneTesta = EdizioneRow & { corso: { id: string; titolo: string; politi
  * Pagina dell'edizione: l'unità di erogazione del corso. Raccoglie quello che
  * prima stava in tre menu: iscritti, sessioni, docenti, fondo, stato.
  */
-export default async function EdizioneLayout({ children, params }: { children: React.ReactNode; params: { id: string; edizioneId: string } }) {
+export default async function EdizioneLayout(
+  props: { children: React.ReactNode; params: Promise<{ id: string; edizioneId: string }> }
+) {
+  const params = await props.params;
+
+  const {
+    children
+  } = props;
+
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: ed } = await supabase
     .from('edizione')
     .select('id, tenant_id, corso_id, codice, data_inizio, data_fine, fad_apertura, fad_chiusura, concluso_at, annullato_at, creato_il, corso:corso_id ( id, titolo, politica_attestato )')

@@ -12,11 +12,12 @@ type Body = { nome?: unknown; ordine?: unknown };
  * (categoria non ancora congelata); i corsi attivi o conclusi tengono il nome
  * con cui sono nati (D22), ed è il motivo per cui il catalogo filtra per testo.
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as Body | null;
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: cat } = await supabase.from('categoria').select('id, tenant_id, nome, ordine, creato_il').eq('id', params.id).maybeSingle<CategoriaRow>();
   if (!cat) return NextResponse.json({ ok: false, error: 'categoria non trovata' }, { status: 404 });
@@ -65,9 +66,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 /** Elimina una categoria non usata da alcun corso (i corsi che la usano la tengono come testo). */
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: cat } = await supabase.from('categoria').select('id, nome').eq('id', params.id).maybeSingle<{ id: string; nome: string }>();
   if (!cat) return NextResponse.json({ ok: false, error: 'categoria non trovata' }, { status: 404 });
   const { count } = await supabase.from('corso').select('id', { count: 'exact', head: true }).eq('categoria', cat.nome);

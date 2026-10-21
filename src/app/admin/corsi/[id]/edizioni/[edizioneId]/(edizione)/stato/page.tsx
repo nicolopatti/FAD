@@ -17,9 +17,10 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
  * registro (la stessa vista dell'auditor, qui per l'amministratore), attestati,
  * codice e date, chiusura.
  */
-export default async function EdizioneStatoPage({ params }: { params: { id: string; edizioneId: string } }) {
+export default async function EdizioneStatoPage(props: { params: Promise<{ id: string; edizioneId: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: ed } = await supabase
     .from('edizione')
     .select('id, tenant_id, corso_id, codice, data_inizio, data_fine, fad_apertura, fad_chiusura, concluso_at, annullato_at, creato_il')

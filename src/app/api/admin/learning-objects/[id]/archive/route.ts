@@ -7,12 +7,10 @@ import { appendEvent } from '@/lib/audit';
 // dalle Strutture già create; le nuove non possono più usarle (lo enforcement
 // arriva con il Task 2). Qui solo l'archive flag.
 
-export async function POST(
-  _request: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('learning_object')

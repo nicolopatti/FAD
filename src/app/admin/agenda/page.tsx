@@ -10,9 +10,10 @@ export const dynamic = 'force-dynamic';
  * Agenda: tutte le sessioni di tutte le edizioni, in sola lettura, con il
  * collegamento all'edizione. Si pianifica dall'edizione, non da qui.
  */
-export default async function AgendaPage({ searchParams }: { searchParams?: { quando?: string } }) {
+export default async function AgendaPage(props: { searchParams?: Promise<{ quando?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const quando: Quando = searchParams?.quando === 'passate' || searchParams?.quando === 'tutte' ? searchParams.quando : 'prossime';
 
   const sessioni = unwrap(await supabase

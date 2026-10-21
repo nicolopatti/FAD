@@ -14,9 +14,15 @@ export const dynamic = 'force-dynamic';
  * Lezioni, Edizioni, Attestato, Impostazioni. L'edizione ha una pagina propria
  * sotto Edizioni, con le sue schede. I numeri vengono dalla vista di riepilogo.
  */
-export default async function CorsoLayout({ children, params }: { children: React.ReactNode; params: { id: string } }) {
+export default async function CorsoLayout(props: { children: React.ReactNode; params: Promise<{ id: string }> }) {
+  const params = await props.params;
+
+  const {
+    children
+  } = props;
+
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: corso } = await supabase
     .from('corso_riepilogo')

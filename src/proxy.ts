@@ -11,7 +11,7 @@ const SCRITTURA = /^\/api\/(admin\/|events\/quiz$|profilo\/(password|informativa
 const SOLO_LETTURA = /^\/api\/admin\/(attestati\/anteprima|learning-objects\/cerca)$/;
 const MUTANTI = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (MUTANTI.has(request.method) && SCRITTURA.test(pathname) && !SOLO_LETTURA.test(pathname) && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json(

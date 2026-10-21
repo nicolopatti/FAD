@@ -6,7 +6,7 @@ import { appendEvent } from '@/lib/audit';
 // registro (`informativa.accettata`, con la versione del testo), mai una
 // colonna. Idempotente: una seconda accettazione è un Evento in più, innocuo.
 export async function POST(request: Request) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
   const body = (await request.json().catch(() => null)) as { versione?: unknown } | null;

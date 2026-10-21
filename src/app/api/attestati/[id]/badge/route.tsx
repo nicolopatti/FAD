@@ -6,8 +6,9 @@ import type { AttestatoRow } from '@/lib/db-types';
 export const dynamic = 'force-dynamic';
 
 // Badge PNG (?formato=post per 1200×630). Autorizzazione via RLS come il PDF.
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createSupabaseServerClient();
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
   const { data: att } = await supabase.from('attestato').select('*').eq('id', params.id).maybeSingle<AttestatoRow>();

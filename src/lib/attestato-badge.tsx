@@ -40,7 +40,7 @@ export async function badgeResponse(att: AttestatoRow, formato: 'quadrato' | 'po
           <div style={{ fontSize: post ? 20 : 26, color: '#d7e0fb', marginTop: 16 }}>{[ore, c.corso.riferimento_normativo, dataBreve(att.emesso_at)].filter(Boolean).join(' · ')}</div>
         </div>
         <div style={{ position: 'absolute', right: post ? 44 : 72, bottom: post ? 44 : 72, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img src={qr} width={post ? 180 : 300} height={post ? 180 : 300} style={{ borderRadius: 18 }} alt="" />
           <div style={{ fontSize: post ? 14 : 18, color: '#b9c7f5', marginTop: 10 }}>verifica l&apos;autenticità</div>
         </div>

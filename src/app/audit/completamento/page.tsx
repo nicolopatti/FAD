@@ -18,9 +18,10 @@ type EdizioneRow = {
   iscrizione: { count: number }[] | null;
 };
 
-export default async function CompletamentoPage({ searchParams }: { searchParams?: { edizione?: string } }) {
+export default async function CompletamentoPage(props: { searchParams?: Promise<{ edizione?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAuditor();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   // Ambito per edizione (Blocco B #2): il ricalcolo dagli Eventi è proporzionale
   // alle iscrizioni lette, quindi il server legge solo quelle dell'edizione
@@ -61,13 +62,13 @@ export default async function CompletamentoPage({ searchParams }: { searchParams
   type AttMini = { id: string; iscrizione_id: string; numero: string; emesso_at: string; emesso_da: string | null };
   const attestati: AttMini[] = [];
   for (const lotto of aLotti(ids)) {
-    attestati.push(...await tutteLeRighe<AttMini>((da, a) => supabase
+    attestati.push(...(await tutteLeRighe<AttMini>((da, a) => supabase
       .from('attestato')
       .select('id, iscrizione_id, numero, emesso_at, emesso_da')
       .in('iscrizione_id', lotto)
       .is('sostituito_da', null)
       .range(da, a)
-      .returns<AttMini[]>(), 'degli attestati'));
+      .returns<AttMini[]>(), 'degli attestati')));
   }
   const attestatoDi = new Map(attestati.map((a) => [a.iscrizione_id, a]));
 

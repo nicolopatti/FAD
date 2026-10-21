@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'event_type non ammesso' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
   const { data: persona } = await supabase.from('persona').select('id, tenant_id').eq('auth_user_id', user.id).single();

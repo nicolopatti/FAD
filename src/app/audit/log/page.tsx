@@ -16,13 +16,14 @@ const PAGE_SIZE = 100;
 
 type Nome = { nome: string; cognome: string; email: string };
 
-export default async function AuditLogPage({
-  searchParams,
-}: {
-  searchParams?: Record<string, string | string[] | undefined>;
-}) {
+export default async function AuditLogPage(
+  props: {
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireAuditor();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const filtri = parseFiltri(searchParams ?? {});
 
   // Stream del tenant corrente.

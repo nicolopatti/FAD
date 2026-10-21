@@ -15,12 +15,13 @@ type Body = {
 };
 
 /** Modifica di una sessione: titolo, quando, durata, riunione, docente; oppure annullamento. */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as Body | null;
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: cur } = await supabase.from('sessione').select('id, edizione_id, titolo, annullato_at, modalita').eq('id', params.id).maybeSingle();
   if (!cur) return NextResponse.json({ ok: false, error: 'sessione non trovata' }, { status: 404 });
 

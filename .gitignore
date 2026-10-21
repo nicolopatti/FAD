@@ -13,3 +13,6 @@ supabase/.temp
 
 # stray editor/script backups
 *.bak
+
+# Generato da `next typegen`/`next dev`/`next build` (Next 16): non va versionato.
+next-env.d.ts

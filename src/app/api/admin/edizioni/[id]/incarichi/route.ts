@@ -19,13 +19,14 @@ type Body = {
  * tra quelle del tenant oppure si crea al volo (dedup per email). Eventi senza
  * PII: solo UUID e ruolo.
  */
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as Body | null;
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
   if (!body.ruolo || !INCARICO_RUOLI.includes(body.ruolo)) return NextResponse.json({ ok: false, error: 'ruolo non valido' }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: edizione } = await supabase.from('edizione').select('id').eq('id', params.id).maybeSingle();
   if (!edizione) return NextResponse.json({ ok: false, error: 'edizione non trovata' }, { status: 404 });
 

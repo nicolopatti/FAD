@@ -9,6 +9,62 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
+## Next 16 — aggiornamento del framework (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **non ancora su `main`**: serve il via libera esplicito)
+
+Motivo: `npm audit --omit=dev` segnalava `next` 14.2.15 (critical: DoS via Server
+Actions, origine del dev server) e `postcss` 8.4.31 (high, trascinata da Next); le
+due correzioni non invasive (`nanoid`, `source-map-js`) erano già su `main`
+(`1aea271`). L'utente: "non riesco a verificare adesso, procedi tu".
+
+- *Pacchetti*: `next` 14.2.15 → **16.4.2**, `react`/`react-dom` 18.3 → **19.3.1**
+  (+ `@types/react*` 19), `eslint` 8 → **9.39** con `eslint-config-next` 16.4.2
+  (config piatta `eslint.config.mjs`, `.eslintrc.json` eliminato; script `lint` =
+  `eslint .`, perché `next lint` non esiste più), `@supabase/ssr` 0.5.2 → **0.12.7**
+  (il formato del cookie di sessione è invariato: prefisso `base64-`, pezzi da 3180
+  → `tests/carico/player.js` e `scripts/verifica-scritture.mjs` non cambiano),
+  `@supabase/supabase-js` 2.106 → 2.118. Tolto `geist` (non più importato). Nessuna
+  modifica a schema, RLS o Eventi.
+- *Codemod ufficiali* (`npx @next/codemod@16.4.2 …`): `next-async-request-api` (65
+  file: `params`/`searchParams` sono **Promise** in pagine, layout e route handler →
+  `const params = await props.params`), `middleware-to-proxy` (`src/middleware.ts` →
+  **`src/proxy.ts`**, `export async function proxy`; la logica fail-fast 503 e
+  `updateSession` sono identiche), `next-lint-to-eslint-cli`.
+- *A mano*: `cookies()` è asincrona → **`createSupabaseServerClient()` è `async`**
+  e tutti i 107 punti di chiamata fanno `await` (`src/lib/supabase/server.ts` e
+  `middleware.ts` passati all'API `getAll/setAll`); i due alias
+  `ReturnType<typeof createSupabaseServerClient>` sono `Awaited<…>`; con
+  `typedRoutes` stabile (`next.config.js`: `typedRoutes: true`, non più
+  `experimental`) i tre `redirect(hrefPaginaUno(…))` castano `as Route`;
+  `agentRules: false` (Next 16 genera un `AGENTS.md` all'avvio del dev server: qui
+  c'è CLAUDE.md); `next-env.d.ts` ora è **generato e ignorato da git** (cambia tra
+  `.next/dev/types` e `.next/types`), e `npm run typecheck` = `next typegen && tsc
+  --noEmit`; `tsconfig.json` aggiornato da Next (`jsx: react-jsx`, include di
+  `.next/dev/types`).
+- *Lint nuovo (react-hooks 7, regole del React Compiler)*: 8 errori sistemati —
+  `Date.now()` durante la resa (`AgendaList`, `SessioniList`, `ProfiloForm`) fissato
+  con `useState(() => …)`; `Lezioni.tsx` riallinea l'ordine con lo schema "stato
+  della resa precedente" invece del ref; i tre `setState` dentro `useEffect`
+  voluti (avviso dall'URL nel login, tema da localStorage, casella di ricerca che
+  segue l'URL) hanno `eslint-disable-next-line react-hooks/set-state-in-effect`
+  con il motivo. `--fix` ha tolto 4 direttive `eslint-disable` ormai inutili.
+- *Verifiche*: typecheck 0, lint 0, unit 39/39, fase4 15/15, build **Turbopack** ok
+  (52 route, "ƒ Proxy (Middleware)"; anche `next build --webpack` passa), smoke E2E
+  **99/99** con 0 errori JS sul dev server Next 16, `scratchpad/pw/funcC.mjs` 37/37,
+  PDF (`pdf-lib`) e badge 1200×1200 e 1200×630 (`ImageResponse`) dell'attestato del
+  discente demo 200 con i byte attesi (`scratchpad/pw/next16_attestato.mjs`).
+  `npm audit --omit=dev` → **0 vulnerabilità**. Vercel ha Node 24 (richiesto ≥ 20.9).
+  **Trabocchetto**: la prima build Turbopack nel container è fallita con "next/font/
+  google queries have exactly one entry" (scaricamento dei font via proxy): al
+  secondo tentativo, anche da `.next` pulita, passa; su Vercel non c'è il proxy.
+  Gli script `func6.mjs`/`func7.mjs` dello scratchpad sono **obsoleti** (pulsante
+  Salva disabilitato perché i dati di nascita ci sono già; sezione "modello
+  specifico" spostata in `/admin/corsi/[id]/attestato` dall'ondata A), non sono
+  regressioni.
+- **Da provare nel browser dopo il deploy**: login e logout, player video fino a
+  fine lezione, test finale, PDF/badge/LinkedIn dell'attestato, area admin (form e
+  azioni che scrivono), tema scuro. Poi **merge su `main` solo con autorizzazione
+  esplicita**.
+
 ## Area admin — ondate A, B e C (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` dal 2026-10-20 sera** con il via libera dell'utente "Vai": fast-forward `e855143..4385cf9`, 9 commit; scritture verificate sul deploy, vedi in fondo all'ondata C)
 
 Richiesta dell'utente: "contenuti" come lista piatta non ha senso, i webinar stanno allo
@@ -428,7 +484,7 @@ senza merge):**
   restano (il player le usa) e danno lo stesso risultato (confronto sul live come
   auditor: 8 iscrizioni, 0 differenze, `scratchpad/confronto.ts`). Non è una funzione
   SQL: la ricostruzione dei tratti video (`lib/visione.ts`) resta in TS.
-- *Fail-fast* — `src/middleware.ts`: POST/PATCH/PUT/DELETE su `/api/admin/*`,
+- *Fail-fast* — `src/middleware.ts` (dal 2026-10-21 `src/proxy.ts`, Next 16): POST/PATCH/PUT/DELETE su `/api/admin/*`,
   `/api/events/*`, `/api/profilo/*` rispondono **503** se manca
   `SUPABASE_SERVICE_ROLE_KEY` (prima: modifica al DB fatta, Evento non scritto);
   `/api/admin/attestati/anteprima` (sola lettura) è esclusa. `/api/auth/*` non è
@@ -1516,15 +1572,13 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 > 4. Dal doc di analisi restano idee non pianificate (non richieste): selettori a ricerca
 >    nei form della rendicontazione, azioni in blocco su altre liste. Niente altro di
 >    aperto sull'area admin. Il resto delle note qui sotto resta valido.
-> 5. **Dipendenze (2026-10-21).** `npm audit fix` applicato sul branch (solo lockfile:
->    `nanoid` 3.3.12→3.3.20, `source-map-js`→1.2.2, `esbuild` 0.28.2 e altri patch;
->    typecheck/lint/unit 39/fase4 15/build invariati). **Restano 2 vulnerabilità** che
->    si chiudono solo passando a **Next 16.4** (`next` 14.2.15 critical: DoS via Server
->    Actions + origine del dev server; `postcss` 8.4.31 high, trascinata da Next):
->    è un aggiornamento con rotture (App Router: `params`/`searchParams` asincroni,
->    `middleware` → `proxy`, caching esplicito, ESLint 9+, `@supabase/ssr` 0.12) → va
->    fatto in una **sessione dedicata** con la smoke E2E 99/99 come rete, non in coda a
->    un'altra attività. Da non fare da soli: `npm audit fix --force`.
+> 5. **Dipendenze (2026-10-21).** `npm audit fix` (lockfile: `nanoid`, `source-map-js`,
+>    patch transitivi) è su `main` (`1aea271`). Poi, su richiesta dell'utente ("procedi
+>    tu"), **aggiornamento a Next 16.4 / React 19** fatto sul branch (vedi la sezione
+>    "Next 16" in testa al file): `npm audit --omit=dev` = **0 vulnerabilità**. Il
+>    branch è **da portare su `main` solo con via libera esplicito**; dopo il deploy
+>    l'utente provi nel browser login, player video, PDF/badge dell'attestato e l'area
+>    admin.
 >
 > **Aggiornamento 2026-10-20 sera (leggere per primo).** Tutto il branch
 > `claude/affectionate-hawking-03ev7i` è su `main` (fast-forward autorizzato

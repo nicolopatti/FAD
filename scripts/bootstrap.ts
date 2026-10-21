@@ -286,7 +286,7 @@ function required(name: string): string {
 }
 
 function log(...args: unknown[]) {
-  // eslint-disable-next-line no-console
+   
   console.log('[bootstrap]', ...args);
 }
 

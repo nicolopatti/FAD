@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (!snapshotId) {
     return NextResponse.json({ ok: false, error: 'snapshot mancante' }, { status: 400 });
   }
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: snap } = await supabase
     .from('report_fondo_depositato')
     .select('formato, contenuto')

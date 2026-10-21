@@ -1,3 +1,4 @@
+import type { Route } from 'next';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -12,12 +13,13 @@ export const dynamic = 'force-dynamic';
 type Params = { q?: string; pagina?: string; nuova?: string };
 
 /** Aziende dei discenti (per la rendicontazione): lista paginata, doppioni da unire. */
-export default async function AziendePage({ searchParams }: { searchParams?: Params }) {
+export default async function AziendePage(props: { searchParams?: Promise<Params> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin();
   const sp = searchParams ?? {};
   const q = (sp.q ?? '').trim().slice(0, 80);
   const pagina = parsePagina(sp.pagina);
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   let query = supabase.from('azienda_riepilogo').select('*', { count: 'exact' }).order('ragione_sociale');
   if (q) {
@@ -31,7 +33,7 @@ export default async function AziendePage({ searchParams }: { searchParams?: Par
     supabase.from('azienda').select('id', { count: 'exact', head: true }),
     supabase.from('azienda').select('id', { count: 'exact', head: true }).is('partita_iva', null),
   ]);
-  if (fuoriIntervallo(righeR.error)) redirect(hrefPaginaUno('/admin/aziende', sp));
+  if (fuoriIntervallo(righeR.error)) redirect(hrefPaginaUno('/admin/aziende', sp) as Route);
   const righe = unwrap(righeR, 'le aziende');
 
   return (

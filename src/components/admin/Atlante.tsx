@@ -100,7 +100,7 @@ export function Cover({
     return (
       <div className={cls} style={style}>
         {/* copertina caricata dall'utente (bucket pubblico copertine) */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        { }
         <img src={src} alt="" />
       </div>
     );

@@ -10,12 +10,13 @@ type Body = { piano_id?: string | null };
  * il piano a tutti). Le eccezioni per singolo iscritto si fanno dalla scheda
  * Iscritti. Un solo Evento per l'operazione, senza PII.
  */
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as Body | null;
   if (!body || body.piano_id === undefined) return NextResponse.json({ ok: false, error: 'piano_id mancante (null per togliere)' }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: edizione } = await supabase.from('edizione').select('id').eq('id', params.id).maybeSingle();
   if (!edizione) return NextResponse.json({ ok: false, error: 'edizione non trovata' }, { status: 404 });
 

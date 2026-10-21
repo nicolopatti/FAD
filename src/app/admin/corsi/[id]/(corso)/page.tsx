@@ -12,9 +12,10 @@ export const dynamic = 'force-dynamic';
 type StrutturaMini = { learning_object: { type: string; config: Record<string, unknown> } | null; obbligatorio: boolean };
 
 /** Panoramica del corso: copertina, descrizione, numeri, edizioni attive con prontezza. */
-export default async function CorsoPanoramicaPage({ params }: { params: { id: string } }) {
+export default async function CorsoPanoramicaPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: corso } = await supabase
     .from('corso')

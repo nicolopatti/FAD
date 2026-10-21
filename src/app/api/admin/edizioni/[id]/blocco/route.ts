@@ -21,7 +21,8 @@ const MAX = 500;
  *  - attestato: emette l'attestato a chi risulta idoneo e non ne ha uno valido
  *  - rimuovi:   toglie l'iscrizione (la persona resta in anagrafica)
  */
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as Body | null;
   if (!body || !body.azione || !AZIONI.has(body.azione)) return NextResponse.json({ ok: false, error: 'azione non valida' }, { status: 400 });
@@ -29,7 +30,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!ids.length) return NextResponse.json({ ok: false, error: 'nessun iscritto selezionato' }, { status: 400 });
   if (ids.length > MAX) return NextResponse.json({ ok: false, error: `al massimo ${MAX} iscritti per volta` }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: iscrizioni, error } = await supabase
     .from('iscrizione')
     .select('id, edizione_id, persona_id, piano_id, persona:persona_id ( id, email, nome, auth_user_id )')

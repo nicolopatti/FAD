@@ -1,3 +1,4 @@
+import type { Route } from 'next';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -15,14 +16,15 @@ type Params = { q?: string; accesso?: string; ruolo?: string; pagina?: string };
  * Anagrafica delle persone del tenant (discenti, docenti, tutor): lista
  * filtrata e paginata sul server sulla vista `persona_riepilogo`.
  */
-export default async function PersonePage({ searchParams }: { searchParams?: Params }) {
+export default async function PersonePage(props: { searchParams?: Promise<Params> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin();
   const sp = searchParams ?? {};
   const q = (sp.q ?? '').trim().slice(0, 80);
   const accesso: AccessoF = sp.accesso === 'si' || sp.accesso === 'no' ? sp.accesso : 'tutti';
   const ruolo = sp.ruolo === 'docenti' ? 'docenti' : sp.ruolo === 'senza' ? 'senza' : 'tutti';
   const pagina = parsePagina(sp.pagina);
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   let query = supabase.from('persona_riepilogo').select('*', { count: 'exact' }).order('cognome').order('nome');
   if (q) {
@@ -41,7 +43,7 @@ export default async function PersonePage({ searchParams }: { searchParams?: Par
     supabase.from('azienda').select('id', { count: 'exact', head: true }),
     supabase.from('persona').select('id', { count: 'exact', head: true }).is('auth_user_id', null),
   ]);
-  if (fuoriIntervallo(righeR.error)) redirect(hrefPaginaUno('/admin/persone', sp));
+  if (fuoriIntervallo(righeR.error)) redirect(hrefPaginaUno('/admin/persone', sp) as Route);
   const righe = unwrap(righeR, 'le persone');
 
   return (

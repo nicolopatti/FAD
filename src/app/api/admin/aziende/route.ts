@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const v = campiAzienda(body, false);
   if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from('azienda').insert({ tenant_id: session.tenantId, ...v.updates }).select(AZIENDA_SELECT).single<AziendaRow>();
   if (error) return NextResponse.json({ ok: false, error: erroreAzienda(error) }, { status: 400 });
   await appendEvent({

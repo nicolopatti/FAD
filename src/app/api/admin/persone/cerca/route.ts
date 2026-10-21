@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   await requireAdmin();
   const url = new URL(request.url);
   const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   let query = supabase
     .from('persona_riepilogo')

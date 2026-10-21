@@ -8,7 +8,7 @@ import { pulisciNomeCategoria } from '@/lib/anagrafiche';
 /** Elenco delle categorie del tenant (per i selettori). */
 export async function GET() {
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from('categoria').select('id, tenant_id, nome, ordine, creato_il').order('ordine').order('nome').returns<CategoriaRow[]>();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true, categorie: data ?? [] });
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const nome = pulisciNomeCategoria(body?.nome);
   if (!nome) return NextResponse.json({ ok: false, error: 'nome non valido (1–60 caratteri)' }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: max } = await supabase.from('categoria').select('ordine').order('ordine', { ascending: false }).limit(1).maybeSingle<{ ordine: number }>();
   const { data, error } = await supabase
     .from('categoria')

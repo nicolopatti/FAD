@@ -16,9 +16,10 @@ type IscrizioneJoin = {
   piano: { titolo: string } | null;
 };
 
-export default async function EdizioneIscrittiPage({ params }: { params: { id: string; edizioneId: string } }) {
+export default async function EdizioneIscrittiPage(props: { params: Promise<{ id: string; edizioneId: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: ed } = await supabase
     .from('edizione')
     .select('id, codice, concluso_at, annullato_at, corso:corso_id ( politica_attestato )')

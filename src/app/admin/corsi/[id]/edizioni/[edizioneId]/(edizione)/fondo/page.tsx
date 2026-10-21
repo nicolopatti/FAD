@@ -9,9 +9,10 @@ export const dynamic = 'force-dynamic';
 
 type EdMini = { id: string; concluso_at: string | null; annullato_at: string | null; corso: { soglia_frequenza_percentuale: number | null } | null };
 
-export default async function EdizioneFondoPage({ params }: { params: { id: string; edizioneId: string } }) {
+export default async function EdizioneFondoPage(props: { params: Promise<{ id: string; edizioneId: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: ed } = await supabase.from('edizione').select('id, concluso_at, annullato_at, corso:corso_id ( soglia_frequenza_percentuale )').eq('id', params.edizioneId).eq('corso_id', params.id).maybeSingle<EdMini>();
   if (!ed) notFound();
 

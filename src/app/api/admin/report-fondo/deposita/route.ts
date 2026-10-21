@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: `formato sconosciuto: ${formato}` }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const dataset = await computeReportFondoDataset(supabase, body.edizione, body.piano);
   if (!dataset) {
     return NextResponse.json({ ok: false, error: 'edizione/piano non leggibili (RLS o inesistenti)' }, { status: 404 });

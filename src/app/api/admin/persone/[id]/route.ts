@@ -15,7 +15,8 @@ type Body = {
  * l'identità di accesso solo nella nostra anagrafica: l'utente Auth, se c'è,
  * resta collegato per id e continua a entrare con la sua email.
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as Body | null;
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
@@ -38,7 +39,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.luogo_nascita !== undefined) updates.luogo_nascita = txt(body.luogo_nascita, 120) || null;
   if (!Object.keys(updates).length) return NextResponse.json({ ok: false, error: 'nessun campo da aggiornare' }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from('persona').update(updates).eq('id', params.id).select('id').maybeSingle();
   if (error) {
     const msg = error.code === '23505' ? 'Esiste già una persona con questa email.' : error.message;

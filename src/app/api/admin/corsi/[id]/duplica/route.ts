@@ -7,9 +7,10 @@ import { appendEvent } from '@/lib/audit';
 // struttura (ordine, obbligatorietà, regola) che punta agli stessi contenuti
 // della libreria. Niente edizioni né iscritti: il duplicato non è congelato e
 // si può modificare. La copertina viene copiata nello Storage se presente.
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: orig } = await supabase
     .from('corso')

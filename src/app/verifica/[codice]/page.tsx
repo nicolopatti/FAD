@@ -27,8 +27,9 @@ type Esito = {
 
 // Pagina pubblica, senza accesso: chi ha il codice (QR sull'attestato) vede i
 // soli campi pubblici restituiti da `attestato_verifica` (RPC eseguibile da anon).
-export default async function VerificaPage({ params }: { params: { codice: string } }) {
-  const supabase = createSupabaseServerClient();
+export default async function VerificaPage(props: { params: Promise<{ codice: string }> }) {
+  const params = await props.params;
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase.rpc('attestato_verifica', { p_codice: params.codice.toLowerCase() });
   const e = (data ?? { trovato: false }) as Esito;
 

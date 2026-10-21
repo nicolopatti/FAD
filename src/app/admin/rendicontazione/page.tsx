@@ -19,13 +19,14 @@ type ComboRow = {
   piano: { id: string; titolo: string; fondo: string | null; cup: string | null } | null;
 };
 
-export default async function ReportFondoPage({
-  searchParams,
-}: {
-  searchParams: { edizione?: string; piano?: string; formato?: string };
-}) {
+export default async function ReportFondoPage(
+  props: {
+    searchParams: Promise<{ edizione?: string; piano?: string; formato?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const edizioneId = searchParams.edizione;
   const pianoId = searchParams.piano;

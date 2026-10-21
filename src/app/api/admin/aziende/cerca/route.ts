@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
   const escludi = url.searchParams.get('escludi') ?? '';
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   let query = supabase.from('azienda_riepilogo').select('id, ragione_sociale, partita_iva, sede_comune, n_iscrizioni').order('ragione_sociale').limit(LIMITE + 1);
   if (q) {

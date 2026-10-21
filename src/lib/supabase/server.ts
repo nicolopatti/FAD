@@ -1,28 +1,26 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-export function createSupabaseServerClient() {
-  const cookieStore = cookies();
+/**
+ * Client Supabase con la sessione dell'utente (cookie). Da Next 16 `cookies()`
+ * è asincrona, quindi lo è anche questa funzione: `await createSupabaseServerClient()`.
+ */
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
+        setAll(cookiesToSet) {
           try {
-            cookieStore.set({ name, value, ...options });
+            for (const { name, value, options } of cookiesToSet) cookieStore.set(name, value, options);
           } catch {
-            // Read-only contesti (RSC). Il refresh avviene nel middleware.
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options });
-          } catch {
-            // come sopra
+            // Contesti di sola lettura (Server Component): il refresh della
+            // sessione avviene nel proxy (ex middleware).
           }
         },
       },

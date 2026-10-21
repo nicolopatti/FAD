@@ -14,7 +14,7 @@ type Row = {
 // Elenco degli attestati del tenant (validi e sostituiti), con ricerca e PDF.
 export default async function AttestatiPage() {
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const righe = unwrap(await supabase
     .from('attestato')
     .select('id, numero, codice_verifica, emesso_at, emesso_da, sostituito_da, sostituisce, contenuto')

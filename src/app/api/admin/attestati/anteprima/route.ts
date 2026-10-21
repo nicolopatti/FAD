@@ -16,7 +16,7 @@ type Body = { modello?: unknown; corso_id?: string | null; ambito?: 'ente' | 'co
 export async function POST(request: Request) {
   const session = await requireAdmin();
   const body = (await request.json().catch(() => ({}))) as Body;
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: t } = await supabase
     .from('tenant')
     .select('nome, ragione_sociale, citta, firmatario_nome, firmatario_ruolo, logo_path, firma_path, linkedin_organization_id, attestato_modello')

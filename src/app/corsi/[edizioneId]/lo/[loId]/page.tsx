@@ -34,9 +34,10 @@ function durataLabel(config: Record<string, unknown>): string | null {
   return `${m} min${sec ? ` ${sec} s` : ''}`;
 }
 
-export default async function LearningObjectPage({ params }: { params: { edizioneId: string; loId: string } }) {
+export default async function LearningObjectPage(props: { params: Promise<{ edizioneId: string; loId: string }> }) {
+  const params = await props.params;
   const session = await requireSession();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: iscrizione } = await supabase
     .from('iscrizione')

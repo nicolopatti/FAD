@@ -4,14 +4,15 @@ import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 import { addIscritto, type IscrittoInput } from '@/lib/iscritti';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as { rows?: IscrittoInput[] } | null;
   if (!body || !Array.isArray(body.rows)) {
     return NextResponse.json({ ok: false, error: 'rows mancante' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const ctx = { tenantId: session.tenantId, personaId: session.personaId };
 
   let creati = 0;

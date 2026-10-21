@@ -74,7 +74,7 @@ function activityView(ev: EventoMini): { ico: string; node: React.ReactNode } | 
  */
 export default async function AdminDashboard() {
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const now = new Date();
   const tra7 = new Date(now.getTime() + 7 * 86400000);
 

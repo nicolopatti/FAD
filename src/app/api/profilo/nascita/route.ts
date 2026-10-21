@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const data = body.data_nascita?.trim() || null;
   if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) return NextResponse.json({ ok: false, error: 'data non valida' }, { status: 400 });
   const luogo = body.luogo_nascita?.trim() || null;
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc('persona_aggiorna_nascita', { p_data_nascita: data, p_luogo_nascita: luogo });
   if (error) return NextResponse.json({ ok: false, error: error.message.replace(/^persona_aggiorna_nascita: /, '') }, { status: 400 });
   return NextResponse.json({ ok: true });

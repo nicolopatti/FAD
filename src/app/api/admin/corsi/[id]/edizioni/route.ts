@@ -15,10 +15,8 @@ function isIsoDate(v: unknown): v is string {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as CreateBody | null;
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
@@ -38,7 +36,7 @@ export async function POST(
     payload[k] = v;
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from('edizione')
     .insert(payload)

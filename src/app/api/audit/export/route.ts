@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   await requireAuditor();
   const url = new URL(request.url);
   const filtri = parseFiltri(url.searchParams);
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const righe: string[] = [
     ['seq', 'occurred_at', 'event_type', 'actor_persona_id', 'actor_type', 'subject_type', 'subject_id', 'payload', 'prev_hash', 'hash'].join(';'),

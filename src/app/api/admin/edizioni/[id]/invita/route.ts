@@ -5,9 +5,10 @@ import { invitaPersona, type PersonaDaInvitare } from '@/lib/inviti';
 
 // Invita tutti gli iscritti dell'edizione che non hanno ancora un accesso.
 // Uno alla volta (il mailer ha limiti): gli errori non fermano gli altri.
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: iscrizioni, error } = await supabase
     .from('iscrizione')
     .select('id, persona:persona_id ( id, email, nome, auth_user_id )')

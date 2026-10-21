@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   if (!streamId) {
     return NextResponse.json({ ok: false, error: 'stream_id mancante' }, { status: 400 });
   }
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const [{ data, error }, { count }, { data: testa }] = await Promise.all([
     supabase.rpc('audit_verify_chain', { p_stream_id: streamId }),
     supabase.from('evento').select('id', { count: 'exact', head: true }).eq('stream_id', streamId),

@@ -8,17 +8,15 @@ import type { LearningObjectRow } from '@/lib/db-types';
 // una volta e lo tiene in memoria.
 const SIGNED_URL_TTL_SECONDS = 3600;
 
-export async function GET(
-  request: Request,
-  { params }: { params: { loId: string } },
-) {
+export async function GET(request: Request, props: { params: Promise<{ loId: string }> }) {
+  const params = await props.params;
   const url = new URL(request.url);
   const iscrizioneId = url.searchParams.get('iscrizione_id');
   if (!iscrizioneId) {
     return NextResponse.json({ ok: false, error: 'iscrizione_id mancante' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 

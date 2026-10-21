@@ -90,11 +90,11 @@ function Sequenza({
   const [order, setOrder] = useState<string[]>(serverIds);
   const [drag, setDrag] = useState<string | null>(null);
   const [target, setTarget] = useState<string | null>(null);
-  const lastKey = useRef(serverKey);
-
-  // Riallinea l'ordine locale quando cambia la membership (aggiunta/rimozione dal server).
-  if (lastKey.current !== serverKey) {
-    lastKey.current = serverKey;
+  // Riallinea l'ordine locale quando cambia la membership (aggiunta/rimozione dal
+  // server): schema "stato derivato dalla resa precedente" di React, senza ref.
+  const [lastKey, setLastKey] = useState(serverKey);
+  if (lastKey !== serverKey) {
+    setLastKey(serverKey);
     setOrder(serverIds);
   }
 

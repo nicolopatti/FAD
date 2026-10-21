@@ -3,12 +3,13 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { addIscritto, type IscrittoInput } from '@/lib/iscritti';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as IscrittoInput | null;
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const res = await addIscritto(supabase, { tenantId: session.tenantId, personaId: session.personaId }, params.id, body);
 
   if (res.status === 'error') return NextResponse.json({ ok: false, error: res.error }, { status: 400 });

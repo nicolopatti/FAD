@@ -15,7 +15,7 @@ export type ContenutoTrovato = {
 
 const LIMITE = 30;
 
-async function conUtilizzo(supabase: ReturnType<typeof createSupabaseServerClient>, righe: Omit<ContenutoTrovato, 'usato_in'>[]): Promise<ContenutoTrovato[]> {
+async function conUtilizzo(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, righe: Omit<ContenutoTrovato, 'usato_in'>[]): Promise<ContenutoTrovato[]> {
   if (righe.length === 0) return [];
   const usi = unwrap(await supabase.from('struttura_corso').select('learning_object_id').in('learning_object_id', righe.map((r) => r.id)), 'l’utilizzo dei contenuti');
   const n = new Map<string, number>();
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   const q = (url.searchParams.get('q') ?? '').trim();
   const tipo = url.searchParams.get('tipo');
   const escludi = url.searchParams.get('escludi_corso');
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   let query = supabase
     .from('learning_object')
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { titoli?: unknown } | null;
   const titoli = Array.isArray(body?.titoli) ? body!.titoli.filter((t): t is string => typeof t === 'string').map((t) => t.trim()).filter(Boolean).slice(0, 500) : [];
   if (titoli.length === 0) return NextResponse.json({ ok: true, trovati: {} });
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const righe = unwrap(await supabase.from('learning_object').select('id, type, titolo').is('archiviato_at', null).in('titolo', titoli), 'la libreria');
   const trovati: Record<string, { id: string; type: LearningObjectType }> = {};
   for (const r of righe) trovati[(r.titolo as string).toLowerCase().trim()] = { id: r.id as string, type: r.type as LearningObjectType };

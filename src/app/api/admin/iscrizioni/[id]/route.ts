@@ -9,13 +9,14 @@ type UpdateBody = {
 
 // Assegnazione (o rimozione) del Piano finanziato a un'iscrizione. Il Piano
 // deve esistere nel tenant (RLS `piano_read`). Evento senza PII: solo UUID.
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as UpdateBody | null;
   if (!body || body.piano_id === undefined) {
     return NextResponse.json({ ok: false, error: 'piano_id mancante' }, { status: 400 });
   }
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const pianoId = typeof body.piano_id === 'string' && body.piano_id ? body.piano_id : null;
   if (pianoId) {
@@ -44,9 +45,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ ok: true, iscrizione: data });
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   // Recupera l'iscrizione (per il payload dell'Evento, senza PII).
   const { data: isc } = await supabase

@@ -7,9 +7,10 @@ import { Lezioni } from '../../_components/Lezioni';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CorsoLezioniPage({ params }: { params: { id: string } }) {
+export default async function CorsoLezioniPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: corso } = await supabase
     .from('corso')

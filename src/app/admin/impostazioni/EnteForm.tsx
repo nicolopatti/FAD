@@ -95,7 +95,7 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
             <div className="field">
               <label>Logo</label>
               <div className="dropzone dropzone--filled" style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 {logo ? <img src={logo} alt="Logo dell'ente" style={{ maxHeight: 96, maxWidth: '90%', objectFit: 'contain' }} /> : <span className="muted">Nessun logo</span>}
               </div>
               <div className="row" style={{ marginTop: 8 }}>
@@ -108,7 +108,7 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
             <div className="field">
               <label>Firma (immagine)</label>
               <div className="dropzone dropzone--filled" style={{ height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 {firma ? <img src={firma} alt="Firma" style={{ maxHeight: 70, maxWidth: '90%', objectFit: 'contain' }} /> : <span className="muted">Nessuna firma: resta la riga con nome e ruolo</span>}
               </div>
               <div className="row" style={{ marginTop: 8 }}>

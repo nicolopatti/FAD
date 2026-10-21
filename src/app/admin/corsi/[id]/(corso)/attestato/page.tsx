@@ -11,9 +11,10 @@ export const dynamic = 'force-dynamic';
 type EnteMini = { nome: string; ragione_sociale: string | null; citta: string | null; firmatario_nome: string | null; firmatario_ruolo: string | null; logo_path: string | null; firma_path: string | null; attestato_modello: unknown };
 
 /** Scheda "Attestato" del corso: dati (ore, riferimento, rilascio) e modello grafico. */
-export default async function CorsoAttestatoPage({ params }: { params: { id: string } }) {
+export default async function CorsoAttestatoPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: corso } = await supabase
     .from('corso')

@@ -7,10 +7,11 @@ import type { AttestatoRow } from '@/lib/db-types';
 // Emissione manuale dell'attestato (politica `manuale`, o riemissione con
 // motivazione quando ne esiste già uno valido: il precedente viene marcato
 // sostituito, mai modificato). Richiede l'idoneità ricalcolata adesso.
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => ({}))) as { motivazione?: string | null };
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: iscr } = await supabase.from('iscrizione').select('id').eq('id', params.id).maybeSingle();
   if (!iscr) return NextResponse.json({ ok: false, error: 'iscrizione non trovata' }, { status: 404 });
   const { data: valido } = await supabase.from('attestato').select('id, numero').eq('iscrizione_id', params.id).is('sostituito_da', null).maybeSingle<Pick<AttestatoRow, 'id' | 'numero'>>();

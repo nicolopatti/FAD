@@ -39,6 +39,8 @@ export function RicercaUrl({ placeholder, label }: { placeholder: string; label:
   const iniziale = params?.get('q') ?? '';
   const [q, setQ] = useState(iniziale);
   const ultimo = useRef(iniziale);
+  // Se l'URL cambia da fuori (link, indietro), la casella si riallinea.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setQ(iniziale); ultimo.current = iniziale; }, [iniziale]);
   useEffect(() => {
     if (q === ultimo.current) return;

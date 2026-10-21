@@ -11,9 +11,10 @@ export const dynamic = 'force-dynamic';
 
 type Filtro = 'tutti' | 'in_corso' | 'completati';
 
-export default async function MieiCorsiPage({ searchParams }: { searchParams?: { filtro?: string } }) {
+export default async function MieiCorsiPage(props: { searchParams?: Promise<{ filtro?: string }> }) {
+  const searchParams = await props.searchParams;
   const session = await requireSession();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const filtro: Filtro =
     searchParams?.filtro === 'in_corso' || searchParams?.filtro === 'completati' ? searchParams.filtro : 'tutti';
 

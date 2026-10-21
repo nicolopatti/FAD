@@ -1,3 +1,4 @@
+import type { Route } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth-context';
@@ -18,7 +19,8 @@ type Params = { q?: string; stato?: string; categoria?: string; ordine?: string;
  * vista `corso_riepilogo` (conteggi già calcolati). I corsi archiviati
  * compaiono solo nel filtro "Archiviati".
  */
-export default async function CorsiListPage({ searchParams }: { searchParams?: Params }) {
+export default async function CorsiListPage(props: { searchParams?: Promise<Params> }) {
+  const searchParams = await props.searchParams;
   await requireAdmin();
   const sp = searchParams ?? {};
   const q = (sp.q ?? '').trim().slice(0, 80);
@@ -26,7 +28,7 @@ export default async function CorsiListPage({ searchParams }: { searchParams?: P
   const categoria = (sp.categoria ?? '').trim();
   const ordine: OrdineF = sp.ordine === 'titolo' || sp.ordine === 'iscritti' ? sp.ordine : 'recenti';
   const pagina = parsePagina(sp.pagina);
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   let query = supabase.from('corso_riepilogo').select('*', { count: 'exact' });
   if (stato === 'tutti') query = query.is('archiviato_at', null);
@@ -48,7 +50,7 @@ export default async function CorsiListPage({ searchParams }: { searchParams?: P
     supabase.from('categoria').select('nome').order('ordine').order('nome'),
     supabase.from('learning_object').select('id', { count: 'exact', head: true }).is('archiviato_at', null),
   ]);
-  if (fuoriIntervallo(righeR.error)) redirect(hrefPaginaUno('/admin/corsi', sp));
+  if (fuoriIntervallo(righeR.error)) redirect(hrefPaginaUno('/admin/corsi', sp) as Route);
   const righe = unwrap(righeR, 'i corsi');
   const totale = righeR.count ?? righe.length;
   const conteggi = { attivo: attivi.count ?? 0, bozza: bozze.count ?? 0, concluso: conclusi.count ?? 0, archiviato: archiviati.count ?? 0 };

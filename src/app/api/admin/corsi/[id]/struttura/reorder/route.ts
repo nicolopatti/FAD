@@ -7,10 +7,8 @@ type ReorderBody = {
   ordered_struttura_ids?: string[];
 };
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as ReorderBody | null;
   if (!body || !Array.isArray(body.ordered_struttura_ids)) {
@@ -20,7 +18,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: 'array non valido' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc('reorder_struttura', {
     p_corso_id: params.id,
     p_ordered_struttura_ids: body.ordered_struttura_ids,

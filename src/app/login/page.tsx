@@ -38,6 +38,8 @@ export default function LoginPage() {
     // Letto dal browser per non richiedere un confine Suspense su useSearchParams.
     const p = new URLSearchParams(window.location.search);
     const a = p.get('errore') ?? p.get('info');
+    // Lettura una tantum dall'URL dopo il montaggio (non è uno stato derivato).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (a && AVVISI[a]) setAvviso(AVVISI[a]);
   }, []);
 

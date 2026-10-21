@@ -4,9 +4,10 @@ import { requireAdmin } from '@/lib/auth-context';
 import { invitaPersona, type PersonaDaInvitare } from '@/lib/inviti';
 
 // Invito di una singola Persona del tenant (RLS: l'admin legge solo le proprie).
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: persona } = await supabase
     .from('persona')
     .select('id, email, nome, auth_user_id')

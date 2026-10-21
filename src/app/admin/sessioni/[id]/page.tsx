@@ -5,9 +5,10 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 /** Indirizzo vecchio (/admin/sessioni/<id>): la sessione ora vive sotto la sua edizione. */
-export default async function SessioneRedirectPage({ params }: { params: { id: string } }) {
+export default async function SessioneRedirectPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from('sessione')
     .select('id, edizione:edizione_id ( id, corso_id )')

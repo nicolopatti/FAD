@@ -19,10 +19,8 @@ type UpdateBody = {
 
 const POLITICHE = new Set(['automatica', 'manuale', 'nessuna']);
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } },
-) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireAdmin();
   const body = (await request.json().catch(() => null)) as UpdateBody | null;
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
@@ -73,7 +71,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: 'nessun campo da aggiornare' }, { status: 400 });
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from('corso')
     .update(updates)

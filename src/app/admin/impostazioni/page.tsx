@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // Dati dell'ente emittente e modello predefinito degli attestati.
 export default async function EntePage() {
   const session = await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: ente } = await supabase
     .from('tenant')
     .select('id, nome, ragione_sociale, logo_path, firmatario_nome, firmatario_ruolo, firma_path, citta, linkedin_organization_id, attestato_modello')

@@ -12,7 +12,7 @@ type EdMini = { corso_id: string; concluso_at: string | null; annullato_at: stri
 /** Libreria dei contenuti, scheda della voce Corsi: per corso di utilizzo o in elenco. */
 export default async function LearningObjectsListPage() {
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const [loR, strutturaR, corsiR, edizioniR] = await Promise.all([
     supabase.from('learning_object').select('id, tenant_id, type, titolo, config, archiviato_at, creato_il').order('creato_il', { ascending: false }).returns<LearningObjectRow[]>(),

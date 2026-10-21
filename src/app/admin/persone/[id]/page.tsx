@@ -21,9 +21,10 @@ type IncJoin = { id: string; ruolo: IncaricoRuolo; edizione: { id: string; codic
 type AttMini = { id: string; numero: string; emesso_at: string; iscrizione_id: string; corso: { titolo: string } | null };
 
 /** Scheda di una persona: anagrafica modificabile, accesso, iscrizioni, incarichi, attestati. */
-export default async function PersonaPage({ params }: { params: { id: string } }) {
+export default async function PersonaPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdmin();
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: p } = await supabase.from('persona_riepilogo').select('*').eq('id', params.id).maybeSingle<PersonaRiepilogo>();
   if (!p) notFound();
 

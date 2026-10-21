@@ -42,7 +42,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: false, error: 'L’ID della pagina LinkedIn è un numero (lo trovi nell’URL della pagina aziendale su LinkedIn).' }, { status: 400 });
   }
   if (Object.keys(updates).length === 0) return NextResponse.json({ ok: false, error: 'nessun campo' }, { status: 400 });
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from('tenant').update(updates).eq('id', session.tenantId).select('id').maybeSingle();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   if (!data) return NextResponse.json({ ok: false, error: 'ente non aggiornato' }, { status: 403 });
