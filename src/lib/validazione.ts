@@ -71,3 +71,23 @@ export function conflittiIdentita(
   else if (cf && !ecf) out.push('codice_fiscale_nuovo');
   return out;
 }
+
+export type DateEdizione = { data_inizio?: string | null; data_fine?: string | null; fad_apertura?: string | null; fad_chiusura?: string | null };
+
+/**
+ * Coerenza delle date di un'edizione (B1, stress test 21/10). Chiavi = campi
+ * del form. Ammesso: lezioni online aperte PRIMA dell'inizio del corso
+ * (materiale preparatorio). Non ammesso: fine prima dell'inizio, chiusura FAD
+ * prima dell'apertura, FAD che apre o chiude dopo la fine del corso, FAD che
+ * chiude prima che il corso inizi.
+ */
+export function erroriDateEdizione(d: DateEdizione): Errori {
+  const e: Errori = {};
+  const di = d.data_inizio || '', df = d.data_fine || '', fa = d.fad_apertura || '', fc = d.fad_chiusura || '';
+  if (dataDopo(di, df)) e.data_fine = 'La fine non può precedere l’inizio.';
+  if (dataDopo(fa, fc)) e.fad_chiusura = 'La chiusura non può precedere l’apertura.';
+  if (dataDopo(fa, df)) e.fad_apertura = 'Le lezioni online non possono aprire dopo la fine del corso.';
+  if (!e.fad_chiusura && dataDopo(fc, df)) e.fad_chiusura = 'Le lezioni online non possono chiudere dopo la fine del corso.';
+  if (!e.fad_chiusura && dataDopo(di, fc)) e.fad_chiusura = 'Le lezioni online non possono chiudere prima che il corso inizi.';
+  return e;
+}

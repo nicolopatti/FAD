@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
+import { erroriDateEdizione, primoErrore } from '@/lib/validazione';
 
 type UpdateBody = {
   codice?: string;
@@ -43,6 +44,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   }
 
   const supabase = await createSupabaseServerClient();
+  // B1: le date si controllano sul risultato finale (valori nuovi + quelli che restano).
+  const { data: attuale, error: errAtt } = await supabase.from('edizione').select('data_inizio, data_fine, fad_apertura, fad_chiusura').eq('id', params.id).maybeSingle();
+  if (errAtt) return NextResponse.json({ ok: false, error: errAtt.message }, { status: 400 });
+  if (!attuale) return NextResponse.json({ ok: false, error: 'Edizione non trovata.' }, { status: 404 });
+  const errDate = primoErrore(erroriDateEdizione({ ...attuale, ...updates } as Record<string, string | null>));
+  if (errDate) return NextResponse.json({ ok: false, error: errDate }, { status: 400 });
   const { data, error } = await supabase
     .from('edizione')
     .update(updates)

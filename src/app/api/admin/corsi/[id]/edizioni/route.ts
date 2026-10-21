@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
+import { erroriDateEdizione, primoErrore } from '@/lib/validazione';
 import { prontezzaCorso } from '@/lib/prontezza-corso';
 
 type CreateBody = {
@@ -36,6 +37,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (!isIsoDate(v)) return NextResponse.json({ ok: false, error: `${k} non è una data ISO YYYY-MM-DD` }, { status: 400 });
     payload[k] = v;
   }
+
+  // B1: date coerenti (stessa regola del form).
+  const errDate = primoErrore(erroriDateEdizione(payload as Record<string, string | null>));
+  if (errDate) return NextResponse.json({ ok: false, error: errDate }, { status: 400 });
 
   const supabase = await createSupabaseServerClient();
   // A3: la prima edizione congela anche le domande dei test. Un test obbligatorio

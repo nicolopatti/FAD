@@ -9,7 +9,7 @@ import { Field } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
 import { useCall } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
-import { dataDopo, type Errori } from '@/lib/validazione';
+import { erroriDateEdizione, type Errori } from '@/lib/validazione';
 import { edizioneHref } from './shared';
 import type { ProntezzaCorso } from '@/lib/prontezza-corso';
 
@@ -23,9 +23,7 @@ function validaEdizione(v: EdizioneForm, edizioni: EdizioneRow[], skipId?: strin
   const codice = v.codice.trim();
   if (!codice) e.codice = 'Indica un codice, es. ED-2026-01.';
   else if (edizioni.some((x) => x.id !== skipId && x.codice.toLowerCase() === codice.toLowerCase())) e.codice = 'Esiste già un\'edizione con questo codice.';
-  if (dataDopo(v.data_inizio, v.data_fine)) e.data_fine = 'La fine non può precedere l\'inizio.';
-  if (dataDopo(v.fad_apertura, v.fad_chiusura)) e.fad_chiusura = 'La chiusura non può precedere l\'apertura.';
-  return e;
+  return { ...e, ...erroriDateEdizione(v) };
 }
 
 export function EdizioneCampi({ v, errs, onChange, busy, prefix }: { v: EdizioneForm; errs: Errori; onChange: (v: EdizioneForm) => void; busy: boolean; prefix: string }) {
@@ -41,10 +39,10 @@ export function EdizioneCampi({ v, errs, onChange, busy, prefix }: { v: Edizione
       <Field id={`${prefix}-df`} label="Fine corso" error={errs.data_fine}>
         <input id={`${prefix}-df`} className="input" type="date" value={v.data_fine} onChange={set('data_fine')} disabled={busy} aria-invalid={Boolean(errs.data_fine)} />
       </Field>
-      <Field id={`${prefix}-fa`} label="Apertura FAD" hint="Da quando le lezioni online sono fruibili.">
-        <input id={`${prefix}-fa`} className="input" type="date" value={v.fad_apertura} onChange={set('fad_apertura')} disabled={busy} />
+      <Field id={`${prefix}-fa`} label="Apertura FAD" error={errs.fad_apertura} hint="Da quando le lezioni online sono fruibili. Vuota = dall’inizio del corso.">
+        <input id={`${prefix}-fa`} className="input" type="date" value={v.fad_apertura} onChange={set('fad_apertura')} disabled={busy} aria-invalid={Boolean(errs.fad_apertura)} />
       </Field>
-      <Field id={`${prefix}-fc`} label="Chiusura FAD" error={errs.fad_chiusura}>
+      <Field id={`${prefix}-fc`} label="Chiusura FAD" error={errs.fad_chiusura} hint="Vuota = fino alla fine del corso.">
         <input id={`${prefix}-fc`} className="input" type="date" value={v.fad_chiusura} onChange={set('fad_chiusura')} disabled={busy} aria-invalid={Boolean(errs.fad_chiusura)} />
       </Field>
     </>
