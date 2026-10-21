@@ -42,9 +42,11 @@ jobs:
           node-version: 20
       - name: Scritture contro il deploy
         env:
-          # Senza input (push): l'anteprima del branch e il suo link di accesso temporaneo (scade in 23 ore).
-          URL: ${{ github.event.inputs.url || 'https://fad-lr1rtpzua-nicolopattis-projects.vercel.app' }}
-          SHARE_URL: ${{ github.event.inputs.share_url || 'https://fad-lr1rtpzua-nicolopattis-projects.vercel.app/?_vercel_share=sBaIcBEyhXpLgiGi533GFOpbcLA7j1Xv' }}
+          # Senza input (push): la produzione, che non è protetta e non ha bisogno del
+          # link _vercel_share. Per un'anteprima protetta: lanciare a mano con gli input
+          # (URL del deploy + link di condivisione, che scade in 23 ore).
+          URL: ${{ github.event.inputs.url || 'https://fad-wine.vercel.app' }}
+          SHARE_URL: ${{ github.event.inputs.share_url || '' }}
           SUPABASE_URL: https://eqtiyqoxwgnerbmdkqff.supabase.co
           SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdGl5cW94d2duZXJibWRrcWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzOTE1NDksImV4cCI6MjA5NDk2NzU0OX0.fTfbtv9t3InpIcWtoyTgfaG550SALiwj45-_gRpNM_I
           ADMIN_EMAIL: admin@fad.local
