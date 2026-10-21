@@ -36,7 +36,7 @@ jobs:
       BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       ANTEPRIMA: ${{ github.event_name == 'deployment_status' && github.event.deployment.environment != 'Production' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: pagine pubbliche (${{ env.URL }})
         run: |
@@ -65,10 +65,10 @@ jobs:
           test "$code" = "401" || { echo "pdf privato: HTTP $code (atteso 401)"; exit 1; }
           echo "ok: login, verifica pubblica, pdf privato protetto"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: env.HA_SECRETS == 'true' && env.SALTA != '1'
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
       - name: dipendenze + Chromium
         if: env.HA_SECRETS == 'true' && env.SALTA != '1'
