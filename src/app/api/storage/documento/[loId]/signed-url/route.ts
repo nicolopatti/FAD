@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
+import { messaggioFinestra } from '@/lib/finestra';
 import type { LearningObjectRow } from '@/lib/db-types';
 
 // 1 ora: tempo abbondante per sfogliare un PDF di formazione tipico
@@ -39,6 +40,10 @@ export async function GET(request: Request, props: { params: Promise<{ loId: str
   // D26 — anche per accedere al PDF serve che il LO sia sbloccato.
   const progresso = await computeProgressoForIscrizione(supabase, iscrizione.id);
   if (!progresso) return NextResponse.json({ ok: false }, { status: 403 });
+  // R2: fuori dalla finestra di fruizione dell'edizione niente eventi (blocco totale).
+  if (!progresso.finestra.aperta) {
+    return NextResponse.json({ ok: false, error: messaggioFinestra(progresso.finestra), finestra: progresso.finestra.stato }, { status: 403 });
+  }
   const item = progresso.items.find((i) => i.learning_object_id === params.loId);
   if (!item) {
     return NextResponse.json({ ok: false, error: 'LO non in corso' }, { status: 403 });

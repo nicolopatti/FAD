@@ -28,7 +28,7 @@ export async function registraEventoPlayer(
   if (error) {
     const msg = error.message.replace(/^evento_player_registra: /, '');
     const status = /non autenticato/.test(msg) ? 401
-      : /non sbloccato|iscrizione non valida|LO non in corso|non coerente/.test(msg) ? 403
+      : /non sbloccato|iscrizione non valida|LO non in corso|non coerente|lezioni|edizione/.test(msg) ? 403
         : /non ammesso/.test(msg) ? 400 : 500;
     throw new ErroreRegistrazione(msg, status);
   }

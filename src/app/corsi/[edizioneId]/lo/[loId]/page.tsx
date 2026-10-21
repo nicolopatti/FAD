@@ -9,6 +9,7 @@ import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { DocumentoPlayer } from '@/components/DocumentoPlayer';
 import { QuizPlayer } from '@/components/QuizPlayer';
 import { configQuizDa, mescola } from '@/lib/quiz';
+import { messaggioFinestra } from '@/lib/finestra';
 import type { DomandaPublica } from '@/lib/quiz-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -63,6 +64,20 @@ export default async function LearningObjectPage(props: { params: Promise<{ ediz
   const isQuiz = (i: { lo_type: string }) => i.lo_type === 'quiz';
   const pulsante = (i: { lo_type: string; ordine: number }) => (isQuiz(i) ? 'Vai al test finale' : `Lezione ${i.ordine}`);
   const nome = (i: { lo_type: string; ordine: number }) => (isQuiz(i) ? 'Il test finale' : `La lezione ${i.ordine}`);
+
+  // R2: fuori dalla finestra dell'edizione la lezione non si apre (le API rifiutano comunque gli eventi).
+  if (!prog.finestra.aperta) {
+    return (
+      <AppShell user={{ name: session.nome, email: session.email }} role="discente" wide>
+        <Link href={corsoHref} className="back-link" style={{ marginBottom: 16 }}><Ico name="chevL" size={16} /> {prog.corso_titolo}</Link>
+        <div className="panel" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <h1 style={{ fontSize: 'var(--text-xl)' }}>{prog.finestra.stato === 'non_aperta' ? 'Le lezioni non sono ancora aperte' : 'Le lezioni sono chiuse'}</h1>
+          <p className="page-lead" style={{ margin: 0, fontSize: 15 }}>{messaggioFinestra(prog.finestra)}</p>
+          <div><Link className="btn btn--secondary" href={corsoHref}>Torna al corso</Link></div>
+        </div>
+      </AppShell>
+    );
+  }
 
   // D26: enforcement server-side. Se non sbloccato, l'accesso è negato.
   if (!item.sbloccato) {

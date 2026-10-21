@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LearningObjectType, StrutturaRow } from './db-types';
 import { coperturaPercentuale, ricostruisciTrattiDaEventi, visioneIntegraleCompleta, type EventoVideo, type Segmento } from './visione';
+import { finestraEdizione, type EdizioneFinestra, type StatoFinestra } from './finestra';
 
 export type StrutturaItem = {
   struttura_id: string;
@@ -40,6 +41,11 @@ export type ProgressoIscrizione = {
   obbligatori_totale: number;
   idonea: boolean;
   items: ProgressoLO[];
+  /**
+   * Finestra di fruizione dell'edizione (R2): fuori finestra le API del player
+   * rifiutano gli eventi. Non tocca il completamento (resta quello del log).
+   */
+  finestra: StatoFinestra;
 };
 
 const COMPLETION_EVENT_FOR_RULE: Record<string, string> = {
@@ -81,7 +87,7 @@ type IscrEdCorso = {
   id: string;
   persona_id: string;
   edizione_id: string;
-  edizione: { id: string; corso_id: string; corso: { id: string; titolo: string; sblocco_sequenziale: boolean; visione_integrale: boolean } | null } | null;
+  edizione: (EdizioneFinestra & { id: string; corso_id: string; corso: { id: string; titolo: string; sblocco_sequenziale: boolean; visione_integrale: boolean } | null }) | null;
 };
 
 type EventoCompletamento = {
@@ -92,7 +98,8 @@ type EventoCompletamento = {
   payload: Record<string, unknown> | null;
 };
 
-const SELECT_ISCRIZIONE = 'id, persona_id, edizione_id, edizione:edizione_id ( id, corso_id, corso:corso_id ( id, titolo, sblocco_sequenziale, visione_integrale ) )';
+const SELECT_ISCRIZIONE = 'id, persona_id, edizione_id, edizione:edizione_id ( id, corso_id, data_inizio, data_fine, fad_apertura, fad_chiusura, concluso_at, annullato_at, corso:corso_id ( id, titolo, sblocco_sequenziale, visione_integrale ) )';
+const FINESTRA_LIBERA: EdizioneFinestra = { data_inizio: null, data_fine: null, fad_apertura: null, fad_chiusura: null, concluso_at: null, annullato_at: null };
 const SELECT_STRUTTURA = `
       id, corso_id, ordine, obbligatorio, regola_completamento, learning_object_id,
       learning_object:learning_object_id ( titolo, type, config )
@@ -130,6 +137,7 @@ export function calcolaProgresso(
   corso: { id: string; titolo: string; sblocco_sequenziale: boolean; visione_integrale: boolean },
   items: StrutturaItem[],
   events: EventoCompletamento[],
+  edizione: EdizioneFinestra = FINESTRA_LIBERA,
 ): ProgressoIscrizione {
   const loIds = new Set(items.map((i) => i.learning_object_id));
   // Visione integrale (corso.visione_integrale): oltre a `video.ended` serve la
@@ -226,6 +234,7 @@ export function calcolaProgresso(
     obbligatori_totale: obbligatoriTot,
     idonea,
     items: decorated,
+    finestra: finestraEdizione(edizione),
   };
 }
 
@@ -276,7 +285,7 @@ export async function computeProgressoForIscrizione(
       .range(da, a)
       .returns<EventoCompletamento[]>(), 'degli eventi');
   }
-  return calcolaProgresso(iscrizione, corso, items, events);
+  return calcolaProgresso(iscrizione, corso, items, events, iscrizione.edizione ?? undefined);
 }
 
 // PostgREST risponde al massimo 1000 righe per richiesta (max-rows di Supabase)
@@ -363,7 +372,7 @@ export async function computeProgressoPerIscrizioni(
   }
   for (const i of valide) {
     const corso = i.edizione!.corso!;
-    out.set(i.id, calcolaProgresso(i, corso, itemsPerCorso.get(corso.id) ?? [], eventiPer.get(i.id) ?? []));
+    out.set(i.id, calcolaProgresso(i, corso, itemsPerCorso.get(corso.id) ?? [], eventiPer.get(i.id) ?? [], i.edizione ?? undefined));
   }
   return out;
 }

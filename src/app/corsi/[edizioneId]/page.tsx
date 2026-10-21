@@ -8,6 +8,7 @@ import { AppShell, Ico } from '@/components/AppShell';
 import { fmtDataOra, fmtData } from '@/components/admin/Atlante';
 import { linkedInAddToProfileUrl, provaEmissioneAutomatica } from '@/lib/attestati';
 import { appBaseUrl, urlVerifica } from '@/lib/url';
+import { messaggioFinestra } from '@/lib/finestra';
 import type { AttestatoRow, PoliticaAttestato } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +45,8 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
   const soglia = freq?.soglia ?? null;
   const completato = deriveIdoneita(prog.obbligatori_totale, prog.idonea, soglia, Boolean(freq?.idoneo_frequenza)).idoneo;
 
+  const finestra = prog.finestra;
+  const aperta = finestra.aperta;
   const descrizione = iscrizione.edizione?.corso?.descrizione ?? null;
   const politica: PoliticaAttestato = iscrizione.edizione?.corso?.politica_attestato ?? 'automatica';
 
@@ -113,6 +116,8 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
                 {prog.obbligatori_totale > 0 ? 'Hai finito le lezioni online. ' : ''}
                 Per completare il corso serve la presenza ad almeno il {soglia}% delle sessioni: finora risulti presente al {freq.frequenza_percentuale}%. La presenza si aggiorna dopo ogni sessione.
               </p>
+            ) : !aperta ? (
+              <p className="course-hero__desc" style={{ fontWeight: 600 }}>{messaggioFinestra(finestra)}</p>
             ) : next && (
               <div className="course-hero__actions">
                 <Link className="btn btn--lg" style={{ background: '#fff', color: 'var(--ink)' }} href={`/corsi/${params.edizioneId}/lo/${next.learning_object_id}`}>
@@ -169,7 +174,9 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
                 )}
                 <div className="next-step">
                   <div className="next-step__icon next-step__icon--ok"><Ico name="check" size={18} /></div>
-                  <div><strong>Puoi rivedere le lezioni quando vuoi</strong><p>Il completamento resta valido: rivederle non cambia nulla nel registro.</p></div>
+                  {aperta
+                    ? <div><strong>Puoi rivedere le lezioni{finestra.chiude_il ? ` fino al ${fmtData(finestra.chiude_il)}` : ' quando vuoi'}</strong><p>Il completamento resta valido: rivederle non cambia nulla nel registro.</p></div>
+                    : <div><strong>Il completamento resta valido</strong><p>{messaggioFinestra(finestra)}</p></div>}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
@@ -210,7 +217,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
                     </div>
                   </div>
                   <div className="lo-row__action">
-                    {it.sbloccato ? (
+                    {it.sbloccato && aperta ? (
                       <Link className={`btn btn--sm ${isCurrent ? '' : 'btn--ghost'}`} href={`/corsi/${params.edizioneId}/lo/${it.learning_object_id}`}>
                         {it.lo_type === 'quiz' ? (it.completato ? 'Esito' : 'Fai il test') : it.completato ? 'Rivedi' : 'Apri'}
                         <Ico name="chevR" size={14} />
@@ -237,6 +244,8 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
               <div className="row row--between"><span className="page-lead">Lezioni</span><strong>{prog.totale}{nVideo > 0 && nVideo === prog.totale ? ' video' : ''}</strong></div>
               {minutiTotali > 0 && <div className="row row--between"><span className="page-lead">Durata</span><strong>{Math.round(minutiTotali)} min</strong></div>}
               {prog.visione_integrale && <div className="row row--between"><span className="page-lead">Modalità</span><strong>visione integrale</strong></div>}
+              {aperta && finestra.chiude_il && <div className="row row--between"><span className="page-lead">Aperto fino al</span><strong>{fmtData(finestra.chiude_il)}</strong></div>}
+              {!aperta && <div className="row row--between"><span className="page-lead">Lezioni</span><strong>{finestra.stato === 'non_aperta' ? `dal ${fmtData(finestra.apre_il!)}` : 'chiuse'}</strong></div>}
               <div className="row row--between"><span className="page-lead">Completate</span><strong>{prog.completati} di {prog.totale}</strong></div>
               {prog.obbligatori_totale !== prog.totale && (
                 <div className="row row--between"><span className="page-lead">Obbligatorie</span><strong>{prog.obbligatori_completati} di {prog.obbligatori_totale}</strong></div>

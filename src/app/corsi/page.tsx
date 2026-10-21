@@ -5,7 +5,8 @@ import { unwrap } from '@/lib/db-result';
 import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni } from '@/lib/compliance';
 import { deriveIdoneita } from '@/lib/report-fondo';
 import { AppShell, StatusChip, Ico } from '@/components/AppShell';
-import { Cover, coverUrl } from '@/components/admin/Atlante';
+import { Cover, coverUrl, fmtData } from '@/components/admin/Atlante';
+import { etichettaFinestra } from '@/lib/finestra';
 import type { IscrizioneListaRow } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
@@ -81,6 +82,8 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
           const pct = totale > 0 ? Math.round((completati / totale) * 100) : 0;
           const idonea = completato;
           const prossima = prog?.items.find((i) => i.sbloccato && !i.completato);
+          const finestra = prog?.finestra ?? null;
+          const chiuso = finestra ? etichettaFinestra(finestra) : null;
 
           return (
             <Link key={iscrizione.id} className="corso-card" href={`/corsi/${iscrizione.edizione_id}`}>
@@ -88,7 +91,10 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
               <div className="corso-card__body">
                 <div className="corso-card__head">
                   <span className="page-lead">{totale} lezion{totale === 1 ? 'e' : 'i'}</span>
-                  <StatusChip idonea={idonea} completati={completati} />
+                  <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {chiuso && !idonea && <span className="chip chip--ghost">{chiuso}</span>}
+                    <StatusChip idonea={idonea} completati={completati} />
+                  </span>
                 </div>
                 <h2 className="corso-card__title">{corsoTitolo}</h2>
                 {descrizione && <p className="corso-card__desc">{descrizione}</p>}
@@ -110,8 +116,12 @@ export default async function MieiCorsiPage(props: { searchParams?: Promise<{ fi
                 <div className="corso-card__cta">
                   <span className={`btn btn--sm ${idonea ? 'btn--secondary' : ''}`}>
                     {idonea
-                      ? 'Rivedi le lezioni'
-                      : prossima?.lo_type === 'quiz'
+                      ? (finestra?.aperta === false ? 'Vedi il corso' : 'Rivedi le lezioni')
+                      : finestra?.stato === 'non_aperta'
+                        ? `Si apre il ${fmtData(finestra.apre_il)}`
+                        : chiuso
+                          ? 'Vedi il corso'
+                          : prossima?.lo_type === 'quiz'
                         ? 'Vai al test finale'
                         : completati === 0
                           ? 'Inizia il corso'

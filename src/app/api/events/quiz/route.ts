@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import { appendEvent } from '@/lib/audit';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
+import { messaggioFinestra } from '@/lib/finestra';
 import { configQuizDa, correggi, type RisposteDate } from '@/lib/quiz';
 import type { QuizDomandaRow } from '@/lib/db-types';
 import { provaEmissioneAutomatica } from '@/lib/attestati';
@@ -47,6 +48,10 @@ export async function POST(request: Request) {
   // D26: il test si apre solo se sbloccato nel percorso.
   const progresso = await computeProgressoForIscrizione(supabase, iscrizione.id);
   if (!progresso) return NextResponse.json({ ok: false }, { status: 403 });
+  // R2: fuori dalla finestra di fruizione dell'edizione niente eventi (blocco totale).
+  if (!progresso.finestra.aperta) {
+    return NextResponse.json({ ok: false, error: messaggioFinestra(progresso.finestra), finestra: progresso.finestra.stato }, { status: 403 });
+  }
   const item = progresso.items.find((i) => i.learning_object_id === learningObjectId);
   if (!item || item.lo_type !== 'quiz') {
     return NextResponse.json({ ok: false, error: 'test non in corso' }, { status: 403 });

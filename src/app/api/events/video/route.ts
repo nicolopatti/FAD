@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { computeProgressoForIscrizione } from '@/lib/compliance';
+import { messaggioFinestra } from '@/lib/finestra';
 import { coperturaSecondi, normalizzaSegmenti } from '@/lib/visione';
 import { provaEmissioneAutomatica } from '@/lib/attestati';
 import { ErroreRegistrazione, registraEventoPlayer } from '@/lib/eventi-player';
@@ -39,6 +40,10 @@ export async function POST(request: Request) {
   // La RPC ripete il controllo "per Eventi" nel DB (titolarità, LO in corso).
   const progresso = await computeProgressoForIscrizione(supabase, iscrizioneId);
   if (!progresso) return NextResponse.json({ ok: false, error: 'iscrizione non valida' }, { status: 403 });
+  // R2: fuori dalla finestra di fruizione dell'edizione niente eventi (blocco totale).
+  if (!progresso.finestra.aperta) {
+    return NextResponse.json({ ok: false, error: messaggioFinestra(progresso.finestra), finestra: progresso.finestra.stato }, { status: 403 });
+  }
   const item = progresso.items.find((i) => i.learning_object_id === learningObjectId);
   if (!item) {
     return NextResponse.json({ ok: false, error: 'LO non in corso' }, { status: 403 });
