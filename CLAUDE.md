@@ -91,7 +91,8 @@ totale**; **R3** codice fiscale doppio = **blocco**, indice unico solo dopo la p
   "Verifica automatica"; email di "Y X" → `verifica-email-non-valida@fad.local`. Poi
   indice unico del CF e CHECK delle date (prove in rollback 5/5), catena integra a
   **728 eventi**, E2E correzioni **54/54** (ED_STRESS ora = edizione annullata), smoke
-  97/97, funzionali 50/50. Lasciati: l'iscrizione di Mario a TEST-STRESS-01 (storia),
+  97/97, funzionali 50/50; poi `verifica-scritture.yml` in produzione **29/29 + 80/80**,
+  catena integra a **781 eventi**, 0 CF doppi. Lasciati: l'iscrizione di Mario a TEST-STRESS-01 (storia),
   l'attestato 2026/000003 (da riemettere dopo i dati dell'ente), le edizioni demo
   scadute ED-001/ED-T4-DEMO/ED-WEB-2026 (**decisione dell'utente in sospeso**:
   prolungare o concludere).
