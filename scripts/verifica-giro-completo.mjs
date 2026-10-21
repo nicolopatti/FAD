@@ -102,9 +102,12 @@ let loVideo = null, loQuiz = null;
 // 2) corso in bozza
 let corso = null;
 {
-  const c = await api('POST', '/api/admin/corsi', { titolo: NOME, categoria: 'Formazione', descrizione: 'Corso creato dalla verifica automatica.', sblocco_sequenziale: true, visione_integrale: false, ore_totali: 1, politica_attestato: 'automatica' });
+  const c = await api('POST', '/api/admin/corsi', { titolo: NOME, categoria: 'Formazione', descrizione: 'Corso creato dalla verifica automatica.', sblocco_sequenziale: true, visione_integrale: false, ore_totali: 1, politica_attestato: 'automatica', soglia_frequenza_percentuale: '80' });
   corso = c.json?.corso?.id ?? null;
   check('corso creato in bozza', c.status === 200 && !!corso, breve(c));
+  check('presenza minima alle sessioni salvata (80%)', Number(c.json?.corso?.soglia_frequenza_percentuale) === 80, `soglia=${c.json?.corso?.soglia_frequenza_percentuale}`);
+  const sogliaMale = await api('POST', '/api/admin/corsi', { titolo: `${NOME} · soglia`, soglia_frequenza_percentuale: '150' });
+  check('presenza minima oltre 100% rifiutata', sogliaMale.status === 400, breve(sogliaMale));
   const vuoto = await api('POST', '/api/admin/corsi', { titolo: '   ' });
   check('corso senza titolo rifiutato', vuoto.status === 400, breve(vuoto));
   if (!corso) { console.log('Interrompo: senza corso il giro non continua.'); process.exit(1); }
@@ -235,6 +238,10 @@ if (edizione && iscrizione) {
     const uno = await api('PATCH', `/api/admin/iscrizioni/${iscrizione}`, { piano_id: null });
     const ri = await api('PATCH', `/api/admin/iscrizioni/${iscrizione}`, { piano_id: piano });
     check('piano tolto e rimesso al singolo iscritto', uno.status === 200 && ri.status === 200, `${breve(uno)} / ${breve(ri)}`);
+    const mod = await api('PATCH', `/api/admin/piani/${piano}`, { avviso: 'Avviso di prova (modificato)' });
+    check('piano modificato (avviso)', mod.status === 200 && mod.json?.piano?.avviso === 'Avviso di prova (modificato)', breve(mod));
+    const cupMale = await api('PATCH', `/api/admin/piani/${piano}`, { cup: 'CORTO' });
+    check('piano: CUP non valido rifiutato', cupMale.status === 400, breve(cupMale));
     const gen = await api('GET', `/api/admin/report-fondo/genera?edizione=${edizione}&piano=${piano}&formato=fondimpresa`);
     check('report fondo generato (anteprima/file) per edizione + piano', gen.status === 200, `HTTP ${gen.status} ${(gen.headers.get('content-type') ?? '').slice(0, 40)}`);
     const dep = await api('POST', '/api/admin/report-fondo/deposita', { edizione, piano, formato: 'fondimpresa' });
@@ -255,6 +262,10 @@ if (edizione && iscrizione) {
     check('sessione annullata', ann.status === 200, breve(ann));
     const ag = await pagina('/admin/agenda?quando=tutte');
     check('agenda: sessione annullata segnalata', ag.status === 200, `HTTP ${ag.status}`);
+    const pmAnn = await api('POST', `/api/admin/sessioni/${sessione}/presenza-manuale`, { iscrizione_id: iscrizione, durata: '60', motivazione: 'prova su sessione annullata' });
+    check('sessione annullata: niente presenze manuali (409)', pmAnn.status === 409, breve(pmAnn));
+    const csvAnn = await api('POST', `/api/admin/sessioni/${sessione}/import-csv`, { csv: 'Name,Email,Duration\nProva,prova@fad.local,60' });
+    check('sessione annullata: niente import del report (409)', csvAnn.status === 409, breve(csvAnn));
   }
   if (incarico) {
     const delInc = await api('DELETE', `/api/admin/incarichi/${incarico}`);
@@ -268,9 +279,11 @@ if (edizione && iscrizione) {
     const conc = await api('POST', `/api/admin/edizioni/${edizione}/concludi`, {});
     check('edizione conclusa', conc.status === 200, breve(conc));
     const bis = await api('POST', `/api/admin/edizioni/${edizione}/concludi`, {});
-    check('edizione già conclusa: seconda conclusione rifiutata o senza effetto', bis.status === 400 || bis.status === 200, breve(bis));
+    check('edizione già conclusa: seconda conclusione rifiutata (409)', bis.status === 409, breve(bis));
+    const annConc = await api('POST', `/api/admin/edizioni/${edizione}/annulla`, {});
+    check('edizione conclusa: annullamento rifiutato (409)', annConc.status === 409, breve(annConc));
     const dopo = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Tardi', cognome: 'Vo', email: `tardivo-${TAG}@fad.local` });
-    check('niente iscritti su edizione conclusa', dopo.status === 400 || dopo.status === 409, breve(dopo));
+    check('niente iscritti su edizione conclusa (409)', dopo.status === 409, breve(dopo));
   }
   const dup = await api('POST', `/api/admin/corsi/${corso}/duplica`, {});
   const copia = dup.json?.corso?.id ?? null;

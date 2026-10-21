@@ -20,8 +20,9 @@ export type PianoRow = {
 
 const FONDI: [string, string][] = [['fondimpresa', 'Fondimpresa'], ['foncoop', 'FonCoop']];
 
-// Piani formativi finanziati del tenant: elenco + creazione. L'assegnazione
-// agli iscritti si fa dalla scheda Fondo dell'edizione.
+// Piani formativi finanziati del tenant: elenco, creazione e modifica della
+// testata. L'assegnazione agli iscritti si fa dalla scheda Fondo dell'edizione.
+const VUOTO = { titolo: '', codice: '', fondo: 'fondimpresa', cup: '', avviso: '', canale: '' };
 export function PianiPanel({ piani }: { piani: PianoRow[] }) {
   const router = useRouter();
   const { toast } = useFeedback();
@@ -29,7 +30,16 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errs, setErrs] = useState<Errori>({});
-  const [f, setF] = useState({ titolo: '', codice: '', fondo: 'fondimpresa', cup: '', avviso: '', canale: '' });
+  const [f, setF] = useState(VUOTO);
+  const [modifica, setModifica] = useState<string | null>(null);   // id del piano in modifica
+
+  function apriNuovo() { setModifica(null); setF(VUOTO); setErrs({}); setError(null); setAperto(true); }
+  function apriModifica(p: PianoRow) {
+    setModifica(p.id);
+    setF({ titolo: p.titolo, codice: p.codice ?? '', fondo: p.fondo ?? 'fondimpresa', cup: p.cup ?? '', avviso: p.avviso ?? '', canale: p.canale ?? '' });
+    setErrs({}); setError(null); setAperto(true);
+  }
+  function chiudi() { setAperto(false); setModifica(null); setErrs({}); setError(null); }
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setF({ ...f, [k]: e.target.value });
@@ -51,16 +61,17 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
     if (Object.keys(ve).length) return;
     setBusy(true);
     try {
-      const res = await fetch('/api/admin/piani', {
-        method: 'POST',
+      const res = await fetch(modifica ? `/api/admin/piani/${modifica}` : '/api/admin/piani', {
+        method: modifica ? 'PATCH' : 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ ...f, titolo: f.titolo.trim() }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      toast(`Piano "${f.titolo.trim()}" creato.`);
-      setF({ titolo: '', codice: '', fondo: 'fondimpresa', cup: '', avviso: '', canale: '' });
+      toast(modifica ? `Piano "${f.titolo.trim()}" aggiornato.` : `Piano "${f.titolo.trim()}" creato.`);
+      setF(VUOTO);
       setAperto(false);
+      setModifica(null);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -74,10 +85,10 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
       <div className="card__head">
         <div>
           <h3>Piani finanziati</h3>
-          <div className="sub">Il piano (fondo, avviso, CUP) si assegna agli iscritti dalla scheda Fondo dell&apos;edizione.</div>
+          <div className="sub">Il piano (fondo, avviso, CUP) si assegna agli iscritti dalla scheda Fondo dell&apos;edizione. Modificarlo non cambia i report già depositati.</div>
         </div>
         {!aperto && (
-          <button type="button" className="btn btn--secondary btn--sm" onClick={() => setAperto(true)}><Icon name="plus" /> Nuovo piano</button>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={apriNuovo}><Icon name="plus" /> Nuovo piano</button>
         )}
       </div>
       <div className="card__body">
@@ -85,7 +96,7 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
           <div className="muted" style={{ marginBottom: 14, fontSize: 13 }}>Nessun piano finanziato ancora registrato.</div>
         ) : (
           <div className="tbl-wrap"><table className="tbl tbl--zebra" style={{ marginBottom: aperto ? 16 : 0 }}>
-            <thead><tr><th>Piano</th><th>Fondo</th><th>Avviso</th><th>CUP</th><th>Canale</th><th className="col-r">Iscritti</th></tr></thead>
+            <thead><tr><th>Piano</th><th>Fondo</th><th>Avviso</th><th>CUP</th><th>Canale</th><th className="col-r">Iscritti</th><th className="col-r"><span className="sr-only">Azioni</span></th></tr></thead>
             <tbody>
               {piani.map((p) => (
                 <tr key={p.id}>
@@ -95,6 +106,9 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
                   <td>{p.cup ? <span className="mono">{p.cup}</span> : <span className="chip chip--err">assente</span>}</td>
                   <td className="muted">{p.canale ?? '—'}</td>
                   <td className="col-r">{p.n_iscritti}</td>
+                  <td className="col-r">
+                    <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => apriModifica(p)} aria-label={`Modifica il piano ${p.titolo}`}><Icon name="edit" /> Modifica</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -103,7 +117,7 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
 
         {aperto && (
           <form onSubmit={submit} noValidate style={{ borderTop: piani.length ? '1px dashed var(--line)' : 0, paddingTop: piani.length ? 14 : 0 }}>
-            <h4 style={{ margin: '0 0 12px' }}>Nuovo piano</h4>
+            <h4 style={{ margin: '0 0 12px' }}>{modifica ? 'Modifica piano' : 'Nuovo piano'}</h4>
             {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
             <div className="grid-3">
               <Field id="pf-titolo" label="Titolo" required error={errs.titolo}>
@@ -128,8 +142,8 @@ export function PianiPanel({ piani }: { piani: PianoRow[] }) {
               </Field>
             </div>
             <div className="row">
-              <button type="submit" className="btn" disabled={busy}>{busy ? 'Creo…' : 'Crea piano'}</button>
-              {piani.length > 0 && <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => { setAperto(false); setErrs({}); }}>Annulla</button>}
+              <button type="submit" className="btn" disabled={busy}>{busy ? 'Salvo…' : modifica ? 'Salva modifiche' : 'Crea piano'}</button>
+              {piani.length > 0 && <button type="button" className="btn btn--ghost" disabled={busy} onClick={chiudi}>Annulla</button>}
             </div>
           </form>
         )}

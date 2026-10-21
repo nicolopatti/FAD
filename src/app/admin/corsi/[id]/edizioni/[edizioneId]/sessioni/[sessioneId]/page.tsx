@@ -19,8 +19,8 @@ type CodaRowDb = { id: string; riga: number; tipo: 'ambiguo' | 'assente'; candid
 type IscrittoDb = { id: string; persona: { nome: string; cognome: string; email: string } | null };
 
 /**
- * Pagina della sessione, sotto l'edizione: dettagli e docente, report importati,
- * coda di riconciliazione, presenze, import CSV.
+ * Pagina della sessione, sotto l'edizione, nell'ordine del lavoro: dettagli e
+ * docente, import del report, coda da risolvere, presenze, storico degli import.
  */
 export default async function SessioneDetailPage(
   props: { params: Promise<{ id: string; edizioneId: string; sessioneId: string }> }
@@ -97,11 +97,21 @@ export default async function SessioneDetailPage(
 
       <SessioneDettagli sessione={sessione} docenti={docenti} />
 
+      {sessione.annullato_at ? (
+        <div className="banner banner--ocra">
+          <Icon name="alert" className="banner__icon" />
+          <div className="banner__body">Sessione <strong>annullata</strong> il {fmtDataOra(sessione.annullato_at)}: non si importano report né si registrano o correggono presenze. Quanto già registrato resta consultabile.</div>
+        </div>
+      ) : (
+        <CsvImportForm sessioneId={sessione.id} />
+      )}
+      {(codaItems.length > 0 || grezzi.length > 0) && <CodaResolver items={codaItems} tuttiIscritti={tuttiIscritti} />}
+      <PresenzeManager sessioneId={sessione.id} presenze={presenze} tuttiIscritti={tuttiIscritti} aperta={!sessione.annullato_at} />
       <div className="card">
         <div className="card__head">
           <div>
             <h3>Report di partecipazione importati</h3>
-            <div className="sub">Ogni import è una prova immutabile; l&apos;impronta del contenuto è nel registro. La riconciliazione gira in automatico; le righe non risolte finiscono nella coda qui sotto.</div>
+            <div className="sub">Ogni import è una prova immutabile; l&apos;impronta del contenuto è nel registro. Le presenze si attribuiscono in automatico all&apos;import; le righe non risolte finiscono nella coda.</div>
           </div>
           <span className="chip chip--muted">{grezzi.length}</span>
         </div>
@@ -117,7 +127,7 @@ export default async function SessioneDetailPage(
                     <td className="muted">{fmtDataOra(g.creato_il)}</td>
                     <td><span className="chip chip--muted">{g.fonte}</span></td>
                     <td>{g.righe ?? '—'}</td>
-                    <td className="mono">{g.importato_da === session.personaId ? 'tu' : (g.importato_da ?? 'automatico')}</td>
+                    <td>{g.importato_da === session.personaId ? 'tu' : g.importato_da ? 'un altro amministratore' : 'automatico'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -125,10 +135,6 @@ export default async function SessioneDetailPage(
           )}
         </div>
       </div>
-
-      <CodaResolver items={codaItems} tuttiIscritti={tuttiIscritti} />
-      <PresenzeManager sessioneId={sessione.id} presenze={presenze} tuttiIscritti={tuttiIscritti} />
-      <CsvImportForm sessioneId={sessione.id} />
     </>
   );
 }

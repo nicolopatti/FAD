@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
-import { addIscritto, type IscrittoInput } from '@/lib/iscritti';
+import { addIscritto, motivoEdizioneChiusa, type IscrittoInput } from '@/lib/iscritti';
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -10,6 +10,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (!body) return NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 });
 
   const supabase = await createSupabaseServerClient();
+  const chiusa = await motivoEdizioneChiusa(supabase, params.id);
+  if (chiusa) return NextResponse.json({ ok: false, error: chiusa.error }, { status: chiusa.status });
   const res = await addIscritto(supabase, { tenantId: session.tenantId, personaId: session.personaId }, params.id, body);
 
   if (res.status === 'error') return NextResponse.json({ ok: false, error: res.error }, { status: 400 });

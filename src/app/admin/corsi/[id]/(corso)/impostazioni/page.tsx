@@ -12,7 +12,7 @@ export default async function CorsoImpostazioniPage(props: { params: Promise<{ i
   const supabase = await createSupabaseServerClient();
   const { data: corso } = await supabase
     .from('corso')
-    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, creato_il')
+    .select('id, tenant_id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, soglia_frequenza_percentuale, creato_il')
     .eq('id', params.id)
     .maybeSingle<CorsoRow>();
   if (!corso) notFound();

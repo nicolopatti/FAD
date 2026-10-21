@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { appendEvent } from '@/lib/audit';
+import { isEmail } from '@/lib/validazione';
 
 export type IscrittoInput = {
   cognome?: string;
@@ -36,6 +37,19 @@ export type AddIscrittoResult =
 type Ctx = { tenantId: string; personaId: string };
 
 /**
+ * Un'edizione accetta iscritti solo se esiste ed è attiva (né conclusa né
+ * annullata). Ritorna il motivo del rifiuto, oppure null se si può iscrivere.
+ */
+export async function motivoEdizioneChiusa(supabase: SupabaseClient, edizioneId: string): Promise<{ status: number; error: string } | null> {
+  const { data, error } = await supabase.from('edizione').select('id, concluso_at, annullato_at').eq('id', edizioneId).maybeSingle();
+  if (error) return { status: 400, error: error.message };
+  if (!data) return { status: 404, error: 'Edizione non trovata.' };
+  if (data.annullato_at) return { status: 409, error: 'Edizione annullata: non si aggiungono iscritti.' };
+  if (data.concluso_at) return { status: 409, error: 'Edizione conclusa: non si aggiungono iscritti.' };
+  return null;
+}
+
+/**
  * Risolve/crea Azienda (per ragione sociale), Persona (dedup per email nel tenant)
  * e Iscrizione (dedup per persona+edizione). Registra `persona.created` (se nuova)
  * e `iscrizione.created` — senza PII nel payload (D18). Usa il client RLS-bound
@@ -59,6 +73,9 @@ export async function addIscritto(
 
   if (!cognome || !nome || !email) {
     return { status: 'error', error: 'cognome, nome ed email sono obbligatori' };
+  }
+  if (!isEmail(email)) {
+    return { status: 'error', error: `email non valida: ${email}` };
   }
   if ((input.data_nascita ?? '').trim() && !dataNascita) {
     return { status: 'error', error: 'data di nascita non valida (usa gg/mm/aaaa)' };

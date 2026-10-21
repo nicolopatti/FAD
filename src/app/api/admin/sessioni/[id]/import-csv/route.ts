@@ -28,6 +28,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     .eq('id', params.id)
     .maybeSingle();
   if (!sessione) return NextResponse.json({ ok: false, error: 'sessione non trovata' }, { status: 404 });
+  if (sessione.annullato_at) return NextResponse.json({ ok: false, error: 'Sessione annullata: non si importano report di partecipazione.' }, { status: 409 });
 
   // Adattatore: parsing + mappatura. Gli errori sono espliciti per l'admin.
   let normalized;
@@ -57,7 +58,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       attestati_emessi: attestati.length,
       result,
       headers: normalized.headers,
-      annullata: Boolean(sessione.annullato_at),
     });
   } catch (err) {
     return NextResponse.json(

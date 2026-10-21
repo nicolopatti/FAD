@@ -872,8 +872,9 @@ input[type='text'], input[type='search'] {
 .page-head__actions .btn { white-space: nowrap; }
 
 /* tabelle: sempre dentro un contenitore scorrevole */
-.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; position: relative; } /* relative: gli elementi assoluti (es. .sr-only) restano dentro lo scorrimento */
 .tbl-wrap > .tbl { min-width: 560px; }
+.field--spaced { margin-top: 16px; }
 .card__body--flush .tbl-wrap { border-radius: 0; }
 
 /* copertine piccole: niente etichetta (si troncava "FORMAZI") */

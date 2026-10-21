@@ -8,6 +8,7 @@ import { Icon, Cover, coverUrl } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { useCall } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
+import { parseSoglia } from '@/lib/validazione';
 
 /**
  * Scheda "Impostazioni" del corso: titolo, categoria, descrizione, copertina e
@@ -23,6 +24,9 @@ export function FormImpostazioni({ corso, frozen, nEdizioni, categorie }: { cors
   const [descrizione, setDescrizione] = useState(corso.descrizione ?? '');
   const [sblocco, setSblocco] = useState(corso.sblocco_sequenziale);
   const [integrale, setIntegrale] = useState(Boolean(corso.visione_integrale));
+  const sogliaIniziale = corso.soglia_frequenza_percentuale != null ? String(Number(corso.soglia_frequenza_percentuale)).replace('.', ',') : '';
+  const [soglia, setSoglia] = useState(sogliaIniziale);
+  const [errSoglia, setErrSoglia] = useState<string | null>(null);
   const [over, setOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -34,7 +38,8 @@ export function FormImpostazioni({ corso, frozen, nEdizioni, categorie }: { cors
       (categoria || null) !== (corso.categoria ?? null) ||
       descrizioneDirty ||
       sblocco !== corso.sblocco_sequenziale ||
-      integrale !== Boolean(corso.visione_integrale);
+      integrale !== Boolean(corso.visione_integrale) ||
+      soglia.trim() !== sogliaIniziale;
 
   const catOptions = useMemo(() => {
     const set = [...categorie];
@@ -47,9 +52,11 @@ export function FormImpostazioni({ corso, frozen, nEdizioni, categorie }: { cors
     if (!dirty) return;
     if (!frozen && !titolo.trim()) { setErrTitolo('Il titolo è obbligatorio.'); return; }
     setErrTitolo(null);
+    if (!frozen && parseSoglia(soglia) === undefined) { setErrSoglia('Indica una percentuale tra 1 e 100, oppure lascia vuoto.'); return; }
+    setErrSoglia(null);
     const body = frozen
       ? { descrizione: descrizione.trim() || null }
-      : { titolo, descrizione: descrizione.trim() || null, categoria: categoria || null, sblocco_sequenziale: sblocco, visione_integrale: integrale };
+      : { titolo, descrizione: descrizione.trim() || null, categoria: categoria || null, sblocco_sequenziale: sblocco, visione_integrale: integrale, soglia_frequenza_percentuale: soglia.trim() || null };
     try {
       await call('PATCH', `/api/admin/corsi/${corso.id}`, body, { successo: frozen ? 'Descrizione salvata.' : 'Impostazioni salvate.', busy: setSalvando });
     } catch { /* banner */ }
@@ -116,7 +123,7 @@ export function FormImpostazioni({ corso, frozen, nEdizioni, categorie }: { cors
                   </div>
                   <div className="row" style={{ marginTop: 8 }}>
                     <button type="button" className="btn btn--secondary btn--sm" disabled={uploading} onClick={() => fileRef.current?.click()}><Icon name="upload" /> Sostituisci</button>
-                    <button type="button" className="btn btn--danger btn--sm" disabled={uploading} onClick={() => call('PATCH', `/api/admin/corsi/${corso.id}`, { cover_path: null }, { successo: 'Copertina rimossa.' })}><Icon name="trash" /> Rimuovi</button>
+                    <button type="button" className="btn btn--danger btn--sm" disabled={uploading} onClick={() => call('PATCH', `/api/admin/corsi/${corso.id}`, { cover_path: null }, { successo: 'Copertina rimossa.' }).catch(() => { /* banner */ })}><Icon name="trash" /> Rimuovi</button>
                   </div>
                 </>
               ) : (
@@ -162,6 +169,9 @@ export function FormImpostazioni({ corso, frozen, nEdizioni, categorie }: { cors
               <span className="switch__track" />
             </label>
           </div>
+          <Field id="corso-soglia" className="field--spaced" label="Presenza minima alle sessioni (%)" error={errSoglia} hint="Per i corsi con sessioni live: sotto questa presenza il discente non completa il corso. Vuoto = nessun requisito.">
+            <input id="corso-soglia" className="input" inputMode="decimal" value={soglia} onChange={(e) => { setSoglia(e.target.value); if (errSoglia) setErrSoglia(null); }} disabled={busy || frozen} placeholder="es. 80" style={{ maxWidth: 160 }} aria-invalid={Boolean(errSoglia)} />
+          </Field>
           <div style={{ marginTop: 16 }}>
             <button type="submit" className="btn" disabled={busy || !dirty}>{salvando ? 'Salvo…' : 'Salva impostazioni'}</button>
           </div>

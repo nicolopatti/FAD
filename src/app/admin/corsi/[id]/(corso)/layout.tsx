@@ -37,7 +37,8 @@ export default async function CorsoLayout(props: { children: React.ReactNode; pa
     { label: 'Panoramica', href: base, exact: true },
     { label: 'Lezioni', href: `${base}/lezioni`, count: corso.n_lezioni },
     { label: 'Edizioni', href: `${base}/edizioni`, count: corso.n_edizioni },
-    ...((corso.politica_attestato ?? 'automatica') !== 'nessuna' ? [{ label: 'Attestato', href: `${base}/attestato` }] : []),
+    // Sempre visibile: è qui che si sceglie il rilascio (anche "nessuno", e si torna indietro).
+    { label: 'Attestato', href: `${base}/attestato` },
     { label: 'Impostazioni', href: `${base}/impostazioni` },
   ];
 

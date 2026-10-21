@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { IscrittoOption } from './CodaResolver';
 import { Icon } from '@/components/admin/Atlante';
+import { useFeedback } from '@/components/ui/Feedback';
 
 export type PresenzaItem = {
   id: string;
@@ -17,12 +18,15 @@ export function PresenzeManager({
   sessioneId,
   presenze,
   tuttiIscritti,
+  aperta = true,
 }: {
   sessioneId: string;
   presenze: PresenzaItem[];
   tuttiIscritti: IscrittoOption[];
+  aperta?: boolean;   // false a sessione annullata: niente nuove presenze né correzioni
 }) {
   const router = useRouter();
+  const { toast } = useFeedback();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -34,7 +38,7 @@ export function PresenzeManager({
   const [corrDurata, setCorrDurata] = useState('');
   const [corrMotivazione, setCorrMotivazione] = useState('');
 
-  async function call(url: string, body: unknown, reset?: () => void) {
+  async function call(url: string, body: unknown, successo: string, reset?: () => void) {
     setError(null);
     setBusy(true);
     try {
@@ -47,6 +51,7 @@ export function PresenzeManager({
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       reset?.();
       router.refresh();
+      toast(successo);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -69,8 +74,9 @@ export function PresenzeManager({
         <div>
           <h3>Presenze registrate</h3>
           <div className="sub">
-            Le presenze sono Eventi. Una correzione è un <em>nuovo</em> Evento che sostituisce
-            semanticamente il precedente (che resta nel log, barrato qui). Motivazione obbligatoria.
+            Presenze attribuite dal report o a mano. Una correzione non cancella il dato
+            precedente: lo sostituisce, e quello vecchio resta nel registro (qui barrato). Ogni
+            correzione chiede una motivazione.
           </div>
         </div>
         <span className="chip chip--muted">{presenze.filter((p) => !p.superseded).length}</span>
@@ -92,7 +98,7 @@ export function PresenzeManager({
                   <td className="mono">{p.durata ?? '—'}</td>
                   <td>{badge(p)}{p.superseded && <span className="chip chip--muted" style={{ marginLeft: 4 }}>superata</span>}</td>
                   <td>
-                    {!p.superseded && (
+                    {!p.superseded && aperta && (
                       <button
                         type="button"
                         className="btn btn--ghost btn--xs"
@@ -109,17 +115,17 @@ export function PresenzeManager({
           </table></div>
         )}
 
-        {correggiId && (
+        {correggiId && aperta && (
           <div style={{ border: '1px dashed var(--line-strong)', borderRadius: 'var(--r-lg)', padding: 16, marginTop: 12 }}>
             <h4 style={{ marginTop: 0, marginBottom: 12 }}>Correggi presenza</h4>
             <div className="grid-2">
               <div className="field" style={{ marginBottom: 0 }}>
-                <label>Durata corretta (minuti)</label>
-                <input className="input" value={corrDurata} onChange={(e) => setCorrDurata(e.target.value)} disabled={busy} />
+                <label htmlFor="pres-corr-durata">Durata corretta (minuti) <span className="req" aria-hidden="true">*</span></label>
+                <input id="pres-corr-durata" className="input" inputMode="numeric" value={corrDurata} onChange={(e) => setCorrDurata(e.target.value)} disabled={busy} />
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
-                <label>Motivazione (obbligatoria)</label>
-                <input className="input" value={corrMotivazione} onChange={(e) => setCorrMotivazione(e.target.value)} disabled={busy} placeholder="es. orario di join errato nel CSV" />
+                <label htmlFor="pres-corr-motivo">Motivazione <span className="req" aria-hidden="true">*</span></label>
+                <input id="pres-corr-motivo" className="input" value={corrMotivazione} onChange={(e) => setCorrMotivazione(e.target.value)} disabled={busy} placeholder="es. orario di join errato nel CSV" />
               </div>
             </div>
             <button
@@ -127,15 +133,15 @@ export function PresenzeManager({
               className="btn btn--sm"
               style={{ marginTop: 12 }}
               disabled={busy || !corrDurata.trim() || !corrMotivazione.trim()}
-              onClick={() => call(`/api/admin/presenze/${correggiId}/correggi`, { durata: corrDurata, motivazione: corrMotivazione }, () => setCorreggiId(null))}
+              onClick={() => call(`/api/admin/presenze/${correggiId}/correggi`, { durata: corrDurata, motivazione: corrMotivazione }, 'Presenza corretta.', () => setCorreggiId(null))}
             >
-              {busy ? '…' : 'Salva correzione'}
+              {busy ? 'Salvo…' : 'Salva correzione'}
             </button>
           </div>
         )}
 
-        <form
-          onSubmit={(e) => { e.preventDefault(); call(`/api/admin/sessioni/${sessioneId}/presenza-manuale`, { iscrizione_id: iscrizioneId, durata, motivazione }, () => { setDurata(''); setMotivazione(''); }); }}
+        {aperta && <form
+          onSubmit={(e) => { e.preventDefault(); call(`/api/admin/sessioni/${sessioneId}/presenza-manuale`, { iscrizione_id: iscrizioneId, durata, motivazione }, 'Presenza aggiunta.', () => { setDurata(''); setMotivazione(''); }); }}
           style={{ borderTop: '1px dashed var(--line)', paddingTop: 14, marginTop: 14 }}
         >
           <h4 style={{ marginTop: 0, marginBottom: 6 }}>Aggiungi presenza manuale</h4>
@@ -144,25 +150,25 @@ export function PresenzeManager({
           </div>
           <div className="grid-2">
             <div className="field" style={{ marginBottom: 0 }}>
-              <label>Iscritto</label>
-              <select className="select" value={iscrizioneId} onChange={(e) => setIscrizioneId(e.target.value)} disabled={busy || tuttiIscritti.length === 0}>
+              <label htmlFor="pres-man-iscritto">Iscritto</label>
+              <select id="pres-man-iscritto" className="select" value={iscrizioneId} onChange={(e) => setIscrizioneId(e.target.value)} disabled={busy || tuttiIscritti.length === 0}>
                 {tuttiIscritti.length === 0 && <option value="">(nessun iscritto)</option>}
                 {tuttiIscritti.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
-              <label>Durata (minuti)</label>
-              <input className="input" value={durata} onChange={(e) => setDurata(e.target.value)} disabled={busy} placeholder="es. 120" />
+              <label htmlFor="pres-man-durata">Durata (minuti) <span className="req" aria-hidden="true">*</span></label>
+              <input id="pres-man-durata" className="input" inputMode="numeric" value={durata} onChange={(e) => setDurata(e.target.value)} disabled={busy} placeholder="es. 120" />
             </div>
           </div>
           <div className="field" style={{ marginTop: 12 }}>
-            <label>Motivazione (obbligatoria)</label>
-            <input className="input" value={motivazione} onChange={(e) => setMotivazione(e.target.value)} disabled={busy} placeholder="es. presente in aula virtuale, non nel report" />
+            <label htmlFor="pres-man-motivo">Motivazione <span className="req" aria-hidden="true">*</span></label>
+            <input id="pres-man-motivo" className="input" value={motivazione} onChange={(e) => setMotivazione(e.target.value)} disabled={busy} placeholder="es. presente in aula virtuale, non nel report" />
           </div>
           <button type="submit" className="btn btn--sm" disabled={busy || !iscrizioneId || !durata.trim() || !motivazione.trim()}>
-            {busy ? '…' : 'Aggiungi presenza'}
+            {busy ? 'Aggiungo…' : 'Aggiungi presenza'}
           </button>
-        </form>
+        </form>}
       </div>
     </div>
   );

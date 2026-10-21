@@ -19,6 +19,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (!motivazione) return NextResponse.json({ ok: false, error: 'motivazione obbligatoria' }, { status: 400 });
 
   const supabase = await createSupabaseServerClient();
+  const { data: sessione } = await supabase.from('sessione').select('id, annullato_at').eq('id', params.id).maybeSingle();
+  if (!sessione) return NextResponse.json({ ok: false, error: 'sessione non trovata' }, { status: 404 });
+  if (sessione.annullato_at) return NextResponse.json({ ok: false, error: 'Sessione annullata: non si registrano presenze.' }, { status: 409 });
   const { data, error } = await supabase.rpc('presenza_inserisci_manuale', {
     p_sessione_id: params.id,
     p_iscrizione_id: body.iscrizione_id,

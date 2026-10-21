@@ -46,7 +46,10 @@ export function PersonaForm({ persona }: { persona: PersonaRiepilogo }) {
       <div className="card__head">
         <div><h3>Anagrafica</h3><div className="sub">Nome, cognome e dati di nascita finiscono sugli attestati; il codice fiscale nella rendicontazione.</div></div>
         {!persona.accesso && (
-          <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={() => call('POST', `/api/admin/persone/${persona.id}/invita`, undefined, { successo: `Invito inviato a ${persona.email}.` })}>Invita</button>
+          <button type="button" className="btn btn--secondary btn--sm" disabled={busy} onClick={async () => {
+            if (!(await confirm({ titolo: `Inviare l'invito a ${persona.cognome} ${persona.nome}?`, messaggio: `Riceve all'indirizzo ${persona.email} un'email con il link per scegliere la password ed entrare.`, conferma: 'Invia l\'invito' }))) return;
+            await call('POST', `/api/admin/persone/${persona.id}/invita`, undefined, { successo: `Invito inviato a ${persona.email}.` }).catch(() => { /* banner */ });
+          }}>Invita</button>
         )}
       </div>
       <div className="card__body">

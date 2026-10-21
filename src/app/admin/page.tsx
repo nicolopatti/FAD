@@ -101,7 +101,7 @@ export default async function AdminDashboard() {
 
   const kpi: { label: string; value: number; icon: string; sub: string; href: Route }[] = [
     { label: 'Corsi attivi', value: corsiAttiviR.count ?? 0, icon: 'corsi', sub: `${corsiR.count ?? 0} nel catalogo`, href: '/admin/corsi?stato=attivo' as Route },
-    { label: 'Edizioni in corso', value: nEdizioniAttive, icon: 'layers', sub: 'Aperte alla fruizione', href: '/admin/corsi?stato=attivo' as Route },
+    { label: 'Edizioni in corso', value: nEdizioniAttive, icon: 'layers', sub: 'Aperte alla fruizione', href: '/admin#edizioni' as Route },
     { label: 'Iscritti', value: personeR.count ?? 0, icon: 'users', sub: 'Persone con almeno un’iscrizione', href: '/admin/persone' as Route },
     { label: 'Sessioni nei prossimi 7 giorni', value: prossime7R.count ?? prossime.length, icon: 'calendar', sub: prossime[0] ? `Prossima il ${fmtData(prossime[0].data_ora)}` : 'Nessuna in programma', href: '/admin/agenda' as Route },
   ];
@@ -137,7 +137,7 @@ export default async function AdminDashboard() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card" id="edizioni">
         <div className="card__head">
           <div><h3>Edizioni in corso</h3><div className="sub">Ogni riga apre la pagina dell&apos;edizione: iscritti, sessioni, docenti, fondo, stato.{nEdizioniAttive > edizioniAttive.length && <> Mostro le {edizioniAttive.length} più recenti su {nEdizioniAttive}.</>}</div></div>
           <Link className="btn btn--secondary btn--sm" href="/admin/corsi?stato=attivo">Tutti i corsi attivi <Icon name="arrowRight" /></Link>

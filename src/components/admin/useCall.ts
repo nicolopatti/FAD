@@ -10,7 +10,8 @@ export type CallFn = (method: string, url: string, body?: unknown, opts?: CallOp
 /**
  * Chiamata alle route admin con stato di attesa, errore ed esito: dopo una
  * risposta ok fa `router.refresh()` (le pagine sono Server Component), mostra
- * il toast di successo e propaga l'errore al chiamante (già mostrato nel banner).
+ * il toast di successo e propaga l'errore al chiamante (già mostrato nel banner
+ * e a comparsa). Chi chiama da un onClick deve chiudere la promessa con catch.
  */
 export function useCall() {
   const router = useRouter();
@@ -33,7 +34,10 @@ export function useCall() {
       if (opts?.successo) toast(opts.successo);
       return json;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      // Anche a comparsa: il banner sta in cima e chi ha scorso la pagina non lo vedrebbe.
+      toast(msg, 'errore');
       throw err;
     } finally {
       setBusy(false);

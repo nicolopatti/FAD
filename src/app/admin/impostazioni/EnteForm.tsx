@@ -27,6 +27,14 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
   const [error, setError] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const firmaRef = useRef<HTMLInputElement>(null);
+  const iniziale = {
+    ragione_sociale: ente.ragione_sociale ?? ente.nome ?? '',
+    citta: ente.citta ?? '',
+    firmatario_nome: ente.firmatario_nome ?? '',
+    firmatario_ruolo: ente.firmatario_ruolo ?? '',
+    linkedin_organization_id: ente.linkedin_organization_id ?? '',
+  };
+  const dirty = (Object.keys(iniziale) as (keyof typeof iniziale)[]).some((k) => f[k].trim() !== iniziale[k].trim());
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function patch(body: Record<string, string | null>, successo: string) {
@@ -119,7 +127,7 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
             </div>
           </div>
         </div>
-        <div style={{ marginTop: 14 }}><button type="submit" className="btn" disabled={busy}>{busy ? 'Salvo…' : 'Salva'}</button></div>
+        <div style={{ marginTop: 14 }}><button type="submit" className="btn" disabled={busy || !dirty}>{busy ? 'Salvo…' : 'Salva'}</button></div>
       </div>
     </form>
   );

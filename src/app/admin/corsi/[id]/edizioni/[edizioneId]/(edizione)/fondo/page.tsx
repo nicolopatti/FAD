@@ -25,5 +25,5 @@ export default async function EdizioneFondoPage(props: { params: Promise<{ id: s
   const lista: PianoFondo[] = piani.map((p) => ({ ...p, iscritti: perPiano.get(p.id) ?? 0 }));
   const senzaPiano = iscrizioni.filter((i) => !i.piano_id).length;
 
-  return <FondoPanel edizioneId={ed.id} attiva={edizioneStato(ed) === 'attiva'} piani={lista} nIscritti={iscrizioni.length} senzaPiano={senzaPiano} soglia={ed.corso?.soglia_frequenza_percentuale ?? null} />;
+  return <FondoPanel corsoId={params.id} edizioneId={ed.id} attiva={edizioneStato(ed) === 'attiva'} piani={lista} nIscritti={iscrizioni.length} senzaPiano={senzaPiano} soglia={ed.corso?.soglia_frequenza_percentuale ?? null} />;
 }

@@ -12,7 +12,7 @@ import { ErrorBanner } from '@/components/admin/ErrorBanner';
 export type PianoFondo = { id: string; titolo: string; codice: string | null; fondo: string | null; cup: string | null; iscritti: number };
 
 /** Scheda "Fondo" dell'edizione: piano finanziato per tutti gli iscritti, eccezioni e collegamento alla rendicontazione. */
-export function FondoPanel({ edizioneId, attiva, piani, nIscritti, senzaPiano, soglia }: { edizioneId: string; attiva: boolean; piani: PianoFondo[]; nIscritti: number; senzaPiano: number; soglia: number | null }) {
+export function FondoPanel({ corsoId, edizioneId, attiva, piani, nIscritti, senzaPiano, soglia }: { corsoId: string; edizioneId: string; attiva: boolean; piani: PianoFondo[]; nIscritti: number; senzaPiano: number; soglia: number | null }) {
   const { confirm } = useFeedback();
   const { call, busy, error } = useCall();
   const [pianoId, setPianoId] = useState(piani.length === 1 ? piani[0].id : '');
@@ -78,9 +78,13 @@ export function FondoPanel({ edizioneId, attiva, piani, nIscritti, senzaPiano, s
             <div className="card__head"><h3>Per la rendicontazione</h3></div>
             <div className="card__body">
               <ul className="ready">
-                <li className={conPiano.length > 0 ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={conPiano.length > 0 ? 'check' : 'euro'} /></span>Piano assegnato</li>
-                <li className={conPiano.every((p) => p.cup) && conPiano.length > 0 ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={conPiano.every((p) => p.cup) && conPiano.length > 0 ? 'check' : 'alert'} /></span>CUP del piano (bloccante per il deposito)</li>
-                <li className={soglia != null ? 'is-ok' : ''}><span className="ready__dot"><Icon name={soglia != null ? 'check' : 'clock'} /></span>Soglia di frequenza del corso{soglia != null ? `: ${soglia}%` : ' non impostata'}</li>
+                <li className={conPiano.length > 0 ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={conPiano.length > 0 ? 'check' : 'euro'} /></span>Piano assegnato agli iscritti</li>
+                <li className={conPiano.every((p) => p.cup) && conPiano.length > 0 ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={conPiano.every((p) => p.cup) && conPiano.length > 0 ? 'check' : 'alert'} /></span>
+                  <span>CUP del piano: <strong>obbligatorio</strong> per il deposito{conPiano.some((p) => !p.cup) && <> · <Link href="/admin/rendicontazione">completa il piano</Link></>}</span>
+                </li>
+                <li className={soglia != null ? 'is-ok' : ''}><span className="ready__dot"><Icon name={soglia != null ? 'check' : 'clock'} /></span>
+                  <span>Presenza minima alle sessioni{soglia != null ? `: ${soglia}%` : <>: nessun requisito. Si sceglie nelle <Link href={`/admin/corsi/${corsoId}/impostazioni` as Route}>impostazioni del corso</Link> prima della prima edizione; per questo corso è ormai fissata.</>}</span>
+                </li>
               </ul>
               <div className="field__hint" style={{ marginTop: 12 }}>I codici fiscali mancanti si vedono nella scheda Iscritti; la rendicontazione li segnala come bloccanti. <Link href="/admin/rendicontazione">Vai a Rendicontazione</Link> per piani, anteprima e deposito.</div>
             </div>

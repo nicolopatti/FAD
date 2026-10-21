@@ -15,7 +15,7 @@ export function SessioniList({ corsoId, edizioneId, attiva, sessioni, docenti }:
   const router = useRouter();
   const [nuova, setNuova] = useState(sessioni.length === 0 && attiva);
   const [now] = useState(() => Date.now()); // fissato al primo disegno
-  const stato = (s: SessioneLista) => s.annullato_at ? 'annullata' : s.coda > 0 ? 'da riconciliare' : s.data_ora && new Date(s.data_ora).getTime() > now ? 'pianificata' : s.presenze > 0 ? 'presenze registrate' : 'senza presenze';
+  const stato = (s: SessioneLista) => s.annullato_at ? 'annullata' : s.coda > 0 ? 'da riconciliare' : s.presenze > 0 ? 'presenze registrate' : !s.data_ora ? 'da pianificare' : new Date(s.data_ora).getTime() > now ? 'pianificata' : 'senza presenze';
 
   return (
     <>

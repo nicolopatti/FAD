@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { IngestGrezzoResult } from '@/lib/pipeline';
 import { Icon } from '@/components/admin/Atlante';
+import { useFeedback } from '@/components/ui/Feedback';
 
 type MappingState = { nome: string; email: string; durata: string; join: string; leave: string };
 const EMPTY_MAPPING: MappingState = { nome: '', email: '', durata: '', join: '', leave: '' };
 
 export function CsvImportForm({ sessioneId }: { sessioneId: string }) {
   const router = useRouter();
+  const { toast } = useFeedback();
   const [csv, setCsv] = useState('');
   const [filename, setFilename] = useState<string | null>(null);
   const [showMapping, setShowMapping] = useState(false);
@@ -43,7 +45,9 @@ export function CsvImportForm({ sessioneId }: { sessioneId: string }) {
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      setResult(json.result as IngestGrezzoResult);
+      const r = json.result as IngestGrezzoResult;
+      setResult(r);
+      toast(`Report importato: ${r.righe} righe.`);
       setCsv('');
       setFilename(null);
       router.refresh();
@@ -56,8 +60,9 @@ export function CsvImportForm({ sessioneId }: { sessioneId: string }) {
 
   const field = (key: keyof MappingState, label: string, required: boolean) => (
     <div className="field">
-      <label>{label}{required && ' *'}</label>
+      <label htmlFor={`csv-map-${key}`}>{label}{required && <span className="req" aria-hidden="true"> *</span>}</label>
       <input
+        id={`csv-map-${key}`}
         className="input"
         value={mapping[key]}
         onChange={(e) => setMapping((m) => ({ ...m, [key]: e.target.value }))}
@@ -74,8 +79,9 @@ export function CsvImportForm({ sessioneId }: { sessioneId: string }) {
       </div>
       <div className="card__body">
         <div className="muted" style={{ marginBottom: 14, fontSize: 13 }}>
-          Carica il CSV esportato dalla piattaforma (Teams/Zoom). Colonne attese: nome, email,
-          durata (più, opzionali, ingresso/uscita). Le intestazioni comuni IT/EN sono riconosciute
+          Carica il CSV con le presenze esportato dalla piattaforma della riunione (es. il
+          report partecipanti di Teams). Colonne attese: nome, email, durata (più, facoltative,
+          ingresso e uscita). Le intestazioni comuni IT/EN sono riconosciute
           in automatico; se una colonna chiave non viene trovata avrai un errore <em>prima</em> di
           salvare, e potrai indicarla con la mappatura. Da Excel: salva come CSV.
         </div>
@@ -85,22 +91,24 @@ export function CsvImportForm({ sessioneId }: { sessioneId: string }) {
           <div className="banner banner--info">
             <Icon name="check" className="banner__icon" />
             <div className="banner__body">
-              Import riuscito: <strong>{result.righe}</strong> righe salvate (write-once).
-              Evento <span className="mono">report_grezzo_importato #{result.evento_seq}</span> ·
-              hash <span className="mono">{result.hash.slice(0, 16)}…</span>
+              Import riuscito: <strong>{result.righe}</strong> righe salvate così come sono arrivate
+              (il file non si può più modificare). Impronta nel registro:{' '}
+              <span className="mono">{result.hash.slice(0, 16)}…</span>. Le presenze sono state
+              attribuite; quello che resta da decidere è nella coda qui sotto.
             </div>
           </div>
         )}
 
         <div className="field">
-          <label>File CSV</label>
-          <input className="input" type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} disabled={busy} />
+          <label htmlFor="csv-file">File CSV</label>
+          <input id="csv-file" className="input" type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} disabled={busy} />
           {filename && <div className="field__hint">Selezionato: {filename}</div>}
         </div>
 
         <div className="field">
-          <label>…oppure incolla il contenuto CSV</label>
+          <label htmlFor="csv-testo">…oppure incolla il contenuto CSV</label>
           <textarea
+            id="csv-testo"
             className="textarea mono"
             rows={6}
             value={csv}

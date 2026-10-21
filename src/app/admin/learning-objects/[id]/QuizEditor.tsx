@@ -181,7 +181,7 @@ export function QuizEditor({ loId, config, domandeIniziali, congelato }: { loId:
                       </label>
                       <input className="input" value={r.testo} onChange={(e) => setRisposta(d.key, k, { testo: e.target.value })} placeholder={`Risposta ${LETTERE[k]}`} disabled={congelato || busy} aria-label={`Risposta ${LETTERE[k]} della domanda ${i + 1}`} />
                       {!congelato && d.risposte.length > 2 && (
-                        <button type="button" className="log-copy" aria-label="Togli risposta" onClick={() => aggiorna((p) => p.map((x) => (x.key === d.key ? { ...x, risposte: x.risposte.filter((_, idx) => idx !== k) } : x)))}><Icon name="x" /></button>
+                        <button type="button" className="icon-btn" aria-label="Togli risposta" onClick={() => aggiorna((p) => p.map((x) => (x.key === d.key ? { ...x, risposte: x.risposte.filter((_, idx) => idx !== k) } : x)))}><Icon name="x" /></button>
                       )}
                     </li>
                   ))}

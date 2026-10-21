@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
-import { normalizzaParziale } from '@/lib/attestato-modello';
+import { normalizzaParziale, pathNelTenant } from '@/lib/attestato-modello';
+import { parseSoglia } from '@/lib/validazione';
 
 type UpdateBody = {
   titolo?: string;
@@ -15,6 +16,7 @@ type UpdateBody = {
   riferimento_normativo?: string | null;
   politica_attestato?: string;
   attestato_modello?: unknown;   // modello parziale del corso; null = usa quello dell'ente
+  soglia_frequenza_percentuale?: number | string | null;
 };
 
 const POLITICHE = new Set(['automatica', 'manuale', 'nessuna']);
@@ -44,7 +46,18 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     updates.categoria = typeof body.categoria === 'string' ? (body.categoria.trim() || null) : null;
   }
   if (body.cover_path !== undefined) {
-    updates.cover_path = typeof body.cover_path === 'string' ? (body.cover_path.trim() || null) : null;
+    const cover = typeof body.cover_path === 'string' ? (body.cover_path.trim() || null) : null;
+    // Solo un file del bucket `copertine` nella cartella del tenant (finisce in una URL pubblica).
+    if (cover !== null && !pathNelTenant(cover, session.tenantId)) {
+      return NextResponse.json({ ok: false, error: 'copertina non valida: il file deve stare nella cartella dell\'ente' }, { status: 400 });
+    }
+    updates.cover_path = cover;
+  }
+  // Presenza minima alle sessioni live: campo strutturale, congelato con D22.
+  if (body.soglia_frequenza_percentuale !== undefined) {
+    const soglia = parseSoglia(body.soglia_frequenza_percentuale);
+    if (soglia === undefined) return NextResponse.json({ ok: false, error: 'soglia di frequenza non valida (tra 1 e 100)' }, { status: 400 });
+    updates.soglia_frequenza_percentuale = soglia;
   }
   // Dati dell'attestato (Fase 5). A corso congelato il DB accetta solo il
   // passaggio da vuoto a valore (D22 esteso): il trigger risponde con errore.
@@ -76,7 +89,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     .from('corso')
     .update(updates)
     .eq('id', params.id)
-    .select('id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, creato_il')
+    .select('id, titolo, descrizione, sblocco_sequenziale, visione_integrale, categoria, cover_path, ore_totali, riferimento_normativo, politica_attestato, soglia_frequenza_percentuale, creato_il')
     .single();
   if (error) {
     const msg = error.message.includes('congelato') ? 'Corso congelato: ore e riferimento normativo si compilano una volta sola se erano vuoti; gli altri campi strutturali non si cambiano.' : error.message;

@@ -3,6 +3,7 @@ import { unwrap } from '@/lib/db-result';
 import { requireAuditor } from '@/lib/auth-context';
 import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni, regolaLabel, aLotti, tutteLeRighe } from '@/lib/compliance';
 import type { IscrizioneAuditRow } from '@/lib/db-types';
+import { deriveIdoneita } from '@/lib/report-fondo';
 import { CompletamentoTable, type RigaCompletamento } from './CompletamentoTable';
 import { ScopeEdizione, type EdizioneScope } from './ScopeEdizione';
 
@@ -92,7 +93,8 @@ export default async function CompletamentoPage(props: { searchParams?: Promise<
         completati: prog?.completati ?? 0,
         obbligatori_totale: prog?.obbligatori_totale ?? 0,
         obbligatori_completati: prog?.obbligatori_completati ?? 0,
-        idonea: Boolean(prog?.idonea),
+        // Stessa regola di attestati e report fondi: lezioni obbligatorie E presenza minima (se il corso la chiede).
+        idonea: deriveIdoneita(prog?.obbligatori_totale ?? 0, Boolean(prog?.idonea), freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza)).idoneo,
         frequenza: freq && freq.soglia != null
           ? { percentuale: freq.frequenza_percentuale, soglia: freq.soglia, ore: freq.ore_frequentate, ore_pianificate: round1(freq.minuti_pianificati / 60), idoneo: freq.idoneo_frequenza, non_parsate: freq.durate_non_parsate }
           : null,
@@ -123,7 +125,7 @@ export default async function CompletamentoPage(props: { searchParams?: Promise<
           <h1>Completamento</h1>
           <p>
             Per ogni iscrizione, lo stato delle lezioni e l&apos;idoneità sono ricalcolati a ogni apertura dagli eventi del registro.
-            L&apos;idoneità richiede tutte le lezioni obbligatorie, ciascuna secondo la sua regola; le facoltative contano nell&apos;avanzamento ma non la bloccano.
+            L&apos;idoneità richiede tutte le lezioni obbligatorie, ciascuna secondo la sua regola, e la presenza minima alle sessioni se il corso la prevede; le facoltative contano nell&apos;avanzamento ma non la bloccano. È la stessa regola di attestati e report fondi.
           </p>
         </div>
       </div>

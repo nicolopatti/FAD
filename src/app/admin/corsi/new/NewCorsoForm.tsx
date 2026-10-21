@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
+import { parseSoglia } from '@/lib/validazione';
 
 export function NewCorsoForm({ categorie }: { categorie: string[] }) {
   const router = useRouter();
@@ -18,6 +19,8 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
   const [ore, setOre] = useState('');
   const [riferimento, setRiferimento] = useState('');
   const [politica, setPolitica] = useState('automatica');
+  const [soglia, setSoglia] = useState('');
+  const [errSoglia, setErrSoglia] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errTitolo, setErrTitolo] = useState<string | null>(null);
@@ -26,6 +29,8 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
     e.preventDefault();
     if (!titolo.trim()) { setErrTitolo('Il titolo è obbligatorio: è quello che vedranno i discenti.'); return; }
     setErrTitolo(null);
+    if (parseSoglia(soglia) === undefined) { setErrSoglia('Indica una percentuale tra 1 e 100, oppure lascia vuoto.'); return; }
+    setErrSoglia(null);
     setBusy(true);
     setError(null);
     try {
@@ -41,6 +46,7 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
           ore_totali: ore.trim() ? ore.trim().replace(',', '.') : null,
           riferimento_normativo: riferimento.trim() || null,
           politica_attestato: politica,
+          soglia_frequenza_percentuale: soglia.trim() || null,
         }),
       });
       const json = await res.json();
@@ -104,6 +110,9 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
               <span className="switch__track" />
             </label>
           </div>
+          <Field id="nc-soglia" label="Presenza minima alle sessioni (%)" error={errSoglia} hint="Per i corsi con sessioni live: sotto questa presenza il discente non completa il corso. Vuoto = nessun requisito.">
+            <input id="nc-soglia" className="input" inputMode="decimal" value={soglia} onChange={(e) => { setSoglia(e.target.value); if (errSoglia) setErrSoglia(null); }} disabled={busy} placeholder="es. 80" style={{ maxWidth: 160 }} aria-invalid={Boolean(errSoglia)} />
+          </Field>
           <h4 style={{ margin: '4px 0 8px' }}>Attestato</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
             <Field id="nc-ore" label="Ore totali" hint="Compaiono sull’attestato (es. 8 o 2,5).">
@@ -120,7 +129,7 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
               <option value="nessuna">Nessuno</option>
             </select>
           </Field>
-          <div className="field__hint" style={{ marginBottom: 14 }}>Sblocco, visione integrale e rilascio dell&apos;attestato si congelano alla prima edizione: scegli adesso con attenzione. Ore e riferimento normativo si possono compilare anche dopo, se lasciati vuoti.</div>
+          <div className="field__hint" style={{ marginBottom: 14 }}>Sblocco, visione integrale, presenza minima e rilascio dell&apos;attestato si congelano alla prima edizione: scegli adesso con attenzione. Ore e riferimento normativo si possono compilare anche dopo, se lasciati vuoti.</div>
           <button type="submit" className="btn" disabled={busy}>{busy ? 'Creo…' : 'Crea corso'}</button>
         </div>
       </form>

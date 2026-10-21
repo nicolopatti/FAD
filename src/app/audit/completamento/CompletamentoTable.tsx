@@ -103,7 +103,7 @@ export function CompletamentoTable({ righe }: { righe: RigaCompletamento[] }) {
     <>
       <nav className="kpi-strip" aria-label="Totali">
         <div className="kpi-strip__item"><span className="kpi-strip__label"><Icon name="users" /> Iscrizioni</span><span className="kpi-strip__value">{tot.iscrizioni}</span><span className="kpi-strip__sub">{righe.length !== tot.iscrizioni ? `su ${righe.length} totali` : 'nel registro'}</span></div>
-        <div className="kpi-strip__item"><span className="kpi-strip__label"><Icon name="check" /> Idonei</span><span className="kpi-strip__value">{tot.idonei}</span><span className="kpi-strip__sub">tutte le lezioni obbligatorie completate</span></div>
+        <div className="kpi-strip__item"><span className="kpi-strip__label"><Icon name="check" /> Idonei</span><span className="kpi-strip__value">{tot.idonei}</span><span className="kpi-strip__sub">lezioni obbligatorie e presenza minima</span></div>
         <div className="kpi-strip__item"><span className="kpi-strip__label"><Icon name="clock" /> In corso</span><span className="kpi-strip__value">{tot.inCorso}</span><span className="kpi-strip__sub">percorso non ancora concluso</span></div>
         <div className="kpi-strip__item"><span className="kpi-strip__label"><Icon name="alert" /> Frequenza sotto soglia</span><span className="kpi-strip__value">{tot.sottoSoglia}</span><span className="kpi-strip__sub">solo corsi con sessioni</span></div>
       </nav>

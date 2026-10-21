@@ -114,6 +114,8 @@ export function ModelloEditor({ ambito, tenantId, corsoId, valore, ereditato }: 
   }
 
   async function tornaAlPredefinito() {
+    // Mai salvato un modello del corso: si spegne e basta, non c'è niente da togliere.
+    if (valore == null) { setAttivo(false); setM({ ...ereditato }); return; }
     if (!(await confirm({ titolo: 'Tornare al modello dell’ente?', messaggio: 'Le personalizzazioni di questo corso vengono tolte. Gli attestati già emessi non cambiano.', conferma: 'Torna al predefinito' }))) return;
     setAttivo(false);
     setM({ ...ereditato });

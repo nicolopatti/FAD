@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
-import { addIscritto, type IscrittoInput } from '@/lib/iscritti';
+import { addIscritto, motivoEdizioneChiusa, type IscrittoInput } from '@/lib/iscritti';
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -13,6 +13,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   }
 
   const supabase = await createSupabaseServerClient();
+  const chiusa = await motivoEdizioneChiusa(supabase, params.id);
+  if (chiusa) return NextResponse.json({ ok: false, error: chiusa.error }, { status: chiusa.status });
   const ctx = { tenantId: session.tenantId, personaId: session.personaId };
 
   let creati = 0;

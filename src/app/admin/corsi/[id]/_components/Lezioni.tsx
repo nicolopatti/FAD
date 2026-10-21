@@ -135,7 +135,7 @@ function Sequenza({
   }
 
   async function toggleObbligatorio(s: StrutturaCorsoConLO) {
-    await call('PATCH', `/api/admin/corsi/${corsoId}/struttura/${s.id}`, { obbligatorio: !s.obbligatorio });
+    await call('PATCH', `/api/admin/corsi/${corsoId}/struttura/${s.id}`, { obbligatorio: !s.obbligatorio }).catch(() => { /* banner */ });
   }
   async function remove(s: StrutturaCorsoConLO) {
     const ok = await confirm({
@@ -145,7 +145,7 @@ function Sequenza({
       pericolosa: true,
     });
     if (!ok) return;
-    await call('DELETE', `/api/admin/corsi/${corsoId}/struttura/${s.id}`, undefined, { successo: 'Lezione tolta dal corso.' });
+    await call('DELETE', `/api/admin/corsi/${corsoId}/struttura/${s.id}`, undefined, { successo: 'Lezione tolta dal corso.' }).catch(() => { /* banner */ });
   }
 
   const durataTot = list.reduce((acc, s) => acc + (s.learning_object?.type === 'video' && typeof s.learning_object.config?.durata_secondi === 'number' ? (s.learning_object.config.durata_secondi as number) : 0), 0);
@@ -426,7 +426,7 @@ function DallaLibreria({ corsoId, busy, call }: { corsoId: string; busy: boolean
                   {lo.usato_in > 0 ? ` · in ${lo.usato_in} ${lo.usato_in === 1 ? 'corso' : 'corsi'}` : ' · in nessun corso'}
                 </div>
               </div>
-              <button type="button" className="btn btn--secondary btn--xs" disabled={busy} onClick={() => call('POST', `/api/admin/corsi/${corsoId}/struttura`, { learning_object_id: lo.id }, { successo: `"${lo.titolo}" aggiunto al corso.` })}>
+              <button type="button" className="btn btn--secondary btn--xs" disabled={busy} onClick={() => call('POST', `/api/admin/corsi/${corsoId}/struttura`, { learning_object_id: lo.id }, { successo: `"${lo.titolo}" aggiunto al corso.` }).catch(() => { /* banner */ })}>
                 <Icon name="plus" /> Aggiungi
               </button>
             </div>
@@ -515,6 +515,7 @@ function DaCsv({
   const importabili = rows.filter((r) => r.esito !== 'errore');
 
   async function importa() {
+    try {
     await call('POST', `/api/admin/corsi/${corsoId}/struttura/import`, {
       rows: importabili.map((r) => ({
         titolo: r.titolo,
@@ -525,6 +526,7 @@ function DaCsv({
       })),
     }, { successo: `${importabili.length} lezion${importabili.length === 1 ? 'e importata' : 'i importate'}.` });
     setRows([]);
+    } catch { /* banner: le righe restano per correggerle e riprovare */ }
   }
 
   return (

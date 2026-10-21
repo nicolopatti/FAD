@@ -1,6 +1,17 @@
 // Validatori leggeri per i form (lato client e server). Messaggi in italiano,
 // pensati per stare accanto al campo.
 
+/**
+ * Soglia di frequenza in percentuale (0 < x ≤ 100, virgola ammessa). Vuoto =
+ * nessun requisito (null). Ritorna undefined se il valore non è valido.
+ */
+export function parseSoglia(v: unknown): number | null | undefined {
+  if (v == null || v === '') return null;
+  const n = Number(String(v).replace(',', '.').trim());
+  if (!Number.isFinite(n) || n <= 0 || n > 100) return undefined;
+  return Math.round(n * 100) / 100;
+}
+
 export function isEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 }

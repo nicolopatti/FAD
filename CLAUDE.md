@@ -9,6 +9,62 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
+## Verifica complessiva dell'area admin (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, "ti approvo tutto" vale anche per il merge)
+
+Richiesta dell'utente: verificare che tutti i pulsanti e le funzioni dell'area admin
+facciano quello che devono e cercare errori concettuali di UX. Tre strumenti:
+- **Crawl pulsante per pulsante** (`scratchpad/pw/crawl_admin.mjs`, dev server senza
+  chiave di servizio): 39 pagine, 162 pulsanti, 131 premuti (gli altri disabilitati),
+  conferme accettate; ogni scrittura deve finire in 503 controllato o in una
+  validazione. Esito prima delle correzioni: 0 click falliti, 0 risposte inattese,
+  0 sforamenti; difetti = promesse non gestite negli onClick e campi senza etichetta.
+- **Giro completo in produzione** (`scripts/verifica-giro-completo.mjs`, secondo step
+  del workflow `verifica-scritture.yml`): corso di prova dalla creazione
+  all'archiviazione (contenuti, test con domande, lezioni, copertina, edizione e D22,
+  iscritti, docente, sessione, presenze, piano, report fondo, attestato, conclusione,
+  duplicazione, archiviazione). Primo giro **62/66**, con 4 difetti reali.
+- **Revisione UX** del codice delle pagine (20 difetti certi + 12 opinioni).
+
+Correzioni (stesso branch):
+- *Server*: policy del bucket `copertine` sul tenant della Persona (migration
+  `20261021000004_copertine_policy_tenant_fix.sql`, **applicata sul live**: prima
+  l'upload della copertina dal browser era SEMPRE rifiutato); `cover_path` accettato
+  solo nella cartella del tenant (`pathNelTenant`); `addIscritto` valida l'email e
+  le route iscritti (singolo e CSV) rifiutano con 409 un'edizione conclusa o
+  annullata (`motivoEdizioneChiusa` in `lib/iscritti.ts`); concludi e annulla
+  rispondono 409 se l'edizione è già chiusa (annullare una conclusa non è più
+  possibile); sessione annullata → 409 su import CSV e presenza manuale; nuova
+  **`PATCH /api/admin/piani/[id]`** (Evento `piano.updated {campi, ha_cup}`) con
+  modifica dalla tabella dei piani; **`corso.soglia_frequenza_percentuale`**
+  impostabile da creazione e Impostazioni del corso (`parseSoglia` in
+  `lib/validazione.ts`, congelata con D22 come prima).
+- *Interfaccia*: scheda Attestato sempre visibile (con "Nessuno" spariva e non si
+  tornava indietro); "Annulla edizione" solo su edizione attiva; sessione senza data
+  = "da pianificare"; pagina della sessione nell'ordine del lavoro (dettagli →
+  import → coda → presenze → storico) e banner a sessione annullata; testi senza
+  gergo (Evento, write-once, hash) in coda, presenze, import e deposito; etichette
+  collegate ai campi; conferma anche sull'invito singolo; `useCall` mostra l'errore
+  anche a comparsa; riepilogo dell'import CSV dagli esiti del server; email non
+  valide segnalate nell'anteprima CSV; KPI "Edizioni in corso" porta alla tabella
+  della dashboard; filtro dell'agenda nell'URL; "Salva" dell'ente attivo solo con
+  modifiche; spegnere il modello del corso mai salvato non scrive nulla; prontezza
+  del Fondo con link e spiegazione della soglia. CSS: **`.tbl-wrap` è
+  `position: relative`** (un `.sr-only` dentro una tabella faceva sforare la pagina a
+  390 px).
+- *Errore concettuale trovato nelle schermate*: la scheda **Stato** dell'edizione e
+  `/audit/completamento` dichiaravano "idoneo" guardando solo le lezioni online (Neri
+  Carla idonea con 0% di presenza su soglia 80%), mentre attestati e report fondi usano
+  `deriveIdoneita` (lezioni E presenza minima). Ora tutte e due usano `deriveIdoneita`.
+  **Resta aperto** (area discente, fuori dalla richiesta): `/corsi` e la pagina del
+  corso del discente mostrano "Completato" con la sola `prog.idonea`; su un corso misto
+  con soglia di presenza il discente vedrebbe il sigillo senza esserlo davvero.
+- Non fatto, segnalato come proposta: riordino delle categorie non atomico (due PATCH),
+  "Persone" come titolo anche della scheda Aziende, sovrapposizione Rendicontazione/
+  scheda Fondo, azioni in blocco su altre liste.
+- **Residui in produzione** del giro completo: corso "Verifica automatica <tag>"
+  archiviato con edizione conclusa e il piano "… · piano" (i piani non si eliminano):
+  compaiono in Rendicontazione. Dati di prova del tenant demo.
+
 ## Manutenzione dopo Next 16 (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` e in produzione** — "vai avanti con le attività previste" e poi "ti approvo tutto")
 
 Quattro attività di piano eseguibili dal container, in quattro commit sul branch:

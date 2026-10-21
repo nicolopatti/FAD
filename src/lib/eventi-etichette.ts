@@ -63,6 +63,7 @@ export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[]
   { tipo: 'iscrizione.imported', etichetta: 'Iscrizioni importate', gruppo: 'edizioni' },
   { tipo: 'iscrizione.removed', etichetta: 'Iscrizione rimossa', gruppo: 'edizioni' },
   { tipo: 'piano.created', etichetta: 'Piano finanziato creato', gruppo: 'fondi' },
+  { tipo: 'piano.updated', etichetta: 'Piano finanziato modificato', gruppo: 'fondi' },
   { tipo: 'edizione.piano_assegnato', etichetta: 'Piano assegnato all’edizione', gruppo: 'fondi' },
   { tipo: 'incarico.created', etichetta: 'Docente o tutor assegnato', gruppo: 'edizioni' },
   { tipo: 'incarico.removed', etichetta: 'Docente o tutor rimosso', gruppo: 'edizioni' },
@@ -186,6 +187,7 @@ export function riassuntoEvento(tipo: string, payload: Record<string, unknown> |
     case 'ente.updated':
     case 'persona.updated':
     case 'azienda.updated':
+    case 'piano.updated':
       return Array.isArray(p.campi) ? (p.campi as string[]).join(', ') : '';
     case 'corso.archived':
     case 'corso.unarchived':

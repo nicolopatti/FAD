@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { computeProgressoPerIscrizioni, computeFrequenzaPerIscrizioni, regolaLabel } from '@/lib/compliance';
 import type { EdizioneRow, IscrizioneAuditRow } from '@/lib/db-types';
+import { deriveIdoneita } from '@/lib/report-fondo';
 import { CompletamentoTable, type RigaCompletamento } from '@/app/audit/completamento/CompletamentoTable';
 import { EdizioneAzioni } from '../../_components/EdizioneAzioni';
 import { EdizioneModifica } from '../../../../_components/EdizioniPanel';
@@ -50,7 +51,8 @@ export default async function EdizioneStatoPage(props: { params: Promise<{ id: s
       completati: prog?.completati ?? 0,
       obbligatori_totale: prog?.obbligatori_totale ?? 0,
       obbligatori_completati: prog?.obbligatori_completati ?? 0,
-      idonea: Boolean(prog?.idonea),
+      // Stessa regola di attestati e report fondi: lezioni obbligatorie E presenza minima (se il corso la chiede).
+        idonea: deriveIdoneita(prog?.obbligatori_totale ?? 0, Boolean(prog?.idonea), freq?.soglia ?? null, Boolean(freq?.idoneo_frequenza)).idoneo,
       frequenza: freq && freq.soglia != null
         ? { percentuale: freq.frequenza_percentuale, soglia: freq.soglia, ore: freq.ore_frequentate, ore_pianificate: round1(freq.minuti_pianificati / 60), idoneo: freq.idoneo_frequenza, non_parsate: freq.durate_non_parsate }
         : null,

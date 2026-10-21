@@ -15,8 +15,9 @@ export async function POST(_request: Request, props: { params: Promise<{ id: str
     .is('concluso_at', null)
     .is('annullato_at', null)
     .select('id, corso_id, codice')
-    .single();
+    .maybeSingle();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  if (!data) return NextResponse.json({ ok: false, error: 'Edizione non trovata, già conclusa o annullata.' }, { status: 409 });
 
   await appendEvent({
     tenantId: session.tenantId,

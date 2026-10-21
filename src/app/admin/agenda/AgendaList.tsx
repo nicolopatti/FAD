@@ -70,7 +70,7 @@ export function AgendaList({ righe, quando: iniziale }: { righe: SessioneAgenda[
           <div className="toolbar__spacer" />
           <div className="seg seg--mono" role="group" aria-label="Quando">
             {([['prossime', 'Prossime'], ['passate', 'Passate'], ['tutte', 'Tutte']] as [Quando, string][]).map(([v, label]) => (
-              <button key={v} type="button" className={quando === v ? 'is-active' : ''} onClick={() => { setQuando(v); setPagina(1); }}>{label}</button>
+              <button key={v} type="button" className={quando === v ? 'is-active' : ''} onClick={() => { setQuando(v); setPagina(1); router.replace((v === 'prossime' ? '/admin/agenda' : `/admin/agenda?quando=${v}`) as Route, { scroll: false }); }}>{label}</button>
             ))}
           </div>
         </div>

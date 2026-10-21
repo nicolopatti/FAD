@@ -53,7 +53,17 @@ export function Iscritti({
     const piano = piani.find((p) => p.id === pianoId);
     await call('PATCH', `/api/admin/iscrizioni/${i.iscrizione_id}`, { piano_id: pianoId || null }, {
       successo: piano ? `${i.cognome} ${i.nome}: piano "${piano.titolo}" assegnato.` : `${i.cognome} ${i.nome}: nessun piano finanziato.`,
-    });
+    }).catch(() => { /* banner */ });
+  }
+
+  async function invita(i: IscrittoRow) {
+    if (!(await confirm({ titolo: `Inviare l'invito a ${i.cognome} ${i.nome}?`, messaggio: `Riceve all'indirizzo ${i.email} un'email con il link per scegliere la password ed entrare.`, conferma: 'Invia l\'invito' }))) return;
+    await call('POST', `/api/admin/persone/${i.persona_id}/invita`, undefined, { successo: `Invito inviato a ${i.email}.` }).catch(() => { /* banner */ });
+  }
+
+  async function rimuovi(i: IscrittoRow) {
+    if (!(await confirm({ titolo: `Rimuovere ${i.cognome} ${i.nome} dall'edizione?`, messaggio: 'La persona resta in anagrafica; viene tolta solo l\'iscrizione a questa edizione.', conferma: 'Rimuovi', pericolosa: true }))) return;
+    await call('DELETE', `/api/admin/iscrizioni/${i.iscrizione_id}`, undefined, { successo: `${i.cognome} ${i.nome} rimosso dall'edizione.` }).catch(() => { /* banner */ });
   }
 
   const selezionati = iscritti.filter((i) => sel.has(i.iscrizione_id));
@@ -87,15 +97,17 @@ export function Iscritti({
   async function emettiAttestato(i: IscrittoRow) {
     if (i.attestato) { setRiemetti({ iscrizione_id: i.iscrizione_id, motivazione: '' }); return; }
     if (!(await confirm({ titolo: `Emettere l'attestato a ${i.cognome} ${i.nome}?`, messaggio: 'Viene emesso solo se il percorso risulta completato adesso. Il documento è numerato e non si modifica: un errore si corregge con una riemissione.', conferma: 'Emetti' }))) return;
-    await call('POST', `/api/admin/iscrizioni/${i.iscrizione_id}/attestato`, {}, { successo: `Attestato emesso a ${i.cognome} ${i.nome}.` });
+    await call('POST', `/api/admin/iscrizioni/${i.iscrizione_id}/attestato`, {}, { successo: `Attestato emesso a ${i.cognome} ${i.nome}.` }).catch(() => { /* banner */ });
   }
   async function confermaRiemissione() {
     if (!riemetti) return;
     const mot = riemetti.motivazione.trim();
     if (!mot) return;
     const i = iscritti.find((x) => x.iscrizione_id === riemetti.iscrizione_id);
-    await call('POST', `/api/admin/iscrizioni/${riemetti.iscrizione_id}/attestato`, { motivazione: mot }, { successo: `Nuovo attestato emesso${i ? ` a ${i.cognome} ${i.nome}` : ''}; il precedente risulta sostituito.` });
-    setRiemetti(null);
+    try {
+      await call('POST', `/api/admin/iscrizioni/${riemetti.iscrizione_id}/attestato`, { motivazione: mot }, { successo: `Nuovo attestato emesso${i ? ` a ${i.cognome} ${i.nome}` : ''}; il precedente risulta sostituito.` });
+      setRiemetti(null);
+    } catch { /* banner */ }
   }
 
   return (
@@ -115,7 +127,7 @@ export function Iscritti({
                 disabled={busy}
                 onClick={async () => {
                   if (!(await confirm({ titolo: `Inviare l'invito a ${senzaAccesso} iscritt${senzaAccesso === 1 ? 'o' : 'i'}?`, messaggio: 'Ognuno riceve un\'email con il link per scegliere la password. Chi ha già un accesso non viene toccato.', conferma: 'Invia gli inviti' }))) return;
-                  const r = (await call('POST', `/api/admin/edizioni/${edizioneId}/invita`)) as { inviati?: number; errori?: { email: string; errore: string }[] } | undefined;
+                  const r = (await call('POST', `/api/admin/edizioni/${edizioneId}/invita`).catch(() => undefined)) as { inviati?: number; errori?: { email: string; errore: string }[] } | undefined;
                   if (!r) return;
                   if (r.errori?.length) toast(`${r.inviati ?? 0} inviti inviati, ${r.errori.length} non riusciti: ${r.errori[0].email} (${r.errori[0].errore})`, 'errore');
                   else toast(`${r.inviati ?? 0} invit${(r.inviati ?? 0) === 1 ? 'o inviato' : 'i inviati'}.`);
@@ -168,7 +180,7 @@ export function Iscritti({
                         {i.accesso ? (
                           <span className="chip chip--ok" title="Ha un utente attivo sulla piattaforma">attivo</span>
                         ) : (
-                          <button type="button" className="btn btn--ghost btn--xs" disabled={busy} title="Manda l'email con il link per scegliere la password" onClick={() => call('POST', `/api/admin/persone/${i.persona_id}/invita`, undefined, { successo: `Invito inviato a ${i.email}.` })}>Invita</button>
+                          <button type="button" className="btn btn--ghost btn--xs" disabled={busy} title="Manda l'email con il link per scegliere la password" onClick={() => invita(i)}>Invita</button>
                         )}
                       </td>
                       <td className="mono">{i.codice_fiscale ?? <span className="chip chip--err">assente</span>}</td>
@@ -197,14 +209,14 @@ export function Iscritti({
                         </td>
                       )}
                       <td>
-                        <button type="button" className="icon-btn" title="Rimuovi iscritto" aria-label={`Rimuovi ${i.cognome} ${i.nome}`} disabled={busy} onClick={async () => { if (await confirm({ titolo: `Rimuovere ${i.cognome} ${i.nome} dall'edizione?`, messaggio: 'La persona resta in anagrafica; viene tolta solo l\'iscrizione a questa edizione.', conferma: 'Rimuovi', pericolosa: true })) call('DELETE', `/api/admin/iscrizioni/${i.iscrizione_id}`, undefined, { successo: `${i.cognome} ${i.nome} rimosso dall'edizione.` }); }}>
+                        <button type="button" className="icon-btn" title="Rimuovi iscritto" aria-label={`Rimuovi ${i.cognome} ${i.nome}`} disabled={busy} onClick={() => rimuovi(i)}>
                           <Icon name="trash" />
                         </button>
                       </td>
                     </tr>
                   ))}
                   {visibili.length === 0 && (
-                    <tr><td colSpan={9} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
+                    <tr><td colSpan={politicaAttestato !== 'nessuna' ? 9 : 8} className="muted">Nessun iscritto corrisponde a “{q}”.</td></tr>
                   )}
                 </tbody>
               </table></div>
@@ -313,7 +325,7 @@ function IscrittoManuale({ edizioneId, piani, busy, call }: { edizioneId: string
         <Field id="isc-azienda" label="Azienda">
           <input id="isc-azienda" className="input" value={azienda} onChange={(e) => setAzienda(e.target.value)} disabled={busy} placeholder="Ragione sociale" autoComplete="off" />
         </Field>
-        <Field id="isc-piano" label="Piano finanziato" hint={piani.length === 0 ? 'Nessun piano: si crea in Rendicontazione.' : undefined}>
+        <Field id="isc-piano" label="Piano finanziato" hint={piani.length === 0 ? 'Nessun piano: si crea in Rendicontazione.' : 'Resta selezionato per l’iscritto successivo.'}>
           <select id="isc-piano" className="select" value={pianoId} onChange={(e) => setPianoId(e.target.value)} disabled={busy || piani.length === 0}>
             <option value="">— nessuno —</option>
             {piani.map((p) => <option key={p.id} value={p.id}>{p.titolo}{p.fondo ? ` (${p.fondo})` : ''}</option>)}
@@ -375,6 +387,7 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
         let motivo: string | undefined;
         const ek = email.toLowerCase(); const ck = cf.toLowerCase();
         if (!cognome || !nome || !email) { esito = 'errore'; motivo = 'cognome/nome/email mancanti'; }
+        else if (!isEmail(email)) { esito = 'errore'; motivo = 'email non valida'; }
         else if (emails.has(ek) || (ck && cfs.has(ck)) || seenEmail.has(ek) || (ck && seenCf.has(ck))) { esito = 'duplicato'; motivo = 'già iscritto'; }
         if (esito === 'nuovo') { seenEmail.add(ek); if (ck) seenCf.add(ck); }
         return { riga: idx + 1, cognome, nome, email, codice_fiscale: cf, azienda, partita_iva, data_nascita, luogo_nascita, esito, motivo };
@@ -391,13 +404,17 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
   async function importa() {
     onBusy(true);
     try {
-      await call('POST', `/api/admin/edizioni/${edizioneId}/iscritti/import`, {
+      const r = (await call('POST', `/api/admin/edizioni/${edizioneId}/iscritti/import`, {
         rows: importabili.map((r) => ({
           cognome: r.cognome, nome: r.nome, email: r.email,
           codice_fiscale: r.codice_fiscale || null, azienda: r.azienda || null, partita_iva: r.partita_iva || null,
           data_nascita: r.data_nascita || null, luogo_nascita: r.luogo_nascita || null,
         })),
-      }, { successo: `${importabili.length} iscritt${importabili.length === 1 ? 'o importato' : 'i importati'}.` });
+      })) as { creati?: number; duplicati?: number; errori?: { riga: number; error: string }[] } | undefined;
+      // Il riepilogo viene dalla risposta del server, non dall'anteprima: dice cosa è entrato davvero.
+      const creati = r?.creati ?? 0;
+      const altri = [r?.duplicati ? `${r.duplicati} già iscritt${r.duplicati === 1 ? 'o' : 'i'}` : '', r?.errori?.length ? `${r.errori.length} con errori (riga ${importabili[r.errori[0].riga - 1]?.riga ?? r.errori[0].riga}: ${r.errori[0].error})` : ''].filter(Boolean).join(', ');
+      toast(`${creati} iscritt${creati === 1 ? 'o importato' : 'i importati'}${altri ? `; ${altri}` : ''}.`, r?.errori?.length && creati === 0 ? 'errore' : 'ok');
       setRows([]);
     } catch { /* banner */ } finally { onBusy(false); }
   }

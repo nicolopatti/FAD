@@ -160,6 +160,7 @@ export type CorsoRow = {
   riferimento_normativo?: string | null;
   politica_attestato?: PoliticaAttestato;
   attestato_modello?: unknown;   // modello parziale del corso (lib/attestato-modello.ts), null = ente
+  soglia_frequenza_percentuale?: number | string | null; // presenza minima alle sessioni live (congelata con D22)
   creato_il: string;
 };
 

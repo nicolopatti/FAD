@@ -38,7 +38,7 @@ export function DepositaPanel({
     if (!override) {
       const ok = await confirm({
         titolo: `Depositare il report ${formato}?`,
-        messaggio: 'I dati calcolati adesso vengono congelati in uno snapshot che non si può modificare né cancellare, e l\'operazione viene scritta nel registro. Potrai sempre generare un nuovo snapshot.',
+        messaggio: 'I dati calcolati adesso vengono congelati in una copia che non si può modificare né cancellare, e l\'operazione viene scritta nel registro. Potrai sempre depositare una nuova copia.',
         conferma: 'Deposita',
       });
       if (!ok) return;
@@ -59,7 +59,7 @@ export function DepositaPanel({
         return;
       }
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      setOk(`Snapshot depositato — Evento #${json.result.evento_seq}, hash ${String(json.result.hash).slice(0, 16)}…`);
+      setOk(`Copia depositata e registrata (impronta ${String(json.result.hash).slice(0, 16)}…).`);
       setNeedsOverride(false);
       router.refresh();
       toast('Report depositato.');
@@ -84,13 +84,13 @@ export function DepositaPanel({
 
   return (
     <div className="card">
-      <div className="card__head"><h3>Deposito (snapshot write-once)</h3></div>
+      <div className="card__head"><h3>Deposito</h3></div>
       <div className="card__body">
         <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-          Il deposito congela i dati risolti adesso in uno snapshot immutabile e scrive un Evento con
-          l&apos;hash nel log (l&apos;auditor lo vede in <span className="mono">/audit/log</span> e ne
-          verifica l&apos;integrità). Rigenerare crea un <strong>nuovo</strong> snapshot; i precedenti
-          restano invariati.
+          Il deposito congela i dati di adesso in una copia che non si può più modificare e ne scrive
+          l&apos;impronta nel registro (l&apos;auditor la ritrova nel log eventi e ne verifica
+          l&apos;integrità). Depositare di nuovo crea una <strong>nuova</strong> copia; le precedenti
+          restano invariate.
         </div>
 
         {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
@@ -112,13 +112,13 @@ export function DepositaPanel({
           </div>
         )}
 
-        <h4 style={{ margin: '18px 0 12px' }}>Snapshot depositati ({snapshots.length})</h4>
+        <h4 style={{ margin: '18px 0 12px' }}>Copie depositate ({snapshots.length})</h4>
         {snapshots.length === 0 ? (
-          <div className="muted">Nessuno snapshot ancora depositato per questa coppia.</div>
+          <div className="muted">Nessuna copia ancora depositata per questa edizione e questo piano.</div>
         ) : (
           <div className="tbl-wrap"><table className="tbl tbl--zebra">
             <thead>
-              <tr><th>Quando</th><th>Formato</th><th>Hash (Evento)</th><th>Integrità</th><th></th></tr>
+              <tr><th>Quando</th><th>Formato</th><th>Impronta</th><th>Integrità</th><th></th></tr>
             </thead>
             <tbody>
               {snapshots.map((s) => (
