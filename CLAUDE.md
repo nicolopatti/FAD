@@ -9,7 +9,7 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Manutenzione dopo Next 16 (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **non su `main`**: "adesso non riesco a controllare, vai avanti con le attività previste")
+## Manutenzione dopo Next 16 (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` e in produzione** — "vai avanti con le attività previste" e poi "ti approvo tutto")
 
 Quattro attività di piano eseguibili dal container, in quattro commit sul branch:
 - **Advisor Supabase** (security + performance riletti): unico rilievo azionabile era
@@ -40,6 +40,15 @@ Quattro attività di piano eseguibili dal container, in quattro commit sul branc
   3.0.3 (GHSA-vfj7-8cjw-p6xm, solo lint via `@next/eslint-plugin-next` → `fast-glob`
   3.3.1 pinnata): **nessuna versione corretta pubblicata**, il "fix" di npm sarebbe
   tornare a eslint-config-next 14 → si ignora; `npm audit --omit=dev` resta **0**.
+- **Scritture su Next 16 verificate in produzione** ("ti approvo tutto, vai avanti in
+  automatico"): i quattro commit sono stati portati su `main` (fast-forward
+  `38d3569`, deploy READY), poi `.github/workflows/verifica-scritture.yml` ora punta
+  **di default alla produzione** (`https://fad-wine.vercel.app`, nessun link
+  `_vercel_share`: la produzione non è protetta) e il push ha fatto partire il run →
+  **29/29** sul deploy Next 16 (categorie, archiviazione, persona, aziende con
+  unione, azioni in blocco; catena integra a **268 eventi**). Nessun residuo nel DB.
+  È la prova end-to-end delle route con `params` asincroni. Per un'anteprima
+  protetta il workflow si lancia a mano con gli input (URL + link di condivisione).
 - Nota sulla build nel container: la Turbopack build da `.next` pulita fallisce
   **a intermittenza** con "next/font/google queries have exactly one entry" (i font
   Google si scaricano via proxy a ogni build pulita); basta rilanciare. Su Vercel
@@ -1619,9 +1628,9 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 >    un'unica passata.
 > 6. **Manutenzione dopo Next 16 (2026-10-21, vedi sezione in testa)**: advisor
 >    Supabase sistemato (migration applicata), `datiEnteDa` unico, suite E2E
->    funzionale nel repo (50 controlli), devDependencies aggiornate. **Quattro commit
->    sul branch, non su `main`**: portarli su `main` con via libera esplicito
->    (fast-forward). Resta non eseguibile da qui: Blocco D (tracciati fondi, Teams),
+>    funzionale nel repo (50 controlli), devDependencies aggiornate; tutto **su
+>    `main` e in produzione**, scritture verificate sul deploy Next 16 (29/29).
+>    Resta non eseguibile da qui: Blocco D (tracciati fondi, Teams),
 >    test di carico a 300 VU dall'Europa, configurazioni lato utente (SMTP, secret
 >    `VERCEL_AUTOMATION_BYPASS_SECRET`, Pro, backup, leaked password protection).
 >
