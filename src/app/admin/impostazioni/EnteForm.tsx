@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/admin/Atlante';
-import { Field } from '@/components/admin/Form';
+import { Field, focusPrimoErrore } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { EnteRow } from '@/lib/db-types';
@@ -17,7 +17,7 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
   const router = useRouter();
   const { toast } = useFeedback();
   const [f, setF] = useState({
-    ragione_sociale: ente.ragione_sociale ?? ente.nome ?? '',
+    ragione_sociale: ente.ragione_sociale ?? '',
     citta: ente.citta ?? '',
     firmatario_nome: ente.firmatario_nome ?? '',
     firmatario_ruolo: ente.firmatario_ruolo ?? '',
@@ -25,10 +25,11 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errRs, setErrRs] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const firmaRef = useRef<HTMLInputElement>(null);
   const iniziale = {
-    ragione_sociale: ente.ragione_sociale ?? ente.nome ?? '',
+    ragione_sociale: ente.ragione_sociale ?? '',
     citta: ente.citta ?? '',
     firmatario_nome: ente.firmatario_nome ?? '',
     firmatario_ruolo: ente.firmatario_ruolo ?? '',
@@ -52,7 +53,7 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
 
   async function salva(e: React.FormEvent) {
     e.preventDefault();
-    if (!f.ragione_sociale.trim()) { setError('La ragione sociale è obbligatoria: è l’intestazione dell’attestato.'); return; }
+    if (!f.ragione_sociale.trim()) { setErrRs('La ragione sociale è obbligatoria: è l’intestazione dell’attestato.'); focusPrimoErrore(); return; }
     await patch({ ...f, linkedin_organization_id: f.linkedin_organization_id.trim() || null }, 'Dati dell’ente salvati.');
   }
 
@@ -83,13 +84,13 @@ export function EnteForm({ ente }: { ente: EnteRow }) {
         {error && <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>}
         <div className="grid-2-380">
           <div>
-            <Field id="en-rs" label="Ragione sociale" required>
-              <input id="en-rs" className="input" value={f.ragione_sociale} onChange={set('ragione_sociale')} disabled={busy} placeholder="es. Eurita Formazione S.r.l." />
+            <Field id="en-rs" label="Ragione sociale" required error={errRs} hint="Senza ragione sociale gli attestati non si emettono.">
+              <input id="en-rs" className="input" value={f.ragione_sociale} onChange={(e) => { set('ragione_sociale')(e); setErrRs(null); }} disabled={busy} placeholder={ente.nome ? `es. ${ente.nome} S.r.l.` : 'es. Eurita Formazione S.r.l.'} aria-invalid={Boolean(errRs)} />
             </Field>
             <Field id="en-citta" label="Città" hint="Luogo di emissione in calce all’attestato.">
               <input id="en-citta" className="input" value={f.citta} onChange={set('citta')} disabled={busy} placeholder="es. Milano" />
             </Field>
-            <Field id="en-fn" label="Firmatario" hint="Chi firma l’attestato.">
+            <Field id="en-fn" label="Firmatario" hint="Chi firma l’attestato. Senza firmatario (qui o nel modello) gli attestati non si emettono.">
               <input id="en-fn" className="input" value={f.firmatario_nome} onChange={set('firmatario_nome')} disabled={busy} placeholder="es. Carla Bianchi" />
             </Field>
             <Field id="en-fr" label="Ruolo del firmatario">

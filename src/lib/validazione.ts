@@ -91,3 +91,18 @@ export function erroriDateEdizione(d: DateEdizione): Errori {
   if (!e.fad_chiusura && dataDopo(di, fc)) e.fad_chiusura = 'Le lezioni online non possono chiudere prima che il corso inizi.';
   return e;
 }
+
+/** Ore totali del corso (0 < x ≤ 9999, virgola ammessa). Vuoto = null; undefined se non valido. */
+export function parseOre(v: unknown): number | null | undefined {
+  if (v == null || String(v).trim() === '') return null;
+  const n = Number(String(v).replace(',', '.').trim());
+  if (!Number.isFinite(n) || n <= 0 || n > 9999) return undefined;
+  return n;
+}
+
+export const MSG_ORE = 'Le ore totali devono essere un numero maggiore di zero (es. 8 o 2,5).';
+
+/** Prima lettera maiuscola (messaggi di errore tecnici mostrati all'utente). */
+export function maiuscola(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}

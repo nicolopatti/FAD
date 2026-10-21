@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '@/components/admin/Atlante';
-import { Field } from '@/components/admin/Form';
+import { Field, focusPrimoErrore } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
-import { parseSoglia } from '@/lib/validazione';
+import { MSG_ORE, parseOre, parseSoglia, type Errori } from '@/lib/validazione';
 
 export function NewCorsoForm({ categorie }: { categorie: string[] }) {
   const router = useRouter();
@@ -20,17 +20,22 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
   const [riferimento, setRiferimento] = useState('');
   const [politica, setPolitica] = useState('manuale');
   const [soglia, setSoglia] = useState('');
-  const [errSoglia, setErrSoglia] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [errTitolo, setErrTitolo] = useState<string | null>(null);
+  // Errori accanto ai campi, tutti insieme; il fuoco va sul primo (B2).
+  const [errs, setErrs] = useState<Errori>({});
+  const errTitolo = errs.titolo || null;
+  const errSoglia = errs.soglia || null;
+  const clear = (k: string) => { if (errs[k]) setErrs({ ...errs, [k]: '' }); };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!titolo.trim()) { setErrTitolo('Il titolo è obbligatorio: è quello che vedranno i discenti.'); return; }
-    setErrTitolo(null);
-    if (parseSoglia(soglia) === undefined) { setErrSoglia('Indica una percentuale tra 1 e 100, oppure lascia vuoto.'); return; }
-    setErrSoglia(null);
+    const ve: Errori = {};
+    if (!titolo.trim()) ve.titolo = 'Il titolo è obbligatorio: è quello che vedranno i discenti.';
+    if (parseOre(ore) === undefined) ve.ore = MSG_ORE;
+    if (parseSoglia(soglia) === undefined) ve.soglia = 'Indica una percentuale tra 1 e 100, oppure lascia vuoto.';
+    setErrs(ve);
+    if (Object.keys(ve).length) { focusPrimoErrore(); return; }
     setBusy(true);
     setError(null);
     try {
@@ -50,6 +55,14 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
         }),
       });
       const json = await res.json();
+      // Un errore del server su un campo va accanto al campo, non solo in cima.
+      const campoServer: Record<string, string> = { ore_totali: 'ore', soglia_frequenza_percentuale: 'soglia' };
+      if (!res.ok && json.campo && campoServer[json.campo]) {
+        setErrs({ [campoServer[json.campo]]: json.error });
+        setBusy(false);
+        focusPrimoErrore();
+        return;
+      }
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       toast('Corso creato: ora componi la struttura.');
       router.push(`/admin/corsi/${json.corso.id}`);
@@ -79,7 +92,7 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
             <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">{error}</div></div>
           )}
           <Field id="nc-titolo" label="Titolo" required error={errTitolo}>
-            <input id="nc-titolo" className="input" value={titolo} onChange={(e) => { setTitolo(e.target.value); if (errTitolo) setErrTitolo(null); }} disabled={busy} placeholder="es. Sicurezza sul lavoro — Formazione generale" autoFocus aria-invalid={Boolean(errTitolo)} />
+            <input id="nc-titolo" className="input" value={titolo} onChange={(e) => { setTitolo(e.target.value); clear('titolo'); }} disabled={busy} placeholder="es. Sicurezza sul lavoro — Formazione generale" autoFocus aria-invalid={Boolean(errTitolo)} />
           </Field>
           <Field id="nc-categoria" label="Categoria" hint={<>Serve per il segnaposto della copertina e per ritrovare il corso nel catalogo. L&apos;elenco si gestisce in <Link href="/admin/impostazioni/categorie">Impostazioni → Categorie</Link>.</>}>
             <select id="nc-categoria" className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={busy}>
@@ -111,12 +124,12 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
             </label>
           </div>
           <Field id="nc-soglia" label="Presenza minima alle sessioni (%)" error={errSoglia} hint="Solo per i corsi con sessioni live (webinar o aula): sotto questa presenza il discente non completa il corso. Per un corso solo online lascia vuoto.">
-            <input id="nc-soglia" className="input" inputMode="decimal" value={soglia} onChange={(e) => { setSoglia(e.target.value); if (errSoglia) setErrSoglia(null); }} disabled={busy} placeholder="es. 80" style={{ maxWidth: 160 }} aria-invalid={Boolean(errSoglia)} />
+            <input id="nc-soglia" className="input" inputMode="decimal" value={soglia} onChange={(e) => { setSoglia(e.target.value); clear('soglia'); }} disabled={busy} placeholder="es. 80" style={{ maxWidth: 160 }} aria-invalid={Boolean(errSoglia)} />
           </Field>
           <h4 style={{ margin: '4px 0 8px' }}>Attestato</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
-            <Field id="nc-ore" label="Ore totali" hint="Compaiono sull’attestato (es. 8 o 2,5).">
-              <input id="nc-ore" className="input" inputMode="decimal" value={ore} onChange={(e) => setOre(e.target.value)} disabled={busy} placeholder="es. 8" />
+            <Field id="nc-ore" label="Ore totali" error={errs.ore || null} hint="Compaiono sull’attestato (es. 8 o 2,5).">
+              <input id="nc-ore" className="input" inputMode="decimal" value={ore} onChange={(e) => { setOre(e.target.value); clear('ore'); }} disabled={busy} placeholder="es. 8" aria-invalid={Boolean(errs.ore)} />
             </Field>
             <Field id="nc-rif" label="Riferimento normativo" hint="Facoltativo.">
               <input id="nc-rif" className="input" value={riferimento} onChange={(e) => setRiferimento(e.target.value)} disabled={busy} placeholder="es. Accordo Stato-Regioni 21/12/2011" />

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import type { CorsoRow, PoliticaAttestato } from '@/lib/db-types';
-import { Field } from '@/components/admin/Form';
+import { Field, focusPrimoErrore } from '@/components/admin/Form';
+import { MSG_ORE, parseOre } from '@/lib/validazione';
 import { useCall } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
 
@@ -18,7 +19,8 @@ const POLITICHE: [PoliticaAttestato, string, string][] = [
  * corso attivo, se erano vuoti; la politica si fissa con la prima edizione.
  */
 export function FormAttestato({ corso, frozen }: { corso: CorsoRow; frozen: boolean }) {
-  const { call, busy, error, setError } = useCall();
+  const { call, busy, error } = useCall();
+  const [errOre, setErrOre] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const oreIniziali = corso.ore_totali != null ? String(corso.ore_totali).replace('.', ',') : '';
   const [ore, setOre] = useState(oreIniziali);
@@ -35,8 +37,8 @@ export function FormAttestato({ corso, frozen }: { corso: CorsoRow; frozen: bool
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!dirty) return;
-    const oreNum = ore.trim() ? Number(ore.trim().replace(',', '.')) : null;
-    if (ore.trim() && (!Number.isFinite(oreNum) || (oreNum as number) <= 0)) { setError('Le ore totali devono essere un numero maggiore di zero (es. 8 o 2,5).'); return; }
+    const oreNum = parseOre(ore);
+    if (oreNum === undefined) { setErrOre(MSG_ORE); focusPrimoErrore(); return; }
     const body = {
       ...(oreDirty ? { ore_totali: oreNum } : {}),
       ...(riferimentoDirty ? { riferimento_normativo: riferimento.trim() || null } : {}),
@@ -53,8 +55,8 @@ export function FormAttestato({ corso, frozen }: { corso: CorsoRow; frozen: bool
       <div className="card__body">
         <ErrorBanner error={error} />
         <div className="grid-3">
-          <Field id="corso-ore" label="Ore totali" hint={frozen && !oreEditabile ? 'Fissate con la prima edizione.' : 'es. 8 oppure 2,5'}>
-            <input id="corso-ore" className="input" inputMode="decimal" value={ore} onChange={(e) => setOre(e.target.value)} disabled={busy || !oreEditabile} placeholder="es. 8" />
+          <Field id="corso-ore" label="Ore totali" error={errOre} hint={frozen && !oreEditabile ? 'Fissate con la prima edizione.' : 'es. 8 oppure 2,5'}>
+            <input id="corso-ore" className="input" inputMode="decimal" value={ore} onChange={(e) => { setOre(e.target.value); setErrOre(null); }} disabled={busy || !oreEditabile} placeholder="es. 8" aria-invalid={Boolean(errOre)} />
           </Field>
           <Field id="corso-rif" label="Riferimento normativo" hint={frozen && !riferimentoEditabile ? 'Fissato con la prima edizione.' : 'Facoltativo.'}>
             <input id="corso-rif" className="input" value={riferimento} onChange={(e) => setRiferimento(e.target.value)} disabled={busy || !riferimentoEditabile} placeholder="es. Accordo Stato-Regioni 21/12/2011" />

@@ -70,3 +70,16 @@ export function Pager({
     </div>
   );
 }
+
+/**
+ * Dopo una validazione fallita: porta in vista e mette il fuoco sul primo campo
+ * con `aria-invalid` (B2: un errore fuori vista sembrava un pulsante che non fa nulla).
+ */
+export function focusPrimoErrore(scope?: HTMLElement | null) {
+  requestAnimationFrame(() => {
+    const el = (scope ?? document).querySelector<HTMLElement>('[aria-invalid="true"]');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.focus({ preventScroll: true });
+  });
+}

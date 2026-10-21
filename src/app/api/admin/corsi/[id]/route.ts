@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 import { normalizzaParziale, pathNelTenant } from '@/lib/attestato-modello';
-import { parseSoglia } from '@/lib/validazione';
+import { MSG_ORE, parseOre, parseSoglia } from '@/lib/validazione';
 
 type UpdateBody = {
   titolo?: string;
@@ -56,16 +56,14 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   // Presenza minima alle sessioni live: campo strutturale, congelato con D22.
   if (body.soglia_frequenza_percentuale !== undefined) {
     const soglia = parseSoglia(body.soglia_frequenza_percentuale);
-    if (soglia === undefined) return NextResponse.json({ ok: false, error: 'soglia di frequenza non valida (tra 1 e 100)' }, { status: 400 });
+    if (soglia === undefined) return NextResponse.json({ ok: false, error: 'La presenza minima deve essere una percentuale tra 1 e 100.', campo: 'soglia_frequenza_percentuale' }, { status: 400 });
     updates.soglia_frequenza_percentuale = soglia;
   }
   // Dati dell'attestato (Fase 5). A corso congelato il DB accetta solo il
   // passaggio da vuoto a valore (D22 esteso): il trigger risponde con errore.
   if (body.ore_totali !== undefined) {
-    const ore = body.ore_totali == null || body.ore_totali === '' ? null : Number(String(body.ore_totali).replace(',', '.'));
-    if (ore != null && (!Number.isFinite(ore) || ore <= 0 || ore > 9999)) {
-      return NextResponse.json({ ok: false, error: 'ore totali non valide' }, { status: 400 });
-    }
+    const ore = parseOre(body.ore_totali);
+    if (ore === undefined) return NextResponse.json({ ok: false, error: MSG_ORE, campo: 'ore_totali' }, { status: 400 });
     updates.ore_totali = ore;
   }
   if (body.riferimento_normativo !== undefined) {

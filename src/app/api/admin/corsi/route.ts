@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
-import { parseSoglia } from '@/lib/validazione';
+import { MSG_ORE, parseOre, parseSoglia } from '@/lib/validazione';
 
 type CreateBody = {
   titolo?: string;
@@ -25,14 +25,12 @@ export async function POST(request: Request) {
 
   const titolo = body.titolo?.trim();
   if (!titolo) {
-    return NextResponse.json({ ok: false, error: 'titolo mancante' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'Il titolo è obbligatorio.' }, { status: 400 });
   }
-  const ore = body.ore_totali == null || body.ore_totali === '' ? null : Number(String(body.ore_totali).replace(',', '.'));
-  if (ore != null && (!Number.isFinite(ore) || ore <= 0 || ore > 9999)) {
-    return NextResponse.json({ ok: false, error: 'ore totali non valide' }, { status: 400 });
-  }
+  const ore = parseOre(body.ore_totali);
+  if (ore === undefined) return NextResponse.json({ ok: false, error: MSG_ORE, campo: 'ore_totali' }, { status: 400 });
   const soglia = parseSoglia(body.soglia_frequenza_percentuale);
-  if (soglia === undefined) return NextResponse.json({ ok: false, error: 'soglia di frequenza non valida (tra 1 e 100)' }, { status: 400 });
+  if (soglia === undefined) return NextResponse.json({ ok: false, error: 'La presenza minima deve essere una percentuale tra 1 e 100.', campo: 'soglia_frequenza_percentuale' }, { status: 400 });
   const politica = body.politica_attestato ?? 'manuale'; // R1 (D10): rilascio con approvazione umana di default
   if (!POLITICHE.has(politica)) return NextResponse.json({ ok: false, error: 'politica attestato non valida' }, { status: 400 });
 
