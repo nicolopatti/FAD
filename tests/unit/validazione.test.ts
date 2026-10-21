@@ -57,3 +57,16 @@ describe('erroriDateEdizione (B1)', () => {
     expect(erroriDateEdizione({ data_inizio: '2026-11-10', fad_chiusura: '2026-11-05' }).fad_chiusura).toContain('prima che il corso inizi');
   });
 });
+
+describe('richiedePasswordAttuale (B8)', () => {
+  it('sessione da login con password → serve l’attuale', async () => {
+    const { richiedePasswordAttuale } = await import('../../src/lib/validazione');
+    expect(richiedePasswordAttuale([{ method: 'password', timestamp: 1 }])).toBe(true);
+  });
+  it('sessione da link (invito, reimpostazione, otp) → no', async () => {
+    const { richiedePasswordAttuale } = await import('../../src/lib/validazione');
+    expect(richiedePasswordAttuale([{ method: 'recovery', timestamp: 1 }])).toBe(false);
+    expect(richiedePasswordAttuale([{ method: 'otp', timestamp: 1 }])).toBe(false);
+    expect(richiedePasswordAttuale(undefined)).toBe(false);
+  });
+});

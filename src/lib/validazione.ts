@@ -112,3 +112,12 @@ export function fmtMmSs(sec: number): string {
   const s = Math.max(0, Math.round(sec));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/**
+ * B8: serve la password attuale per cambiarla? Sì se la sessione è nata da un
+ * accesso con password (`amr` del JWT di Supabase); no se è nata da un link
+ * via email (invito, reimpostazione), che ha già provato l'identità.
+ */
+export function richiedePasswordAttuale(amr: unknown): boolean {
+  return Array.isArray(amr) && amr.some((a) => (a as { method?: unknown })?.method === 'password');
+}
