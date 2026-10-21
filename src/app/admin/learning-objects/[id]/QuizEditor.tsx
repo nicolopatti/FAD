@@ -27,7 +27,9 @@ function vuota(): Domanda {
 export function QuizEditor({ loId, config, domandeIniziali, congelato }: { loId: string; config: QuizConfig; domandeIniziali: QuizDomandaRow[]; congelato: boolean }) {
   const router = useRouter();
   const { toast, confirm } = useFeedback();
-  const [domande, setDomande] = useState<Domanda[]>(domandeIniziali.length ? domandeIniziali.map(daRiga) : [vuota()]);
+  // A un test congelato senza domande non si mostra un segnaposto modificabile (A3).
+  const [domande, setDomande] = useState<Domanda[]>(domandeIniziali.length ? domandeIniziali.map(daRiga) : congelato ? [] : [vuota()]);
+  const nScritte = domande.filter((d) => d.testo.trim()).length;
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errori, setErrori] = useState<string[]>([]);
@@ -136,7 +138,7 @@ export function QuizEditor({ loId, config, domandeIniziali, congelato }: { loId:
 
       <div className="card">
         <div className="card__head">
-          <div><h3>Domande</h3><div className="sub">{domande.length} domand{domande.length === 1 ? 'a' : 'e'} · scelta singola o multipla (tutto o niente). {congelato ? 'In sola lettura.' : ''}</div></div>
+          <div><h3>Domande</h3><div className="sub">{nScritte === 0 ? 'Nessuna domanda scritta' : `${nScritte} domand${nScritte === 1 ? 'a' : 'e'}`} · scelta singola o multipla (tutto o niente). {congelato ? 'In sola lettura.' : ''}</div></div>
           {!congelato && (
             <div className="row">
               <button type="button" className="btn btn--ghost btn--sm" onClick={() => fileRef.current?.click()} disabled={busy}><Icon name="upload" /> Importa CSV</button>
@@ -151,6 +153,9 @@ export function QuizEditor({ loId, config, domandeIniziali, congelato }: { loId:
           )}
           {!congelato && <div className="field__hint" style={{ marginBottom: 14 }}>CSV con colonne: Domanda; Risposta A; Risposta B; Risposta C; Risposta D; Corretta (es. B oppure A,C). Da Excel: salva come CSV.</div>}
 
+          {congelato && domande.length === 0 && (
+            <div className="banner banner--err"><Icon name="alert" className="banner__icon" /><div className="banner__body">Questo test non ha domande ed è una lezione di un corso attivo: non si possono più aggiungere. Per avere un test funzionante: duplica il corso, nella scheda Lezioni della copia togli questo test e aggiungine uno nuovo, scrivi le domande e crea lì la prima edizione.</div></div>
+          )}
           <ol className="quiz-ed">
             {domande.map((d, i) => (
               <li key={d.key} className="quiz-ed__q">

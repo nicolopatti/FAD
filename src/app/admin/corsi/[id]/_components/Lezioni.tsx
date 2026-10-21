@@ -22,10 +22,12 @@ export function Lezioni({
   corso,
   struttura,
   frozen,
+  domandePerTest = {},
 }: {
   corso: CorsoRow;
   struttura: StrutturaCorsoConLO[];
   frozen: boolean;
+  domandePerTest?: Record<string, number>;
 }) {
   const { call, busy, error, setError, setBusy } = useCall();
   const [aggiungi, setAggiungi] = useState<'chiuso' | 'nuovo' | 'libreria' | 'csv'>(struttura.length === 0 && !frozen ? 'nuovo' : 'chiuso');
@@ -33,14 +35,14 @@ export function Lezioni({
   return (
     <>
       <ErrorBanner error={error} />
-      <Sequenza struttura={struttura} frozen={frozen} busy={busy} call={call} corsoId={corso.id} />
+      <Sequenza struttura={struttura} frozen={frozen} busy={busy} call={call} corsoId={corso.id} domandePerTest={domandePerTest} />
 
       {frozen ? (
         <div className="banner banner--freeze">
           <Icon name="lock" className="banner__icon" />
           <div className="banner__body">
             Il corso ha edizioni: la sequenza delle lezioni non si modifica, così chi è iscritto segue sempre lo stesso percorso.
-            Per cambiarla, <strong>duplica il corso</strong> e lavora sulla copia. I contenuti delle singole lezioni (video, file, domande) restano modificabili dalla libreria.
+            Per cambiarla, <strong>duplica il corso</strong> e lavora sulla copia. Il video o il PDF di una lezione si può ancora sostituire dalla libreria; le domande e le regole dei test no.
           </div>
         </div>
       ) : (
@@ -76,12 +78,14 @@ function Sequenza({
   busy,
   call,
   corsoId,
+  domandePerTest,
 }: {
   struttura: StrutturaCorsoConLO[];
   frozen: boolean;
   busy: boolean;
   call: CallFn;
   corsoId: string;
+  domandePerTest: Record<string, number>;
 }) {
   const { confirm } = useFeedback();
   const serverIds = struttura.map((s) => s.id);
@@ -214,6 +218,9 @@ function Sequenza({
                       <span className={`chip ${TIPO_CHIP[tipo]}`}>{TIPO_LABEL[tipo]}</span>
                       {durata && <span><Icon name="clock" style={{ width: 12, height: 12, verticalAlign: -2 }} /> {durata}</span>}
                       {soglia != null && <span>soglia {soglia}%</span>}
+                      {tipo === 'quiz' && (domandePerTest[s.learning_object_id] ?? 0) === 0
+                        ? <span className="chip chip--err">0 domande — da completare</span>
+                        : tipo === 'quiz' && <span>{domandePerTest[s.learning_object_id]} domand{domandePerTest[s.learning_object_id] === 1 ? 'a' : 'e'}</span>}
                       <span>· {regolaLabel(s.regola_completamento.tipo)}</span>
                     </div>
                   </div>

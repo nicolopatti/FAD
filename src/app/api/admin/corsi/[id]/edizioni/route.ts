@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
+import { prontezzaCorso } from '@/lib/prontezza-corso';
 
 type CreateBody = {
   codice?: string;
@@ -37,6 +38,16 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   }
 
   const supabase = await createSupabaseServerClient();
+  // A3: la prima edizione congela anche le domande dei test. Un test obbligatorio
+  // senza domande valide non si potrebbe più completare → si rifiuta.
+  const { count: nEdizioni, error: errCount } = await supabase.from('edizione').select('id', { count: 'exact', head: true }).eq('corso_id', params.id);
+  if (errCount) return NextResponse.json({ ok: false, error: errCount.message }, { status: 400 });
+  if ((nEdizioni ?? 0) === 0) {
+    const prontezza = await prontezzaCorso(supabase, params.id);
+    if (prontezza.bloccanti.length) {
+      return NextResponse.json({ ok: false, error: prontezza.bloccanti.join(' '), bloccanti: prontezza.bloccanti }, { status: 409 });
+    }
+  }
   const { data, error } = await supabase
     .from('edizione')
     .insert(payload)

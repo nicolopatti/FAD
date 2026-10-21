@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import type { CorsoRow, StrutturaCorsoConLO } from '@/lib/db-types';
 import { Lezioni } from '../../_components/Lezioni';
+import { prontezzaCorso } from '@/lib/prontezza-corso';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,7 @@ export default async function CorsoLezioniPage(props: { params: Promise<{ id: st
     supabase.from('edizione').select('id', { count: 'exact', head: true }).eq('corso_id', corso.id),
   ]);
   const frozen = (edizioni.count ?? 0) > 0;
+  const { domandePerTest } = await prontezzaCorso(supabase, corso.id);
 
-  return <Lezioni corso={corso} struttura={struttura} frozen={frozen} />;
+  return <Lezioni corso={corso} struttura={struttura} frozen={frozen} domandePerTest={domandePerTest} />;
 }

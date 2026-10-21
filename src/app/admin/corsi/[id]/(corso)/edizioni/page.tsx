@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import type { EdizioneRiepilogo } from '@/lib/db-types';
 import { EdizioniPanel, type EdizioneLista } from '../../_components/EdizioniPanel';
+import { prontezzaCorso } from '@/lib/prontezza-corso';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,8 @@ export default async function CorsoEdizioniPage(
     .order('creato_il', { ascending: false })
     .returns<EdizioneRiepilogo[]>(), 'le edizioni');
   const lista: EdizioneLista[] = edizioni.map((e) => ({ ...e, iscritti: e.n_iscritti, sessioni: e.n_sessioni, attestati: e.n_attestati }));
+  // Prima edizione: cosa la blocca e cosa conviene controllare (A3).
+  const prontezza = lista.length === 0 ? await prontezzaCorso(supabase, corso.id) : null;
 
-  return <EdizioniPanel corsoId={corso.id} edizioni={lista} apriNuova={searchParams?.nuova === '1' && !corso.archiviato_at} archiviato={Boolean(corso.archiviato_at)} soglia={corso.soglia_frequenza_percentuale != null ? Number(corso.soglia_frequenza_percentuale) : null} />;
+  return <EdizioniPanel corsoId={corso.id} edizioni={lista} apriNuova={searchParams?.nuova === '1' && !corso.archiviato_at} archiviato={Boolean(corso.archiviato_at)} soglia={corso.soglia_frequenza_percentuale != null ? Number(corso.soglia_frequenza_percentuale) : null} prontezza={prontezza} />;
 }
