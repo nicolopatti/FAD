@@ -76,7 +76,7 @@ export function FondoPanel({ corsoId, edizioneId, attiva, piani, nIscritti, senz
         </div>
         <div>
           <div className="card">
-            <div className="card__head"><div><h3>Per la rendicontazione</h3><div className="sub">Gli stessi controlli del report per il fondo, calcolati adesso.</div></div></div>
+            <div className="card__head"><div><h3>Per la rendicontazione</h3><div className="sub">Gli stessi controlli del report per il fondo, calcolati adesso. Riguardano i dati: il file per il fondo è ancora in formato interim, non il tracciato ufficiale.</div></div></div>
             <div className="card__body">
               {conPiano.length === 0 ? (
                 <div className="muted" style={{ fontSize: 13 }}>Assegna un piano agli iscritti: i controlli per il deposito compaiono qui.</div>
@@ -88,7 +88,7 @@ export function FondoPanel({ corsoId, edizioneId, attiva, piani, nIscritti, senz
                       <strong style={{ fontSize: 13.5 }}>{p.titolo}</strong>
                       {c && (
                         <span className="row" style={{ gap: 6 }}>
-                          <span className={`chip ${c.bloccanti > 0 ? 'chip--err' : 'chip--ok'}`}>{c.bloccanti > 0 ? `${c.bloccanti} bloccant${c.bloccanti === 1 ? 'e' : 'i'}` : 'depositabile'}</span>
+                          <span className={`chip ${c.bloccanti > 0 ? 'chip--err' : 'chip--ok'}`}>{c.bloccanti > 0 ? `${c.bloccanti} bloccant${c.bloccanti === 1 ? 'e' : 'i'}` : 'dati completi'}</span>
                           {c.avvisi > 0 && <span className="chip chip--ocra">{c.avvisi} avvis{c.avvisi === 1 ? 'o' : 'i'}</span>}
                         </span>
                       )}

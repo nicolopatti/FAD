@@ -191,8 +191,12 @@ export default async function ReportFondoPage(
               </div>
             </div>
             <div className="card__body">
+              {/* B10: finché il formato è interim "nessun rilievo" non vuol dire "conforme". */}
+              {adapter && !adapter.ufficiale && (
+                <div className="banner banner--ocra"><Icon name="alert" className="banner__icon" /><div className="banner__body">Formato <strong>interim</strong>: il file contiene tutti i dati ma non è ancora il tracciato ufficiale del fondo. I controlli qui sotto riguardano i dati, non la conformità del file.</div></div>
+              )}
               {warnings.length === 0 ? (
-                <div className="banner banner--info"><Icon name="check" className="banner__icon" /><div className="banner__body">Nessun rilievo: pronto al deposito.</div></div>
+                <div className="banner banner--info"><Icon name="check" className="banner__icon" /><div className="banner__body">{adapter && !adapter.ufficiale ? 'Nessun rilievo sui dati: si può depositare lo snapshot, ma il file resta in formato interim.' : 'Nessun rilievo: pronto al deposito.'}</div></div>
               ) : (
                 warnings.map((w, idx) => (
                   <div key={idx} className={`conform ${w.severita === 'bloccante' ? 'conform--err' : 'conform--warn'}`}>
