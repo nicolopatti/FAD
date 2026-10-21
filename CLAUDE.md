@@ -9,7 +9,7 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Correzioni dallo stress test del 21/10 (2026-10-21 pomeriggio, branch `claude/new-session-qr4kff`, **NON su `main`**)
+## Correzioni dallo stress test del 21/10 (2026-10-21 pomeriggio, branch `claude/new-session-qr4kff`, **su `main` e in produzione** dal via libera dell'utente "fai merge")
 
 Mandato: brief dell'utente "correzioni dallo stress test del 21/10/2026" (giro su
 produzione come discente e admin). Ratifiche dell'utente prima del codice:
@@ -86,6 +86,16 @@ totale**; **R3** codice fiscale doppio = **blocco**, indice unico solo dopo la p
   presenze CSV (solo la pagina).
 - **Piano di pulizia** dei dati di prova: `docs/pulizia-dati-prova-21-10.md` (proposta,
   NON eseguita: serve il via libera).
+- **Merge e prova in produzione**: fast-forward `56e742d..3899250` su `main`. **Vercel
+  non ha creato da solo il deploy di produzione** dopo il push (nessun deploy per `main`
+  dopo 8 minuti; il commit era già stato costruito come anteprima del branch): creato
+  a mano con lo strumento Vercel `create_deployment` (gitSource `main` @ `3899250`,
+  target production) → `dpl_GUqSsCLg…` READY in `fra1` con `fad-wine.vercel.app`.
+  Se ricapita: controllare il deploy con `list_deployments` e, se manca, crearlo così
+  (la promozione di un'anteprima risponde 422). Poi `verifica-scritture.yml` (push sul
+  branch che tocca il workflow): **scritture 29/29, giro completo 80/80** (inclusi i
+  409 per conflitto email e CF doppio), catena integra a **717 eventi**; tempi mediani
+  `/admin` 885 ms, `/admin/corsi` 605 ms, `/admin/rendicontazione` 646 ms.
 
 ## Verifica complessiva dell'area admin (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, "ti approvo tutto" vale anche per il merge)
 
@@ -1780,13 +1790,12 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
-> **Punto di ripartenza (2026-10-21 tardo pomeriggio, leggere per primo).** Le
-> correzioni dello stress test sono sul branch `claude/new-session-qr4kff` (sezione in
-> testa al file), **non su `main`**; migration applicate sul live fino alla
-> `20261021000010` (la RPC del player blocca già gli eventi fuori finestra anche per la
-> produzione). Da fare con l'utente: via libera al merge; poi `verifica-scritture.yml`
-> sul deploy; poi il piano di pulizia (`docs/pulizia-dati-prova-21-10.md`), dopo cui
-> l'indice unico del CF (`supabase/pending/`) e il CHECK sulle date dell'edizione.
+> **Punto di ripartenza (2026-10-21 sera, leggere per primo).** Le correzioni dello
+> stress test sono **su `main` e in produzione** (sezione in testa al file), verificate
+> sul deploy (29/29 + 80/80). Migration applicate sul live fino alla `20261021000010`.
+> Da fare con l'utente: via libera al piano di pulizia (`docs/pulizia-dati-prova-21-10.md`),
+> dopo cui l'indice unico del CF (`supabase/pending/`) e il CHECK sulle date
+> dell'edizione; compilare i dati dell'ente (senza, nessun attestato si emette).
 > Il resto di questa nota è lo stato precedente.
 >
 > **Punto di ripartenza precedente (2026-10-21 sera).** Tutto il lavoro è su
