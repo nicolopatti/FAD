@@ -98,6 +98,15 @@ Correzioni (stesso branch):
     fatti/saltati, un Evento `learning_object.archived/unarchived` per contenuto).
   - Giro completo: nuovi controlli (scheda Fondo con i bloccanti, vista del report
     senza l'elenco, archivio in blocco + "già archiviati" saltati).
+- **"Procediamo" (2026-10-21)**: le funzioni Vercel giravano in **iad1 (Washington)**
+  con il database in eu-central-1: ogni query attraversava l'Atlantico e i dati dei
+  discenti erano trattati negli USA. **`vercel.json` con `"regions": ["fra1"]`** (in
+  repo, non nel pannello): deploy `dpl_n1mYw47…` in `fra1`, giro completo 78/78. Tempi
+  mediani dal runner GitHub (USA, quindi con un salto atlantico in più rispetto a un
+  utente italiano): `/admin` 996 → 728 ms, `/admin/corsi` 879 → 660 ms,
+  `/admin/rendicontazione` 1053 → 783 ms; step del giro completo 92 → 64 s. Il giro
+  completo stampa ora questi tempi (informativi). Workflow su **Node 24** con
+  `actions/checkout@v5` e `setup-node@v5` (sparito l'avviso di deprecazione di Node 20).
 
 ## Manutenzione dopo Next 16 (2026-10-21, branch `claude/affectionate-hawking-03ev7i`, **su `main` e in produzione** — "vai avanti con le attività previste" e poi "ti approvo tutto")
 
@@ -1668,6 +1677,8 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 - Team `nicolopatti's projects` (`team_LDcXwgO7cQrFtkAhaISEhjYj`, slug `nicolopattis-projects`).
 - **Project FAD: `fad`** (id `prj_3u7miTUbdIwTRNuNU6KWdUHX6qLC`), collegato a `nicolopatti/FAD` su Production branch `main`.
 - URL canonico di produzione: **https://fad-wine.vercel.app**
+- **Regione delle funzioni: `fra1`** (Francoforte, accanto al database), fissata da
+  `vercel.json` dal 2026-10-21 (prima `iad1`, il default).
 - Branch alias `main`: `https://fad-git-main-nicolopattis-projects.vercel.app`
 - Pattern preview: `https://fad-<hash>-nicolopattis-projects.vercel.app`
 - Env vars configurate sul progetto Vercel (Production + Preview):
