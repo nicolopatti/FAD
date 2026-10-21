@@ -13,6 +13,7 @@ on:
     paths:
       - .github/workflows/verifica-scritture.yml
       - scripts/verifica-scritture.mjs
+      - scripts/verifica-giro-completo.mjs
   workflow_dispatch:
     inputs:
       url:
@@ -55,3 +56,15 @@ jobs:
           AUDITOR_EMAIL: auditor@fad.local
           AUDITOR_PASSWORD: ${{ github.event.inputs.auditor_password || secrets.E2E_AUDITOR_PASSWORD || 'auditor-pass-123' }}
         run: node scripts/verifica-scritture.mjs
+      - name: Giro completo (corso di prova → archiviazione)
+        if: always()
+        env:
+          URL: ${{ github.event.inputs.url || 'https://fad-wine.vercel.app' }}
+          SHARE_URL: ${{ github.event.inputs.share_url || '' }}
+          SUPABASE_URL: https://eqtiyqoxwgnerbmdkqff.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdGl5cW94d2duZXJibWRrcWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzOTE1NDksImV4cCI6MjA5NDk2NzU0OX0.fTfbtv9t3InpIcWtoyTgfaG550SALiwj45-_gRpNM_I
+          ADMIN_EMAIL: admin@fad.local
+          ADMIN_PASSWORD: ${{ github.event.inputs.admin_password || secrets.E2E_ADMIN_PASSWORD || 'admin-pass-123' }}
+          AUDITOR_EMAIL: auditor@fad.local
+          AUDITOR_PASSWORD: ${{ github.event.inputs.auditor_password || secrets.E2E_AUDITOR_PASSWORD || 'auditor-pass-123' }}
+        run: node scripts/verifica-giro-completo.mjs

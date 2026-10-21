@@ -1,0 +1,305 @@
+// Giro completo dell'area admin contro un deploy (gira sul runner GitHub, vedi
+// .github/workflows/verifica-scritture.yml): crea un corso di prova "Verifica
+// automatica", lo compone (contenuti nuovi e dalla libreria, riordino,
+// copertina), apre un'edizione (congelamento D22), iscrive una persona,
+// assegna docente e sessione, registra una presenza manuale, assegna un piano,
+// genera il report fondo, prova l'attestato, annulla la sessione, conclude
+// l'edizione, duplica e archivia il corso. Alla fine: catena del registro.
+// Residui voluti nel tenant demo: 2 corsi archiviati ("Verifica automatica …"),
+// 2 contenuti, 1 piano, 1 persona "Verifica Automatica" (nessuna route la
+// elimina). Gli Eventi restano nel registro per costruzione.
+// Variabili: come scripts/verifica-scritture.mjs.
+import process from 'node:process';
+
+const URL_APP = (process.env.URL ?? '').replace(/\/$/, '');
+const SHARE = process.env.SHARE_URL ?? '';
+const SUPA = (process.env.SUPABASE_URL ?? 'https://eqtiyqoxwgnerbmdkqff.supabase.co').replace(/\/$/, '');
+const ANON = process.env.SUPABASE_ANON_KEY ?? '';
+if (!URL_APP || !ANON) { console.error('URL e SUPABASE_ANON_KEY sono obbligatori'); process.exit(2); }
+
+const TENANT = '00000000-0000-0000-0000-000000000001';
+const LO_LIBRERIA = 'c10a7fe9-2937-419f-aa30-389b84a7285d'; // "Lezione 02" del corso di prova (riuso dalla libreria)
+const PERSONA_DOCENTE = '33333333-0000-0000-0000-0000000d0c01'; // "Docente" del seed webinar
+const TAG = Date.now().toString(36);
+const NOME = `Verifica automatica ${TAG}`;
+
+const esiti = [];
+const check = (nome, ok, dettaglio = '') => { esiti.push([ok, nome, dettaglio]); console.log(`${ok ? 'OK  ' : 'FAIL'} ${nome}${dettaglio ? ` — ${dettaglio}` : ''}`); };
+const breve = (r) => `HTTP ${r.status} ${(r.json?.error ?? r.testo.slice(0, 100)).toString().replace(/\n/g, ' ')}`;
+
+async function login(email, password) {
+  const r = await fetch(`${SUPA}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: ANON, 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) });
+  if (!r.ok) throw new Error(`login ${email}: HTTP ${r.status} ${await r.text()}`);
+  return r.json();
+}
+function cookieSessione(sess) {
+  const ref = SUPA.replace(/^https?:\/\//, '').split('.')[0];
+  const nome = `sb-${ref}-auth-token`;
+  const json = JSON.stringify({ access_token: sess.access_token, token_type: sess.token_type, expires_in: sess.expires_in, expires_at: sess.expires_at, refresh_token: sess.refresh_token, user: sess.user });
+  const valore = 'base64-' + Buffer.from(json).toString('base64url');
+  const MAX = 3180;
+  if (valore.length <= MAX) return `${nome}=${valore}`;
+  const parti = [];
+  for (let i = 0; i * MAX < valore.length; i++) parti.push(`${nome}.${i}=${valore.slice(i * MAX, (i + 1) * MAX)}`);
+  return parti.join('; ');
+}
+async function cookieVercel() {
+  if (!SHARE) return '';
+  const raccolti = new Map();
+  let url = SHARE;
+  for (let hop = 0; hop < 5 && url; hop++) {
+    const r = await fetch(url, { redirect: 'manual', headers: raccolti.size ? { cookie: [...raccolti].map(([k, v]) => `${k}=${v}`).join('; ') } : {} });
+    for (const sc of r.headers.getSetCookie?.() ?? []) { const [kv] = sc.split(';'); const i = kv.indexOf('='); if (i > 0) raccolti.set(kv.slice(0, i).trim(), kv.slice(i + 1).trim()); }
+    const loc = r.headers.get('location');
+    if (r.status >= 300 && r.status < 400 && loc) url = new URL(loc, url).toString(); else break;
+  }
+  return [...raccolti].map(([k, v]) => `${k}=${v}`).join('; ');
+}
+
+const vercel = await cookieVercel();
+const admin = await login(process.env.ADMIN_EMAIL ?? 'admin@fad.local', process.env.ADMIN_PASSWORD ?? '');
+const cookieAdmin = [vercel, cookieSessione(admin)].filter(Boolean).join('; ');
+const api = async (method, path, body) => {
+  const r = await fetch(`${URL_APP}${path}`, { method, headers: { cookie: cookieAdmin, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) }, body: body !== undefined ? JSON.stringify(body) : undefined, redirect: 'manual' });
+  const testo = await r.text();
+  let json = null; try { json = JSON.parse(testo); } catch { /* html */ }
+  return { status: r.status, json, testo, headers: r.headers };
+};
+const pagina = async (path) => { const r = await fetch(`${URL_APP}${path}`, { headers: { cookie: cookieAdmin }, redirect: 'manual' }); return { status: r.status, html: await r.text() }; };
+const ordinePresenza = (html, parole) => { const pos = parole.map((p) => html.indexOf(p)); return pos.every((p) => p >= 0) && pos.every((p, i) => i === 0 || p > pos[i - 1]); };
+
+// 0) sessione
+{
+  const r = await api('GET', '/api/admin/categorie');
+  check('sessione admin riconosciuta dal deploy', r.status === 200 && r.json?.ok === true, breve(r));
+  if (r.status !== 200) process.exit(1);
+}
+
+// 1) contenuti nuovi: un video e un test con domande
+let loVideo = null, loQuiz = null;
+{
+  const v = await api('POST', '/api/admin/learning-objects', { type: 'video', titolo: `${NOME} · video`, config: { vimeo_id: 'https://vimeo.com/1236864492', durata_secondi: 600 } });
+  loVideo = v.json?.learning_object?.id ?? null;
+  check('contenuto video creato da un link Vimeo (ID estratto)', v.status === 200 && v.json?.learning_object?.config?.vimeo_id === '1236864492', breve(v));
+  const cartella = await api('POST', '/api/admin/learning-objects', { type: 'video', titolo: 'x', config: { vimeo_id: 'https://vimeo.com/manage/folders/123', durata_secondi: 10 } });
+  check('contenuto video: link di cartella rifiutato', cartella.status === 400, breve(cartella));
+  const q = await api('POST', '/api/admin/learning-objects', { type: 'quiz', titolo: `${NOME} · test`, config: { soglia_percentuale: 70, tentativi_max: '', ordine_casuale: true, mostra_correzione: true } });
+  loQuiz = q.json?.learning_object?.id ?? null;
+  check('contenuto test creato con soglia 70%', q.status === 200 && q.json?.learning_object?.config?.soglia_percentuale === 70, breve(q));
+  if (loQuiz) {
+    const d = await api('PUT', `/api/admin/learning-objects/${loQuiz}/domande`, { domande: [
+      { testo: 'Quanto fa 2+2?', tipo: 'scelta_singola', risposte: [{ testo: '3', corretta: false }, { testo: '4', corretta: true }] },
+      { testo: 'Numeri pari', tipo: 'scelta_multipla', risposte: [{ testo: '2', corretta: true }, { testo: '3', corretta: false }, { testo: '4', corretta: true }] },
+    ] });
+    check('domande del test salvate (RPC quiz_domande_salva)', d.status === 200 && d.json?.ok === true, breve(d));
+    const lette = await api('GET', `/api/admin/learning-objects/${loQuiz}/domande`);
+    check('domande rilette: 2, con le risposte corrette', lette.status === 200 && (lette.json?.domande?.length === 2), `HTTP ${lette.status} n=${lette.json?.domande?.length}`);
+    const male = await api('PUT', `/api/admin/learning-objects/${loQuiz}/domande`, { domande: [{ testo: 'Senza corrette', tipo: 'scelta_singola', risposte: [{ testo: 'a', corretta: false }, { testo: 'b', corretta: false }] }] });
+    check('domande non valide rifiutate (singola senza risposta corretta)', male.status === 400, breve(male));
+  }
+}
+
+// 2) corso in bozza
+let corso = null;
+{
+  const c = await api('POST', '/api/admin/corsi', { titolo: NOME, categoria: 'Formazione', descrizione: 'Corso creato dalla verifica automatica.', sblocco_sequenziale: true, visione_integrale: false, ore_totali: 1, politica_attestato: 'automatica' });
+  corso = c.json?.corso?.id ?? null;
+  check('corso creato in bozza', c.status === 200 && !!corso, breve(c));
+  const vuoto = await api('POST', '/api/admin/corsi', { titolo: '   ' });
+  check('corso senza titolo rifiutato', vuoto.status === 400, breve(vuoto));
+  if (!corso) { console.log('Interrompo: senza corso il giro non continua.'); process.exit(1); }
+  const p = await pagina(`/admin/corsi/${corso}`);
+  check('pagina del corso: bozza con "Prossimi passi"', p.status === 200 && /Bozza/.test(p.html) && /Prossimi passi/.test(p.html), `HTTP ${p.status}`);
+}
+
+// 3) lezioni: aggiunta (nuove + dalla libreria), riordino, obbligatorio, rimozione
+const struttura = [];
+{
+  for (const [lo, nome] of [[loVideo, 'video nuovo'], [loQuiz, 'test nuovo'], [LO_LIBRERIA, 'dalla libreria']]) {
+    const r = await api('POST', `/api/admin/corsi/${corso}/struttura`, { learning_object_id: lo, obbligatorio: true });
+    if (r.json?.struttura?.id) struttura.push(r.json.struttura.id);
+    check(`lezione aggiunta (${nome})`, r.status === 200 && !!r.json?.struttura?.id, breve(r));
+  }
+  const dup = await api('POST', `/api/admin/corsi/${corso}/struttura`, { learning_object_id: loVideo, obbligatorio: true });
+  check('stessa lezione due volte rifiutata', dup.status === 400 || dup.status === 409, breve(dup));
+  const inv = [...struttura].reverse();
+  const ro = await api('POST', `/api/admin/corsi/${corso}/struttura/reorder`, { ordered_struttura_ids: inv });
+  check('riordino delle lezioni (RPC atomica)', ro.status === 200, breve(ro));
+  const p = await pagina(`/admin/corsi/${corso}/lezioni`);
+  check('pagina Lezioni: ordine invertito (libreria, test, video)', ordinePresenza(p.html, ['Lezione 02', `${NOME} · test`, `${NOME} · video`]), `HTTP ${p.status}`);
+  const fac = await api('PATCH', `/api/admin/corsi/${corso}/struttura/${struttura[2]}`, { obbligatorio: false });
+  check('lezione resa facoltativa', fac.status === 200, breve(fac));
+  const del = await api('DELETE', `/api/admin/corsi/${corso}/struttura/${struttura[2]}`);
+  check('lezione tolta dal corso (il contenuto resta in libreria)', del.status === 200, breve(del));
+  struttura.pop();
+  const lib = await api('GET', `/api/admin/learning-objects/cerca?q=Lezione%2002&escludi_corso=${corso}`);
+  check('ricerca libreria: la lezione tolta torna disponibile per il corso', lib.status === 200 && (lib.json?.risultati ?? []).some((r) => r.id === LO_LIBRERIA), breve(lib));
+  const csv = await api('POST', `/api/admin/corsi/${corso}/struttura/import`, { rows: [{ titolo: 'Lezione 02 - Il sistema dei finanziamenti pubblici', tipo: 'video' }, { titolo: `${NOME} · video CSV`, tipo: 'video', riferimento: '1236864490', durata: '5:00' }] });
+  check('import CSV delle lezioni: riuso per titolo + video nuovo', csv.status === 200 && csv.json?.ok === true, breve(csv));
+}
+
+// 4) copertina: upload nel bucket pubblico con il JWT dell'admin, poi PATCH del percorso
+{
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  const path = `${TENANT}/${corso}.png`;
+  const up = await fetch(`${SUPA}/storage/v1/object/copertine/${path}`, { method: 'POST', headers: { apikey: ANON, authorization: `Bearer ${admin.access_token}`, 'content-type': 'image/png', 'x-upsert': 'true' }, body: png });
+  check('copertina caricata nel bucket (policy admin del tenant)', up.ok, `HTTP ${up.status} ${(await up.text()).slice(0, 80)}`);
+  const pc = await api('PATCH', `/api/admin/corsi/${corso}`, { cover_path: path });
+  check('copertina salvata sul corso', pc.status === 200 && pc.json?.corso?.cover_path === path, breve(pc));
+  const fuori = await api('PATCH', `/api/admin/corsi/${corso}`, { cover_path: `altro-tenant/${corso}.png` });
+  check('copertina fuori dalla cartella del tenant rifiutata', fuori.status === 400, breve(fuori));
+}
+
+// 5) edizione → congelamento D22
+let edizione = null;
+{
+  const e = await api('POST', `/api/admin/corsi/${corso}/edizioni`, { codice: `VERIFICA-${TAG}`, data_inizio: '2026-11-01', data_fine: '2026-12-31', fad_apertura: '2026-11-01', fad_chiusura: '2026-12-31' });
+  edizione = e.json?.edizione?.id ?? null;
+  check('edizione creata', e.status === 200 && !!edizione, breve(e));
+  const dataMale = await api('POST', `/api/admin/corsi/${corso}/edizioni`, { codice: 'X', data_inizio: '01/11/2026' });
+  check('edizione con data non ISO rifiutata', dataMale.status === 400, breve(dataMale));
+  const titolo = await api('PATCH', `/api/admin/corsi/${corso}`, { titolo: `${NOME} rinominato` });
+  check('D22: titolo non modificabile a corso con edizione', titolo.status === 400, breve(titolo));
+  const descr = await api('PATCH', `/api/admin/corsi/${corso}`, { descrizione: 'Descrizione aggiornata a corso attivo.' });
+  check('descrizione modificabile anche a corso attivo', descr.status === 200, breve(descr));
+  const lez = await api('POST', `/api/admin/corsi/${corso}/struttura`, { learning_object_id: LO_LIBRERIA, obbligatorio: true });
+  check('D22: sequenza delle lezioni bloccata a corso attivo', lez.status === 400 || lez.status === 409, breve(lez));
+  if (edizione) {
+    const pe = await api('PATCH', `/api/admin/edizioni/${edizione}`, { codice: `VERIFICA-${TAG}-B`, data_fine: '2027-01-31' });
+    check('edizione: codice e data di fine modificati', pe.status === 200, breve(pe));
+    const pg = await pagina(`/admin/corsi/${corso}`);
+    check('pagina del corso ora "Attivo" con l\'edizione in evidenza', /Attivo/.test(pg.html) && pg.html.includes(`VERIFICA-${TAG}-B`), `HTTP ${pg.status}`);
+  }
+}
+
+// 6) iscritti
+let iscrizione = null;
+if (edizione) {
+  const email = `verifica-auto-${TAG}@fad.local`;
+  const i = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Verifica', cognome: 'Automatica', email, codice_fiscale: 'VRFATM80A01A794X', azienda: 'Cliente Demo S.r.l.', partita_iva: '01234567890', data_nascita: '1980-01-01', luogo_nascita: 'Bergamo' });
+  iscrizione = i.json?.iscrizione_id ?? null;
+  check('iscritto aggiunto (persona nuova, azienda riconosciuta per P.IVA)', i.status === 200 && !!iscrizione, breve(i));
+  const dup = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Verifica', cognome: 'Automatica', email });
+  check('stessa persona iscritta due volte → 409', dup.status === 409, breve(dup));
+  const male = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'X', cognome: 'Y', email: 'non-una-email' });
+  check('iscritto con email non valida rifiutato', male.status === 400, breve(male));
+  const pg = await pagina(`/admin/corsi/${corso}/edizioni/${edizione}`);
+  check('pagina Iscritti mostra la persona con l\'azienda', pg.status === 200 && /Automatica/.test(pg.html) && /Cliente Demo/.test(pg.html), `HTTP ${pg.status}`);
+}
+
+// 7) docente, sessione, presenza manuale
+let incarico = null, sessione = null;
+if (edizione) {
+  const inc = await api('POST', `/api/admin/edizioni/${edizione}/incarichi`, { persona_id: PERSONA_DOCENTE, ruolo: 'docente' });
+  incarico = inc.json?.incarico?.id ?? null;
+  check('docente assegnato all\'edizione (persona esistente)', inc.status === 200 && !!incarico, breve(inc));
+  const ruoloMale = await api('POST', `/api/admin/edizioni/${edizione}/incarichi`, { persona_id: PERSONA_DOCENTE, ruolo: 'preside' });
+  check('ruolo sconosciuto rifiutato', ruoloMale.status === 400, breve(ruoloMale));
+  const s = await api('POST', '/api/admin/sessioni', { edizione_id: edizione, titolo: `${NOME} · sessione`, data_ora: '2026-11-15T10:00:00+01:00', durata_minuti: 60, modalita: 'vcs', vcs_piattaforma: 'teams', vcs_meeting_id: 'verifica-auto' });
+  sessione = s.json?.sessione?.id ?? null;
+  check('sessione Teams pianificata', s.status === 200 && !!sessione, breve(s));
+  const senza = await api('POST', '/api/admin/sessioni', { edizione_id: edizione, titolo: 'x', modalita: 'vcs' });
+  check('sessione VCS senza piattaforma rifiutata', senza.status === 400, breve(senza));
+  if (sessione && incarico) {
+    const ps = await api('PATCH', `/api/admin/sessioni/${sessione}`, { incarico_id: incarico, titolo: `${NOME} · sessione 1` });
+    check('sessione: docente e titolo aggiornati', ps.status === 200, breve(ps));
+    const delUsato = await api('DELETE', `/api/admin/incarichi/${incarico}`);
+    check('docente usato da una sessione: rimozione rifiutata (409)', delUsato.status === 409, breve(delUsato));
+    const ag = await pagina('/admin/agenda');
+    check('agenda mostra la sessione pianificata', ag.status === 200 && ag.html.includes(`${NOME} · sessione 1`), `HTTP ${ag.status}`);
+  }
+  if (sessione && iscrizione) {
+    const pm = await api('POST', `/api/admin/sessioni/${sessione}/presenza-manuale`, { iscrizione_id: iscrizione, durata: '45', motivazione: 'Verifica automatica: presenza inserita a mano' });
+    check('presenza manuale registrata (Evento, mai UPDATE)', pm.status === 200 && pm.json?.ok === true, breve(pm));
+    const evId = JSON.stringify(pm.json?.result ?? {}).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/)?.[0];
+    if (evId) {
+      const corr = await api('POST', `/api/admin/presenze/${evId}/correggi`, { durata: '60', motivazione: 'Verifica automatica: correzione' });
+      check('presenza corretta con nuovo Evento che referenzia il precedente', corr.status === 200 && corr.json?.ok === true, breve(corr));
+    } else check('presenza manuale: id dell\'Evento nella risposta', false, JSON.stringify(pm.json?.result ?? null).slice(0, 120));
+    const senzaMot = await api('POST', `/api/admin/sessioni/${sessione}/presenza-manuale`, { iscrizione_id: iscrizione, durata: '10', motivazione: '' });
+    check('presenza manuale senza motivazione rifiutata', senzaMot.status === 400, breve(senzaMot));
+    const stato = await pagina(`/admin/corsi/${corso}/edizioni/${edizione}/sessioni/${sessione}`);
+    check('pagina della sessione mostra la presenza registrata', stato.status === 200 && /Automatica/.test(stato.html), `HTTP ${stato.status}`);
+  }
+}
+
+// 8) piano, assegnazione, report fondo (generazione; il deposito resta bloccato dai warning senza override)
+let piano = null;
+if (edizione && iscrizione) {
+  const p = await api('POST', '/api/admin/piani', { titolo: `${NOME} · piano`, codice: `VA-${TAG}`.slice(0, 20), fondo: 'fondimpresa', avviso: 'Avviso di prova', canale: 'conto_formazione' });
+  piano = p.json?.piano?.id ?? null;
+  check('piano finanziato creato', p.status === 200 && !!piano, breve(p));
+  if (piano) {
+    const tutti = await api('POST', `/api/admin/edizioni/${edizione}/piano`, { piano_id: piano });
+    check('piano assegnato a tutti gli iscritti dell\'edizione', tutti.status === 200 && tutti.json?.ok === true, breve(tutti));
+    const uno = await api('PATCH', `/api/admin/iscrizioni/${iscrizione}`, { piano_id: null });
+    const ri = await api('PATCH', `/api/admin/iscrizioni/${iscrizione}`, { piano_id: piano });
+    check('piano tolto e rimesso al singolo iscritto', uno.status === 200 && ri.status === 200, `${breve(uno)} / ${breve(ri)}`);
+    const gen = await api('GET', `/api/admin/report-fondo/genera?edizione=${edizione}&piano=${piano}&formato=fondimpresa`);
+    check('report fondo generato (anteprima/file) per edizione + piano', gen.status === 200, `HTTP ${gen.status} ${(gen.headers.get('content-type') ?? '').slice(0, 40)}`);
+    const dep = await api('POST', '/api/admin/report-fondo/deposita', { edizione, piano, formato: 'fondimpresa' });
+    check('deposito bloccato dai warning bloccanti (CUP mancante) senza override', dep.status === 409 || dep.status === 400, breve(dep));
+    const fondo = await pagina(`/admin/corsi/${corso}/edizioni/${edizione}/fondo`);
+    check('scheda Fondo mostra il piano con 1 iscritto', fondo.status === 200 && fondo.html.includes(`${NOME} · piano`), `HTTP ${fondo.status}`);
+  }
+}
+
+// 9) attestato manuale su percorso non completato, blocco azioni, annullamento sessione
+if (edizione && iscrizione) {
+  const att = await api('POST', `/api/admin/iscrizioni/${iscrizione}/attestato`, {});
+  check('attestato manuale rifiutato: percorso non completato', att.status === 409 || att.status === 400, breve(att));
+  const blocco = await api('POST', `/api/admin/edizioni/${edizione}/blocco`, { azione: 'attestato', iscrizione_ids: [iscrizione] });
+  check('azione in blocco "attestato": iscritto saltato con motivo', blocco.status === 200 && blocco.json?.fatti === 0 && blocco.json?.saltati?.length === 1, breve(blocco));
+  if (sessione) {
+    const ann = await api('PATCH', `/api/admin/sessioni/${sessione}`, { annulla: true });
+    check('sessione annullata', ann.status === 200, breve(ann));
+    const ag = await pagina('/admin/agenda?quando=tutte');
+    check('agenda: sessione annullata segnalata', ag.status === 200, `HTTP ${ag.status}`);
+  }
+  if (incarico) {
+    const delInc = await api('DELETE', `/api/admin/incarichi/${incarico}`);
+    check('docente: rimozione dopo l\'annullamento della sessione', delInc.status === 200 || delInc.status === 409, breve(delInc));
+  }
+}
+
+// 10) conclusione, duplicazione, archiviazione
+{
+  if (edizione) {
+    const conc = await api('POST', `/api/admin/edizioni/${edizione}/concludi`, {});
+    check('edizione conclusa', conc.status === 200, breve(conc));
+    const bis = await api('POST', `/api/admin/edizioni/${edizione}/concludi`, {});
+    check('edizione già conclusa: seconda conclusione rifiutata o senza effetto', bis.status === 400 || bis.status === 200, breve(bis));
+    const dopo = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Tardi', cognome: 'Vo', email: `tardivo-${TAG}@fad.local` });
+    check('niente iscritti su edizione conclusa', dopo.status === 400 || dopo.status === 409, breve(dopo));
+  }
+  const dup = await api('POST', `/api/admin/corsi/${corso}/duplica`, {});
+  const copia = dup.json?.corso?.id ?? null;
+  check('corso duplicato in bozza "(copia)" con le lezioni', dup.status === 200 && !!copia && /copia/i.test(dup.json?.corso?.titolo ?? ''), breve(dup));
+  const arch = await api('POST', '/api/admin/corsi/archivia', { corso_ids: [corso, copia].filter(Boolean) });
+  check('corso concluso e copia archiviati', arch.status === 200 && (arch.json?.fatti?.length ?? 0) === [corso, copia].filter(Boolean).length, breve(arch));
+  const cat = await api('GET', '/admin/corsi?stato=archiviato');
+  check('catalogo "Archiviati" elenca il corso di prova', cat.status === 200 && cat.testo.includes(NOME), `HTTP ${cat.status}`);
+  if (iscrizione) {
+    const rim = await api('DELETE', `/api/admin/iscrizioni/${iscrizione}`);
+    check('iscritto rimosso (nessun attestato collegato)', rim.status === 200, breve(rim));
+  }
+  for (const lo of [loVideo, loQuiz].filter(Boolean)) {
+    const a = await api('POST', `/api/admin/learning-objects/${lo}/archive`, {});
+    check('contenuto di prova archiviato', a.status === 200 || a.status === 409, breve(a));
+  }
+}
+
+// 11) registro integro
+{
+  const auditor = await login(process.env.AUDITOR_EMAIL ?? 'auditor@fad.local', process.env.AUDITOR_PASSWORD ?? '');
+  const cookieAud = [vercel, cookieSessione(auditor)].filter(Boolean).join('; ');
+  const sid = await fetch(`${SUPA}/rest/v1/rpc/current_stream_id`, { method: 'POST', headers: { apikey: ANON, authorization: `Bearer ${auditor.access_token}`, 'content-type': 'application/json' }, body: '{}' });
+  const stream = (await sid.text()).replace(/"/g, '');
+  const r = await fetch(`${URL_APP}/api/audit/verify?stream_id=${stream}`, { headers: { cookie: cookieAud } });
+  const j = await r.json().catch(() => null);
+  check('registro: catena integra dopo il giro completo', r.status === 200 && j?.ok === true, `HTTP ${r.status} eventi=${j?.eventi ?? '?'}`);
+}
+
+const ko = esiti.filter(([ok]) => !ok);
+console.log(`\n${esiti.length - ko.length}/${esiti.length} ok`);
+process.exit(ko.length ? 1 : 0);
