@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { appendEvent } from '@/lib/audit';
-import { isEmail } from '@/lib/validazione';
+import { conflittiIdentita, isEmail, type MotivoConflitto } from '@/lib/validazione';
 
 export type IscrittoInput = {
   cognome?: string;
@@ -12,6 +12,8 @@ export type IscrittoInput = {
   piano_id?: string | null;
   data_nascita?: string | null;   // YYYY-MM-DD (per l'attestato)
   luogo_nascita?: string | null;
+  /** L'admin ha confermato di iscrivere questa persona già esistente (A4). */
+  conferma_persona_id?: string | null;
 };
 
 function dataIso(v: string | null | undefined): string | null {
@@ -29,10 +31,22 @@ export function normalizzaPartitaIva(v: string | null | undefined): string | nul
   return s ? s.slice(0, 16) : null;
 }
 
+export type PersonaTrovata = { id: string; nome: string; cognome: string };
+
 export type AddIscrittoResult =
-  | { status: 'created'; iscrizione_id: string; persona_creata: boolean }
-  | { status: 'duplicate' }
+  | { status: 'created'; iscrizione_id: string; persona_creata: boolean; persona: PersonaTrovata }
+  | { status: 'duplicate'; persona: PersonaTrovata }
+  | { status: 'conflict'; persona: PersonaTrovata; motivi: MotivoConflitto[]; error: string }
   | { status: 'error'; error: string };
+
+/** Frase per l'admin: "Questa email appartiene già a Mario Rossi (…)". */
+export function messaggioConflitto(p: PersonaTrovata, motivi: MotivoConflitto[]): string {
+  const extra = [
+    motivi.includes('codice_fiscale') ? 'con un codice fiscale diverso da quello scritto' : null,
+    motivi.includes('codice_fiscale_nuovo') ? 'senza codice fiscale: quello scritto verrebbe aggiunto' : null,
+  ].filter(Boolean).join('; ');
+  return `Questa email appartiene già a ${p.nome} ${p.cognome}${extra ? ` (${extra})` : ''}.`;
+}
 
 type Ctx = { tenantId: string; personaId: string };
 
@@ -123,18 +137,29 @@ export async function addIscritto(
   // 2) Persona — dedup per email nel tenant (unique tenant_id,email).
   let personaId: string;
   let personaCreata = false;
+  let personaNome: PersonaTrovata;
   const { data: persona } = await supabase
     .from('persona')
-    .select('id, codice_fiscale, data_nascita, luogo_nascita')
+    .select('id, nome, cognome, codice_fiscale, data_nascita, luogo_nascita')
     .eq('tenant_id', ctx.tenantId)
     .eq('email', email)
     .limit(1)
     .maybeSingle();
   if (persona) {
     personaId = persona.id as string;
-    // completa CF e dati di nascita se mancanti (rendicontazione e attestato)
+    personaNome = { id: personaId, nome: persona.nome as string, cognome: persona.cognome as string };
+    // A4: l'email esiste già. Se nome/cognome o CF scritti non coincidono con la
+    // persona trovata non si iscrive nulla finché l'admin non conferma: senza,
+    // un refuso nell'email iscriverebbe (e modificherebbe) un'altra persona.
+    const motivi = conflittiIdentita({ nome, cognome, codice_fiscale: cf }, persona as { nome: string; cognome: string; codice_fiscale: string | null });
+    const confermata = input.conferma_persona_id === personaId;
+    if (motivi.length && !confermata) {
+      return { status: 'conflict', persona: personaNome, motivi, error: messaggioConflitto(personaNome, motivi) };
+    }
+    // Completa i dati mancanti (rendicontazione e attestato). Il CF solo dopo la
+    // conferma esplicita; un CF già presente non si sovrascrive mai.
     const completa: Record<string, string> = {};
-    if (cf && !persona.codice_fiscale) completa.codice_fiscale = cf;
+    if (cf && !persona.codice_fiscale && confermata) completa.codice_fiscale = cf;
     if (dataNascita && !persona.data_nascita) completa.data_nascita = dataNascita;
     if (luogoNascita && !persona.luogo_nascita) completa.luogo_nascita = luogoNascita;
     if (Object.keys(completa).length) {
@@ -148,6 +173,7 @@ export async function addIscritto(
       .single();
     if (error) return { status: 'error', error: `persona: ${error.message}` };
     personaId = created.id as string;
+    personaNome = { id: personaId, nome, cognome };
     personaCreata = true;
     await appendEvent({
       tenantId: ctx.tenantId,
@@ -167,7 +193,7 @@ export async function addIscritto(
     .eq('edizione_id', edizioneId)
     .limit(1)
     .maybeSingle();
-  if (gia) return { status: 'duplicate' };
+  if (gia) return { status: 'duplicate', persona: personaNome };
 
   // Piano finanziato (opzionale): deve esistere nel tenant (RLS `piano_read`).
   if (pianoId) {
@@ -191,5 +217,5 @@ export async function addIscritto(
     payload: { edizione_id: edizioneId, persona_id: personaId, azienda_id: aziendaId, piano_id: pianoId },
   });
 
-  return { status: 'created', iscrizione_id: isc.id as string, persona_creata: personaCreata };
+  return { status: 'created', iscrizione_id: isc.id as string, persona_creata: personaCreata, persona: personaNome };
 }

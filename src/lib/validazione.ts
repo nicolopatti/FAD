@@ -43,3 +43,31 @@ export function primoErrore(e: Errori): string | null {
   const k = Object.keys(e)[0];
   return k ? e[k] : null;
 }
+
+/** Nome confrontabile: minuscolo, senza accenti, apostrofi e spazi doppi. */
+export function normalizzaNome(v: string | null | undefined): string {
+  return (v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/['’`.-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export type MotivoConflitto = 'nome' | 'codice_fiscale' | 'codice_fiscale_nuovo';
+
+/**
+ * Iscrizione con un'email già in anagrafica (A4, stress test 21/10): i dati
+ * scritti corrispondono alla persona trovata? Nome e cognome devono coincidere
+ * (anche invertiti); un codice fiscale diverso è un conflitto, e uno nuovo su
+ * una persona che non l'ha va comunque confermato prima di copiarlo.
+ */
+export function conflittiIdentita(
+  scritto: { nome: string; cognome: string; codice_fiscale: string | null },
+  esistente: { nome: string | null; cognome: string | null; codice_fiscale: string | null },
+): MotivoConflitto[] {
+  const out: MotivoConflitto[] = [];
+  const n = normalizzaNome(scritto.nome), c = normalizzaNome(scritto.cognome);
+  const en = normalizzaNome(esistente.nome), ec = normalizzaNome(esistente.cognome);
+  if (!((n === en && c === ec) || (n === ec && c === en))) out.push('nome');
+  const cf = (scritto.codice_fiscale ?? '').trim().toUpperCase();
+  const ecf = (esistente.codice_fiscale ?? '').trim().toUpperCase();
+  if (cf && ecf && cf !== ecf) out.push('codice_fiscale');
+  else if (cf && !ecf) out.push('codice_fiscale_nuovo');
+  return out;
+}

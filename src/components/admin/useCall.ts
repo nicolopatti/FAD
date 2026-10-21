@@ -4,8 +4,20 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFeedback } from '@/components/ui/Feedback';
 
-export type CallOpts = { successo?: string; busy?: (v: boolean) => void };
+/**
+ * `successo` può essere una funzione della risposta (es. il nome della persona
+ * davvero iscritta). `quiet`: in caso di errore niente banner né toast, il
+ * chiamante riceve un `ErroreCall` con status e corpo (es. un conflitto da far
+ * confermare) e decide lui cosa mostrare.
+ */
+export type CallOpts = { successo?: string | ((json: Record<string, unknown>) => string); busy?: (v: boolean) => void; quiet?: boolean };
 export type CallFn = (method: string, url: string, body?: unknown, opts?: CallOpts) => Promise<unknown>;
+
+export class ErroreCall extends Error {
+  status: number;
+  dati: Record<string, unknown> | null;
+  constructor(message: string, status: number, dati: Record<string, unknown> | null) { super(message); this.status = status; this.dati = dati; }
+}
 
 /**
  * Chiamata alle route admin con stato di attesa, errore ed esito: dopo una
@@ -29,11 +41,12 @@ export function useCall() {
         ...(body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      if (!res.ok || !json.ok) throw new ErroreCall(json.error ?? `HTTP ${res.status}`, res.status, json);
       router.refresh();
-      if (opts?.successo) toast(opts.successo);
+      if (opts?.successo) toast(typeof opts.successo === 'function' ? opts.successo(json) : opts.successo);
       return json;
     } catch (err) {
+      if (opts?.quiet) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
       // Anche a comparsa: il banner sta in cima e chi ha scorso la pagina non lo vedrebbe.

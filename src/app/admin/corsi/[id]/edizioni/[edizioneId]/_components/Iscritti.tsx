@@ -6,7 +6,7 @@ import { parseDelimited } from '@/lib/csv';
 import { useFeedback } from '@/components/ui/Feedback';
 import { Icon, fmtData } from '@/components/admin/Atlante';
 import { Field, Pager } from '@/components/admin/Form';
-import { useCall, type CallFn } from '@/components/admin/useCall';
+import { ErroreCall, useCall, type CallFn } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
 import { BulkBar } from '@/components/admin/Lista';
 import { isEmail, isCodiceFiscale, type Errori } from '@/lib/validazione';
@@ -31,7 +31,7 @@ export function Iscritti({
   politicaAttestato: PoliticaAttestato;
 }) {
   const { confirm, toast } = useFeedback();
-  const { call, busy, error, setBusy } = useCall();
+  const { call, busy, error, setError, setBusy } = useCall();
   const [mode, setMode] = useState<'manuale' | 'csv'>('manuale');
   const [q, setQ] = useState('');
   const [pagina, setPagina] = useState(1);
@@ -254,7 +254,7 @@ export function Iscritti({
           </div>
           <div className="card__body">
             {mode === 'manuale' ? (
-              <IscrittoManuale edizioneId={edizioneId} piani={piani} busy={busy} call={call} />
+              <IscrittoManuale edizioneId={edizioneId} piani={piani} busy={busy} call={call} setError={setError} />
             ) : (
               <IscrittiCsv edizioneId={edizioneId} esistenti={iscritti} busy={busy} call={call} onBusy={setBusy} />
             )}
@@ -265,7 +265,8 @@ export function Iscritti({
   );
 }
 
-function IscrittoManuale({ edizioneId, piani, busy, call }: { edizioneId: string; piani: PianoMini[]; busy: boolean; call: CallFn }) {
+function IscrittoManuale({ edizioneId, piani, busy, call, setError }: { edizioneId: string; piani: PianoMini[]; busy: boolean; call: CallFn; setError: (e: string | null) => void }) {
+  const { confirm, toast } = useFeedback();
   const [cognome, setCognome] = useState('');
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -292,15 +293,42 @@ function IscrittoManuale({ edizioneId, piani, busy, call }: { edizioneId: string
     const ve = valida();
     setErrs(ve);
     if (Object.keys(ve).length) return;
+    const dati = {
+      cognome: cognome.trim(), nome: nome.trim(), email: email.trim(),
+      codice_fiscale: cf.trim().toUpperCase() || null, azienda: azienda.trim() || null,
+      piano_id: pianoId || null,
+      data_nascita: dataNascita || null, luogo_nascita: luogoNascita.trim() || null,
+    };
+    // Il toast usa il nome della persona davvero iscritta (risposta del server).
+    const successo = (json: Record<string, unknown>) => {
+      const p = json.persona as { nome: string; cognome: string } | undefined;
+      return `${p ? `${p.cognome} ${p.nome}` : `${dati.cognome} ${dati.nome}`} iscritto all'edizione.`;
+    };
+    const svuota = () => { setCognome(''); setNome(''); setEmail(''); setCf(''); setAzienda(''); setDataNascita(''); setLuogoNascita(''); };
     try {
-      await call('POST', `/api/admin/edizioni/${edizioneId}/iscritti`, {
-        cognome: cognome.trim(), nome: nome.trim(), email: email.trim(),
-        codice_fiscale: cf.trim().toUpperCase() || null, azienda: azienda.trim() || null,
-        piano_id: pianoId || null,
-        data_nascita: dataNascita || null, luogo_nascita: luogoNascita.trim() || null,
-      }, { successo: `${cognome.trim()} ${nome.trim()} iscritto all'edizione.`, busy: setAggiungendo });
-      setCognome(''); setNome(''); setEmail(''); setCf(''); setAzienda(''); setDataNascita(''); setLuogoNascita('');
-    } catch { /* banner */ }
+      await call('POST', `/api/admin/edizioni/${edizioneId}/iscritti`, dati, { successo, busy: setAggiungendo, quiet: true });
+      svuota();
+    } catch (err) {
+      // A4: l'email è di una persona già in anagrafica con dati diversi → si chiede.
+      const conflitto = err instanceof ErroreCall ? (err.dati?.conflitto as { persona: { id: string; nome: string; cognome: string }; motivi: string[] } | undefined) : undefined;
+      if (!conflitto) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+        toast(msg, 'errore');
+        return;
+      }
+      const p = conflitto.persona;
+      const ok = await confirm({
+        titolo: `Iscrivere ${p.nome} ${p.cognome}?`,
+        messaggio: <>{(err as Error).message} Hai scritto <strong>{dati.nome} {dati.cognome}</strong>. Se è la stessa persona, conferma: verrà iscritta <strong>{p.nome} {p.cognome}</strong> con i suoi dati attuali{conflitto.motivi.includes('codice_fiscale_nuovo') ? ' e il codice fiscale scritto verrà aggiunto alla sua scheda' : ''}. Se è un&apos;altra persona, annulla e correggi l&apos;email.</>,
+        conferma: `Iscrivi ${p.nome} ${p.cognome}`,
+      });
+      if (!ok) return;
+      try {
+        await call('POST', `/api/admin/edizioni/${edizioneId}/iscritti`, { ...dati, conferma_persona_id: p.id }, { successo, busy: setAggiungendo });
+        svuota();
+      } catch { /* banner */ }
+    }
   }
 
   const clear = (k: string) => { if (errs[k]) setErrs({ ...errs, [k]: '' }); };
@@ -347,7 +375,7 @@ function IscrittoManuale({ edizioneId, piani, busy, call }: { edizioneId: string
 
 type ImportIscrittoRow = {
   riga: number; cognome: string; nome: string; email: string; codice_fiscale: string; azienda: string; partita_iva: string; data_nascita: string; luogo_nascita: string;
-  esito: 'nuovo' | 'duplicato' | 'errore'; motivo?: string;
+  esito: 'nuovo' | 'duplicato' | 'errore' | 'conflitto'; motivo?: string;
 };
 
 function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId: string; esistenti: IscrittoRow[]; busy: boolean; call: CallFn; onBusy: (v: boolean) => void }) {
@@ -410,12 +438,23 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
           codice_fiscale: r.codice_fiscale || null, azienda: r.azienda || null, partita_iva: r.partita_iva || null,
           data_nascita: r.data_nascita || null, luogo_nascita: r.luogo_nascita || null,
         })),
-      })) as { creati?: number; duplicati?: number; errori?: { riga: number; error: string }[] } | undefined;
+      })) as { creati?: number; duplicati?: number; errori?: { riga: number; error: string }[]; conflitti?: { riga: number; error: string }[] } | undefined;
       // Il riepilogo viene dalla risposta del server, non dall'anteprima: dice cosa è entrato davvero.
       const creati = r?.creati ?? 0;
-      const altri = [r?.duplicati ? `${r.duplicati} già iscritt${r.duplicati === 1 ? 'o' : 'i'}` : '', r?.errori?.length ? `${r.errori.length} con errori (riga ${importabili[r.errori[0].riga - 1]?.riga ?? r.errori[0].riga}: ${r.errori[0].error})` : ''].filter(Boolean).join(', ');
-      toast(`${creati} iscritt${creati === 1 ? 'o importato' : 'i importati'}${altri ? `; ${altri}` : ''}.`, r?.errori?.length && creati === 0 ? 'errore' : 'ok');
-      setRows([]);
+      const conflitti = r?.conflitti ?? [];
+      const errori = r?.errori ?? [];
+      const altri = [
+        r?.duplicati ? `${r.duplicati} già iscritt${r.duplicati === 1 ? 'o' : 'i'}` : '',
+        conflitti.length ? `${conflitti.length} da controllare (email di una persona già in anagrafica)` : '',
+        errori.length ? `${errori.length} con errori` : '',
+      ].filter(Boolean).join(', ');
+      toast(`${creati} iscritt${creati === 1 ? 'o importato' : 'i importati'}${altri ? `; ${altri}` : ''}.`, (errori.length || conflitti.length) && creati === 0 ? 'errore' : 'ok');
+      // A4: in anteprima restano solo le righe non applicate, con il motivo del server.
+      const resto: ImportIscrittoRow[] = [
+        ...conflitti.map((c) => ({ ...importabili[c.riga - 1], esito: 'conflitto' as const, motivo: c.error })),
+        ...errori.map((e) => ({ ...importabili[e.riga - 1], esito: 'errore' as const, motivo: e.error })),
+      ].filter((x) => x.riga != null).sort((a, b) => a.riga - b.riga);
+      setRows(resto);
     } catch { /* banner */ } finally { onBusy(false); }
   }
 
@@ -447,6 +486,7 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
                     <td className="muted">{r.email || '—'}</td>
                     <td>
                       {r.esito === 'errore' ? <span className="chip chip--err">Errore · {r.motivo}</span>
+                        : r.esito === 'conflitto' ? <span className="chip chip--err" title="Non iscritto: aggiungilo a mano dal modulo singolo, che chiede conferma">Da controllare · {r.motivo}</span>
                         : r.esito === 'duplicato' ? <span className="chip chip--muted">Duplicato · ignorato</span>
                         : <span className="chip chip--teal">Nuovo</span>}
                     </td>
@@ -455,6 +495,9 @@ function IscrittiCsv({ edizioneId, esistenti, busy, call, onBusy }: { edizioneId
               </tbody>
             </table></div>
           </div>
+          {rows.some((r) => r.esito === 'conflitto') && (
+            <div className="field__hint" style={{ marginTop: 10 }}>Le righe “da controllare” non sono state iscritte: l&apos;email appartiene già a un&apos;altra persona. Correggi il file oppure aggiungile una alla volta con “Aggiungi a mano”, che chiede conferma.</div>
+          )}
           <div className="row" style={{ marginTop: 14 }}>
             <button type="button" className="btn" disabled={busy || importabili.length === 0} onClick={importa}>
               Importa {importabili.length} {importabili.length === 1 ? 'iscritto' : 'iscritti'}
