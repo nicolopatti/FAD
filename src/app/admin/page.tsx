@@ -5,6 +5,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import type { EdizioneRiepilogo } from '@/lib/db-types';
 import { Icon, fmtData, fmtDataOra, fmtTempoRelativo } from '@/components/admin/Atlante';
+import { attestatiInAttesa } from '@/lib/attestati';
+import { datiEnteMancanti, ENTE_SELECT, type EnteTenantRow } from '@/lib/attestato-modello';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +92,25 @@ export default async function AdminDashboard() {
     supabase.from('evento').select('seq, event_type, occurred_at, payload').order('seq', { ascending: false }).limit(25),
   ]);
 
+  // Cose che aspettano una tua azione (A5): attestati di idonei non ancora emessi
+  // nelle edizioni attive, e perché (manuale, dati dell'ente, presenza in attesa).
+  const [enteR, attiveR] = await Promise.all([
+    supabase.from('tenant').select(ENTE_SELECT).eq('id', session.tenantId).maybeSingle<EnteTenantRow>(),
+    supabase.from('edizione').select('id, codice, corso_id').is('concluso_at', null).is('annullato_at', null).limit(200).returns<{ id: string; codice: string; corso_id: string }[]>(),
+  ]);
+  const enteMancano = datiEnteMancanti(enteR.data ?? null);
+  const attive = unwrap(attiveR, 'le edizioni attive');
+  const inAttesa = await attestatiInAttesa(supabase, attive.map((e) => e.id));
+  const daFare = attive.map((e) => {
+    const mie = inAttesa.filter((a) => a.edizione_id === e.id);
+    return {
+      edizione: e,
+      daEmettere: mie.filter((a) => a.politica === 'manuale' && !a.frequenza_in_attesa).length,
+      attesaEnte: enteMancano.length ? mie.filter((a) => a.politica === 'automatica' && !a.frequenza_in_attesa).length : 0,
+      attesaPresenza: mie.filter((a) => a.frequenza_in_attesa).length,
+    };
+  }).filter((x) => x.daEmettere + x.attesaEnte + x.attesaPresenza > 0);
+
   const edizioniAttive = unwrap(edizioniAttiveR, 'le edizioni attive');
   const nEdizioniAttive = edizioniTotR.count ?? edizioniAttive.length;
   const prossime = unwrap(sessioniR, 'le sessioni');
@@ -133,6 +154,28 @@ export default async function AdminDashboard() {
           <Icon name="alert" className="banner__icon" />
           <div className="banner__body">
             <strong>{nCoda} partecipant{nCoda === 1 ? 'e' : 'i'} da riconciliare</strong> nei report di partecipazione importati: aprili dalla colonna &quot;Da riconciliare&quot; qui sotto o dall&apos;<Link href="/admin/agenda">agenda</Link>.
+          </div>
+        </div>
+      )}
+
+      {(enteMancano.length > 0 || daFare.length > 0) && (
+        <div className="card">
+          <div className="card__head"><div><h3>Da fare</h3><div className="sub">Attestati che aspettano una tua azione.</div></div></div>
+          <div className="card__body">
+            <ul className="stack-sm" style={{ margin: 0, paddingLeft: 18 }}>
+              {enteMancano.length > 0 && (
+                <li><strong>Dati dell&apos;ente incompleti</strong> (manca{enteMancano.length > 1 ? 'no' : ''} {enteMancano.join(' e ')}): finché non li completi nessun attestato può essere emesso. <Link href="/admin/impostazioni">Completa in Impostazioni</Link></li>
+              )}
+              {daFare.map((x) => {
+                const href = `/admin/corsi/${x.edizione.corso_id}/edizioni/${x.edizione.id}` as Route;
+                const parti = [
+                  x.daEmettere ? `${x.daEmettere} attestat${x.daEmettere === 1 ? 'o' : 'i'} da emettere` : null,
+                  x.attesaEnte ? `${x.attesaEnte} in attesa dei dati dell’ente` : null,
+                  x.attesaPresenza ? `${x.attesaPresenza} in attesa: presenza minima ma nessuna sessione` : null,
+                ].filter(Boolean).join(' · ');
+                return <li key={x.edizione.id}><Link className="mono" href={href}>{x.edizione.codice}</Link>: {parti}</li>;
+              })}
+            </ul>
           </div>
         </div>
       )}

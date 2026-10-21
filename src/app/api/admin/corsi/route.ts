@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   }
   const soglia = parseSoglia(body.soglia_frequenza_percentuale);
   if (soglia === undefined) return NextResponse.json({ ok: false, error: 'soglia di frequenza non valida (tra 1 e 100)' }, { status: 400 });
-  const politica = body.politica_attestato ?? 'automatica';
+  const politica = body.politica_attestato ?? 'manuale'; // R1 (D10): rilascio con approvazione umana di default
   if (!POLITICHE.has(politica)) return NextResponse.json({ ok: false, error: 'politica attestato non valida' }, { status: 400 });
 
   const supabase = await createSupabaseServerClient();

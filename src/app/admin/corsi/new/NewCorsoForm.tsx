@@ -18,7 +18,7 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
   const [integrale, setIntegrale] = useState(false);
   const [ore, setOre] = useState('');
   const [riferimento, setRiferimento] = useState('');
-  const [politica, setPolitica] = useState('automatica');
+  const [politica, setPolitica] = useState('manuale');
   const [soglia, setSoglia] = useState('');
   const [errSoglia, setErrSoglia] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -122,10 +122,10 @@ export function NewCorsoForm({ categorie }: { categorie: string[] }) {
               <input id="nc-rif" className="input" value={riferimento} onChange={(e) => setRiferimento(e.target.value)} disabled={busy} placeholder="es. Accordo Stato-Regioni 21/12/2011" />
             </Field>
           </div>
-          <Field id="nc-politica" label="Rilascio dell’attestato" hint={politica === 'automatica' ? 'Si emette da solo appena il percorso è completato (e il test superato).' : politica === 'manuale' ? 'Lo emette l’amministratore dalla sezione Iscritti.' : 'Il corso non rilascia attestati.'}>
+          <Field id="nc-politica" label="Rilascio dell’attestato" hint={politica === 'automatica' ? 'Si emette da solo appena il percorso è completato (e il test superato).' : politica === 'manuale' ? 'Lo emette l’amministratore dalla scheda Iscritti dell’edizione, dopo i controlli del caso.' : 'Il corso non rilascia attestati.'}>
             <select id="nc-politica" className="select" value={politica} onChange={(e) => setPolitica(e.target.value)} disabled={busy}>
+              <option value="manuale">Manuale (consigliato)</option>
               <option value="automatica">Automatico</option>
-              <option value="manuale">Manuale</option>
               <option value="nessuna">Nessuno</option>
             </select>
           </Field>

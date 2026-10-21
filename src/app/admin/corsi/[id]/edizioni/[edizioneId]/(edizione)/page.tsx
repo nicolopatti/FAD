@@ -60,7 +60,7 @@ export default async function EdizioneIscrittiPage(props: { params: Promise<{ id
       attiva={edizioneStato(ed) === 'attiva'}
       iscritti={righe}
       piani={piani}
-      politicaAttestato={ed.corso?.politica_attestato ?? 'automatica'}
+      politicaAttestato={ed.corso?.politica_attestato ?? 'manuale'}
     />
   );
 }

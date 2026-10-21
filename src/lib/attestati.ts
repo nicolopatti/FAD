@@ -6,7 +6,7 @@ import {
 } from './compliance';
 import { deriveIdoneita } from './report-fondo';
 import { bytesToHex } from './audit-filtri';
-import { datiEnteDa, ENTE_SELECT, risolviModello, type EnteTenantRow, type ModelloAttestato } from './attestato-modello';
+import { datiEnteDa, datiEnteMancanti, ENTE_SELECT, messaggioEnteIncompleto, risolviModello, type EnteTenantRow, type ModelloAttestato } from './attestato-modello';
 import type { AttestatoRow, PoliticaAttestato } from './db-types';
 
 /**
@@ -98,7 +98,7 @@ export async function costruisciSnapshot(
   service: SupabaseClient,
   iscrizioneId: string,
   precalcolato?: Precalcolato,
-): Promise<{ idoneo: boolean; frequenza_in_attesa: boolean; contenuto: AttestatoContenuto } | null> {
+): Promise<{ idoneo: boolean; frequenza_in_attesa: boolean; ente_mancano: string[]; contenuto: AttestatoContenuto } | null> {
   const iscr = await caricaIscrizione(service, iscrizioneId);
   if (!iscr?.edizione?.corso || !iscr.persona) return null;
   const corso = iscr.edizione.corso;
@@ -164,7 +164,7 @@ export async function costruisciSnapshot(
     completato_il: completatoIl,
     registro: { seq: testa?.seq ?? null, hash: testa?.hash != null ? bytesToHex(testa.hash as string) : null },
   };
-  return { idoneo, frequenza_in_attesa: frequenzaInAttesa, contenuto };
+  return { idoneo, frequenza_in_attesa: frequenzaInAttesa, ente_mancano: datiEnteMancanti(ente, contenuto.modello), contenuto };
 }
 
 export type EsitoEmissione = { attestato_id: string; numero: string; codice_verifica: string; hash: string };
@@ -196,7 +196,9 @@ export async function emettiAttestatoSeIdonea(iscrizioneId: string, attorePerson
   if (await attestatoValido(service, iscrizioneId)) return null;
   const snap = await costruisciSnapshot(service, iscrizioneId);
   // A2: presenza minima impostata ma nessuna sessione → niente automatico, decide l'admin.
-  if (!snap || !snap.idoneo || snap.frequenza_in_attesa) return null;
+  // A5: dati dell'ente incompleti → l'iscrizione resta "idonea, attestato in attesa"
+  // (la dashboard lo segnala) invece di uscire un attestato congelato incompleto.
+  if (!snap || !snap.idoneo || snap.frequenza_in_attesa || snap.ente_mancano.length) return null;
   const { data, error } = await service.rpc('attestato_emetti', {
     p_iscrizione_id: iscrizioneId,
     p_contenuto: snap.contenuto,
@@ -219,6 +221,7 @@ export async function emettiAttestatoManuale(
   const snap = await costruisciSnapshot(service, iscrizioneId);
   if (!snap) throw new Error('Iscrizione non trovata.');
   if (!snap.idoneo) throw new Error('Il percorso non è completato: l’attestato si emette solo a idoneità raggiunta.');
+  if (snap.ente_mancano.length) throw new Error(messaggioEnteIncompleto(snap.ente_mancano));
   const { data, error } = await service.rpc('attestato_emetti', {
     p_iscrizione_id: iscrizioneId,
     p_contenuto: snap.contenuto,
@@ -267,7 +270,7 @@ export async function emettiPerEdizioneSeIdonee(edizioneId: string, attorePerson
     if (!idoneo || frequenza_in_attesa) continue;
     try {
       const snap = await costruisciSnapshot(service, id, { prog, freq });
-      if (!snap?.idoneo || snap.frequenza_in_attesa) continue;
+      if (!snap?.idoneo || snap.frequenza_in_attesa || snap.ente_mancano.length) continue;
       const { data, error } = await service.rpc('attestato_emetti', {
         p_iscrizione_id: id, p_contenuto: snap.contenuto, p_attore: attorePersonaId, p_emesso_da: null, p_sostituisce: null, p_motivazione: null,
       });
@@ -315,4 +318,40 @@ export function linkedInAddToProfileUrl(a: Pick<AttestatoRow, 'numero' | 'codice
   });
   if (c.ente?.linkedin_organization_id) params.set('organizationId', c.ente.linkedin_organization_id);
   return `https://www.linkedin.com/profile/add?${params.toString()}`;
+}
+
+export type AttestatoInAttesa = { iscrizione_id: string; edizione_id: string; politica: PoliticaAttestato; frequenza_in_attesa: boolean };
+
+/**
+ * Iscrizioni idonee senza attestato valido nelle edizioni date, per i corsi che
+ * rilasciano attestati (A5: "cose che aspettano una tua azione"). Con il client
+ * dell'admin (RLS del tenant); stesse funzioni in blocco del report.
+ */
+export async function attestatiInAttesa(supabase: SupabaseClient, edizioneIds: string[]): Promise<AttestatoInAttesa[]> {
+  if (!edizioneIds.length) return [];
+  const { data: iscr, error } = await supabase
+    .from('iscrizione')
+    .select('id, edizione_id, edizione:edizione_id ( corso:corso_id ( politica_attestato, soglia_frequenza_percentuale ) )')
+    .in('edizione_id', edizioneIds)
+    .returns<{ id: string; edizione_id: string; edizione: { corso: { politica_attestato: PoliticaAttestato; soglia_frequenza_percentuale: number | string | null } | null } | null }[]>();
+  if (error) throw new Error(`Lettura delle iscrizioni non riuscita: ${error.message}`);
+  const conAttestato = (iscr ?? []).filter((i) => i.edizione?.corso && i.edizione.corso.politica_attestato !== 'nessuna');
+  const ids = conAttestato.map((i) => i.id);
+  if (!ids.length) return [];
+  const [progressi, frequenze, validiRes] = await Promise.all([
+    computeProgressoPerIscrizioni(supabase, ids),
+    computeFrequenzaPerIscrizioni(supabase, ids),
+    supabase.from('attestato').select('iscrizione_id').in('iscrizione_id', ids).is('sostituito_da', null).returns<{ iscrizione_id: string }[]>(),
+  ]);
+  const valide = new Set((validiRes.data ?? []).map((a) => a.iscrizione_id));
+  const out: AttestatoInAttesa[] = [];
+  for (const i of conAttestato) {
+    if (valide.has(i.id)) continue;
+    const prog = progressi.get(i.id) ?? null;
+    const freq = frequenze.get(i.id) ?? null;
+    const soglia = i.edizione!.corso!.soglia_frequenza_percentuale;
+    const r = deriveIdoneita(prog?.obbligatori_totale ?? 0, prog?.idonea ?? false, soglia != null ? Number(soglia) : null, freq?.idoneo_frequenza ?? false, freq?.sessioni_totali);
+    if (r.idoneo) out.push({ iscrizione_id: i.id, edizione_id: i.edizione_id, politica: i.edizione!.corso!.politica_attestato, frequenza_in_attesa: r.frequenza_in_attesa });
+  }
+  return out;
 }

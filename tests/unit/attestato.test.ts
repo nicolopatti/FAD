@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODELLO_PREDEFINITO, compilaTesto, normalizzaParziale, risolviModello } from '../../src/lib/attestato-modello';
+import { MODELLO_PREDEFINITO, compilaTesto, datiEnteMancanti, normalizzaParziale, risolviModello } from '../../src/lib/attestato-modello';
 import { contenutoEsempio, generaAttestatoPdf, oreLabel, nascitaLabel } from '../../src/lib/attestato-pdf';
 
 const ente = { ragione_sociale: 'Ente Demo', citta: 'Milano', firmatario_nome: 'Carla Bianchi', firmatario_ruolo: 'Direttrice', logo_path: null, firma_path: null };
@@ -66,5 +66,21 @@ describe('attestato-pdf', () => {
     delete (c as { modello?: unknown }).modello;
     const bytes = await generaAttestatoPdf(c);
     expect(bytes.length).toBeGreaterThan(3000);
+  });
+});
+
+describe('datiEnteMancanti (A5)', () => {
+  const enteT = { nome: 'Tenant', ragione_sociale: 'Ente Srl', citta: 'Milano', firmatario_nome: 'Anna Neri', firmatario_ruolo: 'Direttrice', logo_path: null, firma_path: null };
+  it('ente completo: si può emettere', () => {
+    expect(datiEnteMancanti(enteT)).toEqual([]);
+  });
+  it('senza ragione sociale (il nome del tenant non basta) o senza firmatario: bloccato', () => {
+    expect(datiEnteMancanti({ ...enteT, ragione_sociale: '  ' })).toEqual(['ragione sociale']);
+    expect(datiEnteMancanti({ ...enteT, firmatario_nome: null })).toEqual(['firmatario']);
+    expect(datiEnteMancanti(null)).toEqual(['ragione sociale', 'firmatario']);
+  });
+  it('vale il firmatario del modello risolto, se c’è', () => {
+    expect(datiEnteMancanti({ ...enteT, firmatario_nome: null }, { firmatari: [{ nome: 'Luca Bianchi', ruolo: '', firma_path: null }] })).toEqual([]);
+    expect(datiEnteMancanti(enteT, { firmatari: [] })).toEqual(['firmatario']);
   });
 });

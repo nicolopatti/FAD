@@ -186,3 +186,21 @@ function stripUndefined<T extends object>(o: T): Partial<T> {
 export function compilaTesto(t: string, v: Record<string, string>): string {
   return t.replace(/\{(nome|corso|ore|ente|edizione|data)\}/g, (_, k: string) => v[k] ?? '');
 }
+
+/**
+ * Dati dell'ente indispensabili per emettere un attestato (A5, stress test
+ * 21/10): ragione sociale compilata e almeno un firmatario con il nome (quello
+ * del modello risolto, se c'è, altrimenti quello dell'ente). Lista vuota = si
+ * può emettere. Senza, l'attestato uscirebbe e resterebbe congelato incompleto.
+ */
+export function datiEnteMancanti(t: EnteTenantRow | null | undefined, modello?: Pick<ModelloAttestato, 'firmatari'>): string[] {
+  const out: string[] = [];
+  if (!t?.ragione_sociale?.trim()) out.push('ragione sociale');
+  const firmatari = (modello ?? risolviModello(datiEnteDa(t), t?.attestato_modello ?? null, null)).firmatari;
+  if (!firmatari.some((f) => f.nome?.trim())) out.push('firmatario');
+  return out;
+}
+
+export function messaggioEnteIncompleto(mancano: string[]): string {
+  return `Completa i dati dell’ente in Impostazioni prima di emettere attestati: manca${mancano.length > 1 ? 'no' : ''} ${mancano.join(' e ')}.`;
+}

@@ -32,7 +32,7 @@ export default async function CorsoAttestatoPage(props: { params: Promise<{ id: 
   return (
     <>
       <FormAttestato corso={corso} frozen={frozen} />
-      {(corso.politica_attestato ?? 'automatica') !== 'nessuna' && (
+      {(corso.politica_attestato ?? 'manuale') !== 'nessuna' && (
         <div className="card">
           <div className="card__head"><div><h3>Modello grafico</h3><div className="sub">Come appare l&apos;attestato di questo corso: layout, testi, loghi e firme. Si può cambiare anche a corso attivo; vale per gli attestati emessi da quel momento. Senza modello specifico si usa quello dell&apos;ente (Impostazioni).</div></div></div>
           <div className="card__body">

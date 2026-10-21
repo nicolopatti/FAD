@@ -1,7 +1,8 @@
 import { requireAdmin } from '@/lib/auth-context';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { EnteRow } from '@/lib/db-types';
-import { datiEnteDa, normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
+import { datiEnteDa, datiEnteMancanti, messaggioEnteIncompleto, normalizzaParziale, risolviModello } from '@/lib/attestato-modello';
+import { Icon } from '@/components/admin/Atlante';
 import { ModelloEditor } from '@/components/admin/ModelloEditor';
 import { EnteForm } from './EnteForm';
 import { ImpostazioniTabs } from '@/components/admin/SezioneTabs';
@@ -23,6 +24,7 @@ export default async function EntePage() {
   }
   const datiEnte = datiEnteDa(ente);
   const salvato = ente.attestato_modello ? normalizzaParziale(ente.attestato_modello) : null;
+  const mancano = datiEnteMancanti(ente);
   const { count: nCategorie } = await supabase.from('categoria').select('id', { count: 'exact', head: true });
 
   return (
@@ -34,6 +36,12 @@ export default async function EntePage() {
         </div>
       </div>
       <ImpostazioniTabs nCategorie={nCategorie ?? 0} />
+      {mancano.length > 0 && (
+        <div className="banner banner--ocra" style={{ maxWidth: 980 }}>
+          <Icon name="alert" className="banner__icon" />
+          <div className="banner__body"><strong>Dati dell&apos;ente incompleti.</strong> {messaggioEnteIncompleto(mancano)} Gli attestati automatici restano in attesa e compaiono nella dashboard.</div>
+        </div>
+      )}
       <EnteForm ente={ente} />
       <div className="card" style={{ maxWidth: 980, marginTop: 18 }}>
         <div className="card__head"><div><h3>Modello predefinito dell&apos;attestato</h3><div className="sub">Layout, testi, loghi, firme e campi che usano tutti i corsi, salvo quelli con un modello proprio. Intestazione, luogo, logo e firmatario vuoti prendono i dati dell&apos;ente qui sopra.</div></div></div>

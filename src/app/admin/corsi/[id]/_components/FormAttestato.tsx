@@ -7,8 +7,8 @@ import { useCall } from '@/components/admin/useCall';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
 
 const POLITICHE: [PoliticaAttestato, string, string][] = [
+  ['manuale', 'Manuale (consigliato)', 'Lo emette l’amministratore dalla scheda Iscritti dell’edizione, dopo i controlli del caso.'],
   ['automatica', 'Automatico', 'Si emette da solo appena il percorso è completato (e il test superato).'],
-  ['manuale', 'Manuale', 'Lo emette l’amministratore dalla scheda Iscritti dell’edizione, dopo i controlli del caso.'],
   ['nessuna', 'Nessuno', 'Il corso non rilascia attestati.'],
 ];
 
@@ -23,13 +23,13 @@ export function FormAttestato({ corso, frozen }: { corso: CorsoRow; frozen: bool
   const oreIniziali = corso.ore_totali != null ? String(corso.ore_totali).replace('.', ',') : '';
   const [ore, setOre] = useState(oreIniziali);
   const [riferimento, setRiferimento] = useState(corso.riferimento_normativo ?? '');
-  const [politica, setPolitica] = useState<PoliticaAttestato>(corso.politica_attestato ?? 'automatica');
+  const [politica, setPolitica] = useState<PoliticaAttestato>(corso.politica_attestato ?? 'manuale');
 
   const oreEditabile = !frozen || corso.ore_totali == null;
   const riferimentoEditabile = !frozen || !corso.riferimento_normativo;
   const oreDirty = oreEditabile && ore.trim() !== oreIniziali;
   const riferimentoDirty = riferimentoEditabile && riferimento.trim() !== (corso.riferimento_normativo ?? '');
-  const politicaDirty = !frozen && politica !== (corso.politica_attestato ?? 'automatica');
+  const politicaDirty = !frozen && politica !== (corso.politica_attestato ?? 'manuale');
   const dirty = oreDirty || riferimentoDirty || politicaDirty;
 
   async function save(e: React.FormEvent) {

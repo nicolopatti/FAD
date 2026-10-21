@@ -98,7 +98,7 @@ export default async function CorsoPanoramicaPage(props: { params: Promise<{ id:
                             <li className={nI > 0 ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={nI > 0 ? 'check' : 'alert'} /></span>{nI > 0 ? `${nI} iscritt${nI === 1 ? 'o' : 'i'}` : <Link href={href}>Nessun iscritto</Link>}</li>
                             <li className={nS > 0 ? 'is-ok' : ''}><span className="ready__dot"><Icon name={nS > 0 ? 'check' : 'calendar'} /></span>{nS > 0 ? `${nS} session${nS === 1 ? 'e' : 'i'}` : <Link href={`${href}/sessioni`}>Nessuna sessione</Link>}</li>
                             <li className={nP > 0 ? 'is-ok' : ''}><span className="ready__dot"><Icon name={nP > 0 ? 'check' : 'euro'} /></span>{nP > 0 ? `${nP} su ${nI} con piano finanziato` : <Link href={`${href}/fondo`}>Nessun piano finanziato</Link>}</li>
-                            {(corso.politica_attestato ?? 'automatica') !== 'nessuna' && (
+                            {(corso.politica_attestato ?? 'manuale') !== 'nessuna' && (
                               <li className={nA > 0 ? 'is-ok' : ''}><span className="ready__dot"><Icon name={nA > 0 ? 'check' : 'shield'} /></span>{nA} attestat{nA === 1 ? 'o emesso' : 'i emessi'}</li>
                             )}
                           </ul>
@@ -124,7 +124,7 @@ export default async function CorsoPanoramicaPage(props: { params: Promise<{ id:
                 <tr><th>Lezioni</th><td><Link href={`${base}/lezioni`}>{struttura.length}</Link>{struttura.length > 0 && <span className="muted"> · {obbligatorie} obbligatori{obbligatorie === 1 ? 'a' : 'e'}</span>}</td></tr>
                 <tr><th>Video</th><td>{durata > 0 ? fmtDurataSec(durata) : <span className="muted">—</span>}</td></tr>
                 <tr><th>Edizioni</th><td><Link href={`${base}/edizioni`}>{edizioni.length}</Link>{attive.length > 0 && <span className="muted"> · {attive.length} attiv{attive.length === 1 ? 'a' : 'e'}</span>}</td></tr>
-                <tr><th>Attestato</th><td>{(corso.politica_attestato ?? 'automatica') === 'nessuna' ? 'Nessuno' : (corso.politica_attestato ?? 'automatica') === 'manuale' ? 'Manuale' : 'Automatico'}{(corso.politica_attestato ?? 'automatica') !== 'nessuna' && corso.ore_totali == null && <div className="muted" style={{ fontSize: 12 }}>Ore totali mancanti: <Link href={`${base}/attestato`}>compilale</Link>.</div>}</td></tr>
+                <tr><th>Attestato</th><td>{(corso.politica_attestato ?? 'manuale') === 'nessuna' ? 'Nessuno' : (corso.politica_attestato ?? 'manuale') === 'manuale' ? 'Manuale' : 'Automatico'}{(corso.politica_attestato ?? 'manuale') !== 'nessuna' && corso.ore_totali == null && <div className="muted" style={{ fontSize: 12 }}>Ore totali mancanti: <Link href={`${base}/attestato`}>compilale</Link>.</div>}</td></tr>
                 <tr><th>Creato il</th><td className="muted">{fmtData(corso.creato_il)}</td></tr>
               </tbody>
             </table></div>
@@ -138,7 +138,7 @@ export default async function CorsoPanoramicaPage(props: { params: Promise<{ id:
               <ul className="ready">
                 <li className={struttura.length > 0 ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={struttura.length > 0 ? 'check' : 'alert'} /></span><Link href={`${base}/lezioni`}>Aggiungi le lezioni</Link></li>
                 <li className={corso.descrizione ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={corso.descrizione ? 'check' : 'alert'} /></span><Link href={`${base}/impostazioni`}>Scrivi la descrizione</Link></li>
-                <li className={(corso.politica_attestato ?? 'automatica') === 'nessuna' || corso.ore_totali != null ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={(corso.politica_attestato ?? 'automatica') === 'nessuna' || corso.ore_totali != null ? 'check' : 'alert'} /></span><Link href={`${base}/attestato`}>Ore e attestato</Link></li>
+                <li className={(corso.politica_attestato ?? 'manuale') === 'nessuna' || corso.ore_totali != null ? 'is-ok' : 'is-todo'}><span className="ready__dot"><Icon name={(corso.politica_attestato ?? 'manuale') === 'nessuna' || corso.ore_totali != null ? 'check' : 'alert'} /></span><Link href={`${base}/attestato`}>Ore e attestato</Link></li>
                 <li className="is-todo"><span className="ready__dot"><Icon name="calendar" /></span><Link href={`${base}/edizioni?nuova=1`}>Crea la prima edizione</Link></li>
               </ul>
             </div>

@@ -49,7 +49,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
   const finestra = prog.finestra;
   const aperta = finestra.aperta;
   const descrizione = iscrizione.edizione?.corso?.descrizione ?? null;
-  const politica: PoliticaAttestato = iscrizione.edizione?.corso?.politica_attestato ?? 'automatica';
+  const politica: PoliticaAttestato = iscrizione.edizione?.corso?.politica_attestato ?? 'manuale';
 
   // Attestato valido di questa iscrizione (RLS: solo il titolare). Se il corso
   // è completato, la politica è automatica e non c'è ancora (percorsi chiusi
@@ -164,7 +164,7 @@ export default async function DettaglioCorsoPage(props: { params: Promise<{ ediz
                 {!attestato && politica !== 'nessuna' && (
                   <div className="next-step">
                     <div className="next-step__icon"><Ico name="doc2" size={18} /></div>
-                    <div><strong>{politica === 'manuale' ? 'L’attestato lo rilascia il tuo ente' : 'L’attestato è in preparazione'}</strong><p>{politica === 'manuale' ? 'Il referente della formazione lo emette dopo i controlli del caso: lo troverai qui e nel tuo profilo.' : 'Ricarica questa pagina tra poco: appena pronto compare qui, con il PDF e il badge.'}</p></div>
+                    <div><strong>{politica === 'manuale' ? 'L’attestato lo rilascia il tuo ente' : 'L’attestato è in preparazione'}</strong><p>{politica === 'manuale' ? 'Il referente della formazione lo emette dopo i controlli del caso: lo troverai qui e nel tuo profilo.' : 'Appena il tuo ente lo rilascia compare qui e nel tuo profilo, con il PDF e il badge.'}</p></div>
                   </div>
                 )}
                 {attestato && !(attestato.contenuto as { discente?: { data_nascita?: string | null } }).discente?.data_nascita && (
