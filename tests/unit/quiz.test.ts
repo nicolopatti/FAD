@@ -76,3 +76,18 @@ describe('validaDomande / parseQuizCsv', () => {
     expect(parseQuizCsv('Domanda;Risposta A;Risposta B\nQ;a;b\n').errori[0]).toContain('Corretta');
   });
 });
+
+describe('ordine stabile per tentativo (B5)', () => {
+  it('stesso tentativo → stesso ordine; tentativo diverso → seme diverso', async () => {
+    const { mescola, semeTentativo } = await import('../../src/lib/quiz');
+    const xs = Array.from({ length: 12 }, (_, i) => i);
+    const s1 = semeTentativo('isc-1', 'lo-1', 1);
+    expect(semeTentativo('isc-1', 'lo-1', 1)).toBe(s1);
+    expect(mescola(xs, s1)).toEqual(mescola(xs, s1));
+    expect(semeTentativo('isc-1', 'lo-1', 2)).not.toBe(s1);
+    expect(semeTentativo('isc-2', 'lo-1', 1)).not.toBe(s1);
+    expect(s1).toBeGreaterThanOrEqual(0);
+    expect(s1).toBeLessThan(2 ** 31);
+    expect([...mescola(xs, s1)].sort((a, b) => a - b)).toEqual(xs);
+  });
+});

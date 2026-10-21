@@ -8,7 +8,7 @@ import { AppShell, Ico } from '@/components/AppShell';
 import { VimeoPlayer } from '@/components/VimeoPlayer';
 import { DocumentoPlayer } from '@/components/DocumentoPlayer';
 import { QuizPlayer } from '@/components/QuizPlayer';
-import { configQuizDa, mescola } from '@/lib/quiz';
+import { configQuizDa, mescola, semeTentativo } from '@/lib/quiz';
 import { messaggioFinestra } from '@/lib/finestra';
 import type { DomandaPublica } from '@/lib/quiz-types';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -19,12 +19,13 @@ export const dynamic = 'force-dynamic';
 // lettura per il discente, le dà la RPC `quiz_domande_pubbliche` (SECURITY
 // DEFINER, solo a chi è iscritto a un corso con quel test) e il flag non lascia
 // mai il database. La pagina la chiama solo se il test è sbloccato (D26).
-// Ordine casuale a ogni apertura, se previsto.
-async function domandeDelTest(supabase: SupabaseClient, loId: string, ordineCasuale: boolean): Promise<DomandaPublica[] | null> {
+// Ordine casuale, se previsto, ma stabile per tentativo (B5): seme da
+// iscrizione + test + numero del tentativo che sta per iniziare.
+async function domandeDelTest(supabase: SupabaseClient, loId: string, ordineCasuale: boolean, seme: number): Promise<DomandaPublica[] | null> {
   const { data, error } = await supabase.rpc('quiz_domande_pubbliche', { p_learning_object_id: loId });
   if (error) return null;
   const pubbliche = (Array.isArray(data) ? data : []) as DomandaPublica[];
-  return ordineCasuale ? mescola(pubbliche) : pubbliche;
+  return ordineCasuale ? mescola(pubbliche, seme) : pubbliche;
 }
 
 function durataLabel(config: Record<string, unknown>): string | null {
@@ -101,7 +102,8 @@ export default async function LearningObjectPage(props: { params: Promise<{ ediz
   const nextHref = nextItem ? hrefDi(nextItem.learning_object_id) : undefined;
   const nextLabel = nextItem ? pulsante(nextItem) : undefined;
   const quizCfg = item.lo_type === 'quiz' ? configQuizDa(item.lo_config) : null;
-  const domande = quizCfg && item.sbloccato ? await domandeDelTest(supabase, item.learning_object_id, quizCfg.ordine_casuale) : null;
+  const seme = semeTentativo(iscrizione.id, item.learning_object_id, (item.quiz?.tentativi ?? 0) + 1);
+  const domande = quizCfg && item.sbloccato ? await domandeDelTest(supabase, item.learning_object_id, quizCfg.ordine_casuale, seme) : null;
   const metaQuiz = quizCfg && domande ? `${domande.length} domand${domande.length === 1 ? 'a' : 'e'} · soglia ${quizCfg.soglia_percentuale}%` : null;
 
   return (

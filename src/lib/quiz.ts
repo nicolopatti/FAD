@@ -20,6 +20,21 @@ export function spogliaDomande(domande: QuizDomandaRow[]): DomandaPublica[] {
   }));
 }
 
+/**
+ * Seme stabile per l'ordine casuale delle domande di UN tentativo (B5): stessa
+ * iscrizione, stesso test, stesso numero di tentativo → stesso ordine (un
+ * ricaricamento a metà non rimescola); il tentativo successivo cambia ordine.
+ * FNV-1a a 31 bit.
+ */
+export function semeTentativo(iscrizioneId: string, learningObjectId: string, tentativo: number): number {
+  let h = 0x811c9dc5;
+  for (const ch of `${iscrizioneId}:${learningObjectId}:${tentativo}`) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h % 2 ** 31;
+}
+
 export function mescola<T>(items: T[], seed?: number): T[] {
   const out = [...items];
   // LCG deterministico se c'è un seme (riproducibilità nei test), altrimenti Math.random.

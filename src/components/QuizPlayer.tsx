@@ -37,9 +37,13 @@ export function QuizPlayer({ iscrizioneId, learningObjectId, domande, soglia, te
   const [errore, setErrore] = useState<string | null>(null);
   const [risultato, setRisultato] = useState<Risultato | null>(null);
   const [tentativiFatti, setTentativiFatti] = useState(esito.tentativi);
+  // B5: l'ordine delle domande resta quello del tentativo in corso, anche quando
+  // dopo la consegna la pagina si aggiorna (la correzione segue l'ordine risposto).
+  // Un tentativo nuovo prende l'ordine che il server ha preparato per lui.
+  const [ordine, setOrdine] = useState<DomandaPublica[]>(domande);
 
   const esauriti = tentativiMax != null && tentativiFatti >= tentativiMax;
-  const nonRisposte = domande.filter((d) => !(risposte[d.id]?.length)).length;
+  const nonRisposte = ordine.filter((d) => !(risposte[d.id]?.length)).length;
 
   async function post(body: Record<string, unknown>) {
     const res = await fetch('/api/events/quiz', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ iscrizione_id: iscrizioneId, learning_object_id: learningObjectId, ...body }) });
@@ -56,6 +60,7 @@ export function QuizPlayer({ iscrizioneId, learningObjectId, domande, soglia, te
     setBusy(true); setErrore(null);
     try {
       await post({ event_type: 'quiz.started' });
+      setOrdine(domande);
       setRisposte({});
       setRisultato(null);
       setFase('in_corso');
@@ -78,7 +83,7 @@ export function QuizPlayer({ iscrizioneId, learningObjectId, domande, soglia, te
         titolo: 'Consegnare comunque?',
         messaggio: `Hai lasciato ${nonRisposte} domand${nonRisposte === 1 ? 'a' : 'e'} senza risposta: conter${nonRisposte === 1 ? 'à' : 'anno'} come sbagliat${nonRisposte === 1 ? 'a' : 'e'}.`,
         conferma: 'Consegna',
-        annulla: 'Torna alle domande',
+        annulla: 'Torna alle ordine',
       });
       if (!ok) return;
     }
@@ -101,7 +106,7 @@ export function QuizPlayer({ iscrizioneId, learningObjectId, domande, soglia, te
       <div className="quiz-card">
         <div className="quiz-card__head">
           <div className="quiz-card__kicker">Test finale</div>
-          <h2 className="quiz-card__title">{domande.length} domand{domande.length === 1 ? 'a' : 'e'}, si supera con almeno il {soglia}% di risposte giuste</h2>
+          <h2 className="quiz-card__title">{ordine.length} domand{ordine.length === 1 ? 'a' : 'e'}, si supera con almeno il {soglia}% di risposte giuste</h2>
           <p className="page-lead" style={{ margin: 0 }}>
             Puoi rispondere con calma, non c&apos;è un tempo limite. Alla consegna il risultato viene registrato{tentativiMax == null ? ' e, se serve, puoi riprovare.' : ` (tentativi disponibili: ${tentativiMax}).`}
           </p>
@@ -114,8 +119,8 @@ export function QuizPlayer({ iscrizioneId, learningObjectId, domande, soglia, te
         {errore && <div className="alert bad" role="alert">{errore}</div>}
         {esauriti ? (
           <div className="alert warn">Hai usato tutti i tentativi disponibili. Rivolgiti al tuo ente di formazione.</div>
-        ) : domande.length === 0 ? (
-          <div className="alert warn">Il test non ha ancora domande: riprova più tardi.</div>
+        ) : ordine.length === 0 ? (
+          <div className="alert warn">Il test non ha ancora ordine: riprova più tardi.</div>
         ) : (
           <div><button type="button" className="btn btn--lg" onClick={inizia} disabled={busy}>{busy ? 'Un attimo…' : esito.tentativi > 0 ? 'Riprova il test' : 'Inizia il test'}</button></div>
         )}
@@ -154,7 +159,7 @@ export function QuizPlayer({ iscrizioneId, learningObjectId, domande, soglia, te
         {errore && <div className="alert bad" role="alert" style={{ marginTop: 12 }}>{errore}</div>}
         {risultato && (
           <ol className="quiz-review">
-            {domande.map((d, n) => {
+            {ordine.map((d, n) => {
               const c = correzioneDi(d.id);
               const scelte = risposte[d.id] ?? [];
               return (
@@ -179,11 +184,11 @@ export function QuizPlayer({ iscrizioneId, learningObjectId, domande, soglia, te
   return (
     <div className="quiz">
       <div className="quiz__bar">
-        <span>{domande.length - nonRisposte} di {domande.length} risposte date</span>
-        <span className="progress" style={{ width: 140 }}><span className="progress__bar" style={{ width: `${domande.length ? Math.round(((domande.length - nonRisposte) / domande.length) * 100) : 0}%` }} /></span>
+        <span>{ordine.length - nonRisposte} di {ordine.length} risposte date</span>
+        <span className="progress" style={{ width: 140 }}><span className="progress__bar" style={{ width: `${ordine.length ? Math.round(((ordine.length - nonRisposte) / ordine.length) * 100) : 0}%` }} /></span>
       </div>
       <ol className="quiz__list">
-        {domande.map((d, n) => (
+        {ordine.map((d, n) => (
           <li key={d.id} className="quiz__q">
             <div className="quiz__qhead">
               <span className="quiz__n">{n + 1}</span>
