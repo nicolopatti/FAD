@@ -14,7 +14,8 @@ import type { EdizioneRow } from './db-types';
 export type EdizioneFinestra = Pick<EdizioneRow, 'data_inizio' | 'data_fine' | 'fad_apertura' | 'fad_chiusura' | 'concluso_at' | 'annullato_at'>;
 
 export type StatoFinestra = {
-  stato: 'aperta' | 'non_aperta' | 'chiusa' | 'conclusa' | 'annullata';
+  /** `scaduta`/`revocata` riguardano l'accesso del singolo iscritto (Fase 6, vendita). */
+  stato: 'aperta' | 'non_aperta' | 'chiusa' | 'conclusa' | 'annullata' | 'scaduta' | 'revocata';
   aperta: boolean;
   /** Primo giorno di fruizione (YYYY-MM-DD), se c'è un limite. */
   apre_il: string | null;
@@ -40,6 +41,33 @@ export function finestraEdizione(e: EdizioneFinestra, oggi: string = giornoRoma(
   return { stato: 'aperta', aperta: true, ...base };
 }
 
+/** Accesso del singolo iscritto (acquisto con scadenza, rimborso). */
+export type AccessoIscrizione = {
+  accesso_dal?: string | null;
+  accesso_fino_al?: string | null;
+  accesso_revocato_at?: string | null;
+};
+
+/**
+ * Finestra effettiva di un iscritto (Fase 6): prima la revoca, poi la finestra
+ * dell'edizione, poi `accesso_dal`/`accesso_fino_al`. Stessa regola di
+ * `public.iscrizione_finestra_stato` nel DB. Senza campi di accesso coincide con
+ * `finestraEdizione`.
+ */
+export function finestraIscrizione(e: EdizioneFinestra, a: AccessoIscrizione = {}, oggi: string = giornoRoma()): StatoFinestra {
+  const ed = finestraEdizione(e, oggi);
+  const dal = giorno(a.accesso_dal);
+  const fino = giorno(a.accesso_fino_al);
+  const apre = [ed.apre_il, dal].filter((x): x is string => Boolean(x)).sort().pop() ?? null;
+  const chiude = [ed.chiude_il, fino].filter((x): x is string => Boolean(x)).sort()[0] ?? null;
+  const base = { apre_il: apre, chiude_il: chiude };
+  if (a.accesso_revocato_at) return { stato: 'revocata', aperta: false, ...base };
+  if (!ed.aperta) return { ...ed, ...base };
+  if (dal && oggi < dal) return { stato: 'non_aperta', aperta: false, ...base };
+  if (fino && oggi > fino) return { stato: 'scaduta', aperta: false, ...base, chiude_il: fino };
+  return { stato: 'aperta', aperta: true, ...base };
+}
+
 function dataIt(iso: string): string {
   const [a, m, g] = iso.split('-');
   return `${g}/${m}/${a}`;
@@ -56,6 +84,10 @@ export function messaggioFinestra(f: StatoFinestra): string {
       return 'L’edizione è conclusa: le lezioni sono chiuse.';
     case 'annullata':
       return 'L’edizione è stata annullata: le lezioni non sono disponibili.';
+    case 'scaduta':
+      return f.chiude_il ? `Il tuo accesso era valido fino al ${dataIt(f.chiude_il)}: ora è scaduto.` : 'Il tuo accesso è scaduto.';
+    case 'revocata':
+      return 'Il tuo accesso a questo corso non è più attivo.';
     default:
       return f.chiude_il ? `Le lezioni sono aperte fino al ${dataIt(f.chiude_il)}.` : 'Le lezioni sono aperte.';
   }
@@ -65,5 +97,6 @@ export function messaggioFinestra(f: StatoFinestra): string {
 export function etichettaFinestra(f: StatoFinestra): string | null {
   if (f.stato === 'non_aperta') return 'Non ancora aperto';
   if (f.stato === 'aperta') return null;
+  if (f.stato === 'scaduta') return 'Accesso scaduto';
   return 'Chiuso';
 }

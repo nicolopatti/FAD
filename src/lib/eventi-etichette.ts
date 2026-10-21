@@ -11,7 +11,8 @@ export type GruppoEvento =
   | 'edizioni'
   | 'presenze'
   | 'fondi'
-  | 'attestati';
+  | 'attestati'
+  | 'vendite';
 
 export const GRUPPI: { id: GruppoEvento; etichetta: string }[] = [
   { id: 'accesso', etichetta: 'Accessi' },
@@ -23,6 +24,7 @@ export const GRUPPI: { id: GruppoEvento; etichetta: string }[] = [
   { id: 'presenze', etichetta: 'Sessioni e presenze' },
   { id: 'fondi', etichetta: 'Report fondi' },
   { id: 'attestati', etichetta: 'Attestati' },
+  { id: 'vendite', etichetta: 'Vendite' },
 ];
 
 export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[] = [
@@ -92,6 +94,16 @@ export const EVENTI: { tipo: string; etichetta: string; gruppo: GruppoEvento }[]
   { tipo: 'azienda.created', etichetta: 'Azienda creata', gruppo: 'edizioni' },
   { tipo: 'azienda.updated', etichetta: 'Azienda modificata', gruppo: 'edizioni' },
   { tipo: 'azienda.unita', etichetta: 'Aziende unite', gruppo: 'edizioni' },
+  { tipo: 'persona.registrata', etichetta: 'Registrazione collegata all’anagrafica', gruppo: 'accesso' },
+  { tipo: 'iscrizione.revoked', etichetta: 'Accesso revocato', gruppo: 'edizioni' },
+  { tipo: 'offerta.created', etichetta: 'Offerta creata', gruppo: 'vendite' },
+  { tipo: 'offerta.updated', etichetta: 'Offerta modificata', gruppo: 'vendite' },
+  { tipo: 'offerta.published', etichetta: 'Offerta pubblicata', gruppo: 'vendite' },
+  { tipo: 'offerta.withdrawn', etichetta: 'Offerta ritirata', gruppo: 'vendite' },
+  { tipo: 'ordine.created', etichetta: 'Ordine creato', gruppo: 'vendite' },
+  { tipo: 'ordine.paid', etichetta: 'Ordine pagato', gruppo: 'vendite' },
+  { tipo: 'ordine.refunded', etichetta: 'Ordine rimborsato', gruppo: 'vendite' },
+  { tipo: 'ordine.cancelled', etichetta: 'Ordine annullato', gruppo: 'vendite' },
 ];
 
 const BY_TIPO = new Map(EVENTI.map((e) => [e.tipo, e]));
@@ -182,6 +194,20 @@ export function riassuntoEvento(tipo: string, payload: Record<string, unknown> |
       return str('durata') ? `durata ${str('durata')}` : num('durata_minuti') != null ? `${num('durata_minuti')} min` : '';
     case 'report_fondo_depositato':
       return str('formato') ? `formato ${str('formato')}` : '';
+    case 'ordine.created':
+    case 'ordine.paid':
+    case 'ordine.refunded':
+      return [
+        num('importo_centesimi') != null ? `${(num('importo_centesimi')! / 100).toFixed(2).replace('.', ',')} €` : null,
+        num('sconto_centesimi') ? `sconto ${(num('sconto_centesimi')! / 100).toFixed(2).replace('.', ',')} €` : null,
+      ].filter(Boolean).join(' · ');
+    case 'ordine.cancelled':
+      return str('motivo') === 'sostituito' ? 'sostituito da un nuovo ordine' : str('motivo') === 'sessione_scaduta' ? 'pagamento non completato' : '';
+    case 'offerta.created':
+    case 'offerta.updated':
+    case 'offerta.published':
+    case 'offerta.withdrawn':
+      return str('slug') ?? '';
     case 'attestato.emesso':
       return [str('numero') ? `n. ${str('numero')}` : null, p.automatico === true ? 'automatico' : 'manuale', str('sostituisce') ? 'riemissione' : null].filter(Boolean).join(' · ');
     case 'attestato.sostituito':

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LearningObjectType, StrutturaRow } from './db-types';
 import { coperturaPercentuale, ricostruisciTrattiDaEventi, visioneIntegraleCompleta, type EventoVideo, type Segmento } from './visione';
-import { finestraEdizione, type EdizioneFinestra, type StatoFinestra } from './finestra';
+import { finestraIscrizione, type AccessoIscrizione, type EdizioneFinestra, type StatoFinestra } from './finestra';
 
 export type StrutturaItem = {
   struttura_id: string;
@@ -42,7 +42,7 @@ export type ProgressoIscrizione = {
   idonea: boolean;
   items: ProgressoLO[];
   /**
-   * Finestra di fruizione dell'edizione (R2): fuori finestra le API del player
+   * Finestra di fruizione (R2): edizione ∩ accesso dell'iscritto (Fase 6). Fuori finestra le API del player
    * rifiutano gli eventi. Non tocca il completamento (resta quello del log).
    */
   finestra: StatoFinestra;
@@ -83,7 +83,7 @@ export type EsitoQuiz = {
   superato_il: string | null;
 };
 
-type IscrEdCorso = {
+type IscrEdCorso = AccessoIscrizione & {
   id: string;
   persona_id: string;
   edizione_id: string;
@@ -98,7 +98,7 @@ type EventoCompletamento = {
   payload: Record<string, unknown> | null;
 };
 
-const SELECT_ISCRIZIONE = 'id, persona_id, edizione_id, edizione:edizione_id ( id, corso_id, data_inizio, data_fine, fad_apertura, fad_chiusura, concluso_at, annullato_at, corso:corso_id ( id, titolo, sblocco_sequenziale, visione_integrale ) )';
+const SELECT_ISCRIZIONE = 'id, persona_id, edizione_id, accesso_dal, accesso_fino_al, accesso_revocato_at, edizione:edizione_id ( id, corso_id, data_inizio, data_fine, fad_apertura, fad_chiusura, concluso_at, annullato_at, corso:corso_id ( id, titolo, sblocco_sequenziale, visione_integrale ) )';
 const FINESTRA_LIBERA: EdizioneFinestra = { data_inizio: null, data_fine: null, fad_apertura: null, fad_chiusura: null, concluso_at: null, annullato_at: null };
 const SELECT_STRUTTURA = `
       id, corso_id, ordine, obbligatorio, regola_completamento, learning_object_id,
@@ -133,7 +133,7 @@ function tipiEventoPer(items: StrutturaItem[]): string[] {
  * payload.iscrizione_id = iscrizione), in ordine di `seq`.
  */
 export function calcolaProgresso(
-  iscrizione: { id: string; persona_id: string; edizione_id: string },
+  iscrizione: { id: string; persona_id: string; edizione_id: string } & AccessoIscrizione,
   corso: { id: string; titolo: string; sblocco_sequenziale: boolean; visione_integrale: boolean },
   items: StrutturaItem[],
   events: EventoCompletamento[],
@@ -234,7 +234,7 @@ export function calcolaProgresso(
     obbligatori_totale: obbligatoriTot,
     idonea,
     items: decorated,
-    finestra: finestraEdizione(edizione),
+    finestra: finestraIscrizione(edizione, iscrizione),
   };
 }
 

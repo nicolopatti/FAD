@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { finestraEdizione, giornoRoma, messaggioFinestra, etichettaFinestra, type EdizioneFinestra } from '../../src/lib/finestra';
+import { finestraEdizione, finestraIscrizione, giornoRoma, messaggioFinestra, etichettaFinestra, type EdizioneFinestra } from '../../src/lib/finestra';
 
 const base: EdizioneFinestra = { data_inizio: null, data_fine: null, fad_apertura: null, fad_chiusura: null, concluso_at: null, annullato_at: null };
 
@@ -40,6 +40,30 @@ describe('finestraEdizione (R2)', () => {
     expect(etichettaFinestra(finestraEdizione(e, '2026-10-01'))).toBe('Non ancora aperto');
     expect(etichettaFinestra(finestraEdizione(e, '2026-12-01'))).toBe('Chiuso');
     expect(etichettaFinestra(finestraEdizione(e, '2026-11-10'))).toBeNull();
+  });
+});
+
+describe('finestraIscrizione (Fase 6: accesso per iscritto)', () => {
+  const ed = { ...base, data_inizio: '2026-01-01', data_fine: '2027-07-31' };
+  it('senza campi di accesso = finestra dell’edizione', () => {
+    expect(finestraIscrizione(ed, {}, '2026-10-21')).toEqual(finestraEdizione(ed, '2026-10-21'));
+  });
+  it('accesso a scadenza: aperto fino all’ultimo giorno, poi scaduto', () => {
+    const a = { accesso_dal: '2026-10-21', accesso_fino_al: '2026-11-20' };
+    expect(finestraIscrizione(ed, a, '2026-11-20').aperta).toBe(true);
+    const f = finestraIscrizione(ed, a, '2026-11-21');
+    expect(f.stato).toBe('scaduta');
+    expect(messaggioFinestra(f)).toBe('Il tuo accesso era valido fino al 20/11/2026: ora è scaduto.');
+    expect(etichettaFinestra(f)).toBe('Accesso scaduto');
+  });
+  it('vince il limite più stretto fra edizione e accesso', () => {
+    const f = finestraIscrizione(ed, { accesso_fino_al: '2028-01-01' }, '2027-08-01');
+    expect(f.stato).toBe('chiusa');
+    expect(finestraIscrizione(ed, { accesso_fino_al: '2026-12-31' }, '2026-10-21').chiude_il).toBe('2026-12-31');
+    expect(finestraIscrizione(ed, { accesso_dal: '2026-11-01' }, '2026-10-21').stato).toBe('non_aperta');
+  });
+  it('revoca (rimborso): chiuso anche con date valide', () => {
+    expect(finestraIscrizione(ed, { accesso_revocato_at: '2026-10-21T10:00:00Z' }, '2026-10-21').stato).toBe('revocata');
   });
 });
 
