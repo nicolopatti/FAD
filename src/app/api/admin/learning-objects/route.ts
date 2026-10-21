@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 import type { LearningObjectType } from '@/lib/db-types';
-import { validateDocumentoConfig, validateVideoConfig } from '@/lib/lo-config';
+import { campoErroreConfig, validateDocumentoConfig, validateVideoConfig } from '@/lib/lo-config';
 import { validaConfigQuiz } from '@/lib/quiz';
 
 type CreateBody = {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'type non valido' }, { status: 400 });
   }
   if (typeof titolo !== 'string' || titolo.trim() === '') {
-    return NextResponse.json({ ok: false, error: 'titolo mancante' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'Il titolo è obbligatorio.', campo: 'titolo' }, { status: 400 });
   }
   if (!config || typeof config !== 'object') {
     return NextResponse.json({ ok: false, error: 'config mancante' }, { status: 400 });
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         ? validaConfigQuiz(config)
         : validateDocumentoConfig(config, session.tenantId);
   if (typeof normalizedConfig === 'string') {
-    return NextResponse.json({ ok: false, error: normalizedConfig }, { status: 400 });
+    return NextResponse.json({ ok: false, error: normalizedConfig, campo: campoErroreConfig(normalizedConfig) }, { status: 400 });
   }
 
   const supabase = await createSupabaseServerClient();

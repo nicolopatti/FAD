@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth-context';
 import { appendEvent } from '@/lib/audit';
 import { validaConfigQuiz } from '@/lib/quiz';
-import { validateDocumentoConfig, validateVideoConfig } from '@/lib/lo-config';
+import { campoErroreConfig, validateDocumentoConfig, validateVideoConfig } from '@/lib/lo-config';
 
 type UpdateBody = {
   titolo?: string;
@@ -54,7 +54,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       updates.config = cfg;
     } else {
       const cfg = lo.type === 'video' ? validateVideoConfig(body.config) : validateDocumentoConfig(body.config, session.tenantId);
-      if (typeof cfg === 'string') return NextResponse.json({ ok: false, error: cfg }, { status: 400 });
+      if (typeof cfg === 'string') return NextResponse.json({ ok: false, error: cfg, campo: campoErroreConfig(cfg) }, { status: 400 });
       updates.config = cfg;
     }
   }

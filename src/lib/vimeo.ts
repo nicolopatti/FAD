@@ -71,3 +71,31 @@ export function vimeoEmbedUrl(
   if (opts.bloccaVelocita) url += '&speed=false';
   return url;
 }
+
+/** Messaggio per l'admin quando il riferimento non è un video Vimeo (B3). */
+export const MSG_VIMEO_NON_VALIDO = 'Questo non sembra un video Vimeo: incolla l’ID numerico (es. 1084894652) o il link del video, non quello di una cartella.';
+
+/** URL oEmbed di Vimeo per un riferimento (link pubblico o non in elenco). */
+export function vimeoOembedUrl(ref: VimeoRef): string {
+  const video = `https://vimeo.com/${ref.vimeo_id}${ref.vimeo_hash ? `/${ref.vimeo_hash}` : ''}`;
+  return `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(video)}`;
+}
+
+/**
+ * Durata in secondi letta da Vimeo (oEmbed, dal browser dell'admin). Best
+ * effort: null se Vimeo non risponde o il video non la espone (privacy); in quel
+ * caso la durata si scrive a mano come prima.
+ */
+export async function leggiDurataVimeo(input: string): Promise<number | null> {
+  const ref = parseVimeoRef(input);
+  if (!ref) return null;
+  try {
+    const res = await fetch(vimeoOembedUrl(ref));
+    if (!res.ok) return null;
+    const j = (await res.json()) as { duration?: unknown };
+    const d = Number(j.duration);
+    return Number.isFinite(d) && d > 0 ? Math.round(d) : null;
+  } catch {
+    return null;
+  }
+}

@@ -8,9 +8,10 @@ import { useFeedback } from '@/components/ui/Feedback';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Icon, fmtDurataSec, regolaLabel } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
-import { useCall, type CallFn } from '@/components/admin/useCall';
+import { ErroreCall, useCall, type CallFn } from '@/components/admin/useCall';
+import { leggiDurataVimeo, MSG_VIMEO_NON_VALIDO, parseVimeoRef } from '@/lib/vimeo';
 import { ErrorBanner } from '@/components/admin/ErrorBanner';
-import { parseMmSs, type Errori } from '@/lib/validazione';
+import { fmtMmSs, parseMmSs, type Errori } from '@/lib/validazione';
 import { TIPO_CHIP, TIPO_ICON, TIPO_LABEL, matchCol } from './shared';
 
 /**
@@ -281,6 +282,7 @@ function NuovaLezione({
     if (!titolo.trim()) e.titolo = 'Indica il titolo della lezione.';
     if (newType === 'video') {
       if (!vimeo.trim()) e.vimeo = 'Incolla l\'ID numerico o il link del video Vimeo.';
+      else if (!parseVimeoRef(vimeo)) e.vimeo = MSG_VIMEO_NON_VALIDO;
       const sec = parseMmSs(durata);
       if (!durata.trim()) e.durata = 'Indica la durata, es. 12:40.';
       else if (sec == null || sec <= 0) e.durata = 'Formato non valido: usa mm:ss (es. 12:40) o i secondi.';
@@ -318,7 +320,17 @@ function NuovaLezione({
         if (upErr) { setErrs({ pdf: `Caricamento non riuscito: ${upErr.message}` }); return; }
         config = { storage_key: key, mime: 'application/pdf', size: file.size, filename: file.name };
       }
-      const created = (await call('POST', '/api/admin/learning-objects', { type: newType, titolo: titolo.trim(), config })) as { learning_object: { id: string } };
+      let created: { learning_object: { id: string } };
+      try {
+        created = (await call('POST', '/api/admin/learning-objects', { type: newType, titolo: titolo.trim(), config }, { quiet: true })) as { learning_object: { id: string } };
+      } catch (err) {
+        // B3: un errore su un campo va sotto il campo, una volta sola (niente banner + toast).
+        const campo = err instanceof ErroreCall ? (err.dati?.campo as string | undefined) : undefined;
+        const mappa: Record<string, string> = { vimeo_id: 'vimeo', durata_secondi: 'durata', titolo: 'titolo' };
+        if (campo && mappa[campo]) setErrs({ [mappa[campo]]: (err as Error).message });
+        else onError(err instanceof Error ? err.message : String(err));
+        return;
+      }
       await call('POST', `/api/admin/corsi/${corso.id}/struttura`, { learning_object_id: created.learning_object.id }, {
         successo: newType === 'quiz' ? 'Test aggiunto al corso: ora scrivi le domande (apri il test dalla sequenza).' : 'Lezione aggiunta al corso.',
         busy: setAggiungendo,
@@ -342,9 +354,14 @@ function NuovaLezione({
       {newType === 'video' ? (
         <div className="grid-2">
           <Field id="nuovo-vimeo" label="ID o link Vimeo" required error={errs.vimeo}>
-            <input id="nuovo-vimeo" className="input" value={vimeo} onChange={(e) => { setVimeo(e.target.value); if (errs.vimeo) setErrs({ ...errs, vimeo: '' }); }} disabled={busy} placeholder="es. 824601551 oppure https://vimeo.com/824601551/abc123" aria-invalid={Boolean(errs.vimeo)} />
+            <input id="nuovo-vimeo" className="input" value={vimeo} onChange={(e) => { setVimeo(e.target.value); if (errs.vimeo) setErrs({ ...errs, vimeo: '' }); }} onBlur={async () => {
+              // Bonus B3: la durata la legge Vimeo, se il video la espone (altrimenti si scrive a mano).
+              if (durata.trim() || !parseVimeoRef(vimeo)) return;
+              const sec = await leggiDurataVimeo(vimeo);
+              if (sec) setDurata((d) => d.trim() ? d : fmtMmSs(sec));
+            }} disabled={busy} placeholder="es. 824601551 oppure https://vimeo.com/824601551/abc123" aria-invalid={Boolean(errs.vimeo)} />
           </Field>
-          <Field id="nuovo-durata" label="Durata" required error={errs.durata} hint="mm:ss, es. 12:40">
+          <Field id="nuovo-durata" label="Durata" required error={errs.durata} hint="mm:ss, es. 12:40 · si compila da sola se Vimeo la fornisce">
             <input id="nuovo-durata" className="input" value={durata} onChange={(e) => { setDurata(e.target.value); if (errs.durata) setErrs({ ...errs, durata: '' }); }} disabled={busy} placeholder="12:40" inputMode="numeric" aria-invalid={Boolean(errs.durata)} />
           </Field>
         </div>

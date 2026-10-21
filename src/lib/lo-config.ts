@@ -1,19 +1,26 @@
-import type { DocumentoConfig, VideoConfig } from '@/lib/db-types';
-import { parseVimeoRef } from '@/lib/vimeo';
+import type { DocumentoConfig, VideoConfig } from './db-types';
+import { MSG_VIMEO_NON_VALIDO, parseVimeoRef } from './vimeo';
 
 /**
  * Validazione della configurazione di un contenuto (video, documento):
  * condivisa dalla creazione e dalla sostituzione di video o file.
  */
+export const MSG_DURATA_NON_VALIDA = 'Indica la durata del video in minuti e secondi (es. 12:40).';
+
+/** Campo del form a cui riferire un errore di validazione (per l'errore inline). */
+export function campoErroreConfig(msg: string): 'vimeo_id' | 'durata_secondi' | null {
+  return msg === MSG_VIMEO_NON_VALIDO ? 'vimeo_id' : msg === MSG_DURATA_NON_VALIDA ? 'durata_secondi' : null;
+}
+
 export function validateVideoConfig(c: Record<string, unknown>): VideoConfig | string {
   const durata = c.durata_secondi;
   // Si accetta l'ID numerico o un link Vimeo; si salva sempre l'ID (+ hash).
   const ref = parseVimeoRef(c.vimeo_id);
   if (!ref) {
-    return 'config.vimeo_id non valido: serve l\'ID numerico o il link del video Vimeo (non di una cartella)';
+    return MSG_VIMEO_NON_VALIDO;
   }
   if (typeof durata !== 'number' || !Number.isFinite(durata) || durata <= 0) {
-    return 'config.durata_secondi non valido';
+    return MSG_DURATA_NON_VALIDA;
   }
   const out: VideoConfig = { vimeo_id: ref.vimeo_id, durata_secondi: Math.round(durata) };
   const hash = ref.vimeo_hash ?? (typeof c.vimeo_hash === 'string' ? c.vimeo_hash.trim() : '');

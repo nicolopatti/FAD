@@ -6,7 +6,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Icon } from '@/components/admin/Atlante';
 import { Field } from '@/components/admin/Form';
 import { useFeedback } from '@/components/ui/Feedback';
-import { parseMmSs, type Errori } from '@/lib/validazione';
+import { fmtMmSs, parseMmSs, type Errori } from '@/lib/validazione';
+import { leggiDurataVimeo, MSG_VIMEO_NON_VALIDO, parseVimeoRef } from '@/lib/vimeo';
 
 type LoType = 'video' | 'documento' | 'quiz';
 
@@ -30,6 +31,7 @@ export function NewLearningObjectForm({ tenantId }: { tenantId: string }) {
     if (!titolo.trim()) e.titolo = 'Indica il titolo del contenuto.';
     if (type === 'video') {
       if (!vimeoId.trim()) e.vimeo = 'Incolla l\'ID numerico o il link del video Vimeo.';
+      else if (!parseVimeoRef(vimeoId)) e.vimeo = MSG_VIMEO_NON_VALIDO;
       const sec = parseMmSs(durata);
       if (!durata.trim()) e.durata = 'Indica la durata, es. 12:40.';
       else if (sec == null || sec <= 0) e.durata = 'Formato non valido: usa mm:ss (es. 12:40) o i secondi.';
@@ -82,6 +84,14 @@ export function NewLearningObjectForm({ tenantId }: { tenantId: string }) {
         body: JSON.stringify(body),
       });
       const json = await res.json();
+      // B3: errore su un campo → sotto il campo, non nel banner.
+      const campi: Record<string, string> = { vimeo_id: 'vimeo', durata_secondi: 'durata', titolo: 'titolo' };
+      if (!res.ok && json.campo && campi[json.campo]) {
+        setErrs({ [campi[json.campo]]: json.error });
+        setBusy(false);
+        setProgress(null);
+        return;
+      }
       if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
 
       if (type === 'quiz') {
@@ -122,7 +132,11 @@ export function NewLearningObjectForm({ tenantId }: { tenantId: string }) {
         {type === 'video' ? (
           <div className="grid-2">
             <Field id="lo-vimeo" label="ID o link Vimeo" required error={errs.vimeo} hint="Vale anche il link di un video non in elenco.">
-              <input id="lo-vimeo" className="input" value={vimeoId} onChange={(e) => { setVimeoId(e.target.value); clear('vimeo'); }} disabled={busy} placeholder="es. 1084894652 oppure https://vimeo.com/1084894652/abc123" aria-invalid={Boolean(errs.vimeo)} />
+              <input id="lo-vimeo" className="input" value={vimeoId} onChange={(e) => { setVimeoId(e.target.value); clear('vimeo'); }} onBlur={async () => {
+                if (durata.trim() || !parseVimeoRef(vimeoId)) return;
+                const sec = await leggiDurataVimeo(vimeoId);
+                if (sec) setDurata((d) => d.trim() ? d : fmtMmSs(sec));
+              }} disabled={busy} placeholder="es. 1084894652 oppure https://vimeo.com/1084894652/abc123" aria-invalid={Boolean(errs.vimeo)} />
             </Field>
             <Field id="lo-durata" label="Durata" required error={errs.durata} hint="mm:ss, es. 12:40">
               <input id="lo-durata" className="input" value={durata} onChange={(e) => { setDurata(e.target.value); clear('durata'); }} disabled={busy} placeholder="12:40" inputMode="numeric" aria-invalid={Boolean(errs.durata)} />

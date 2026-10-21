@@ -106,3 +106,9 @@ export const MSG_ORE = 'Le ore totali devono essere un numero maggiore di zero (
 export function maiuscola(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
+
+/** Secondi → "mm:ss" (inverso di parseMmSs). */
+export function fmtMmSs(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
