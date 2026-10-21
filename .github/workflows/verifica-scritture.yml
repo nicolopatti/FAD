@@ -5,6 +5,8 @@
 # (vedi scripts/verifica-scritture.mjs). Si lancia a mano oppure parte da sola
 # a ogni push che tocca questo file o lo script (l'integrazione GitHub della
 # sessione Claude non può avviare i workflow: il push è il grilletto).
+# Va lanciato DOPO che il deploy di produzione ha il codice da provare: con il
+# codice vecchio i controlli nuovi falliscono (e possono lasciare residui).
 name: Verifica scritture admin
 
 on:
