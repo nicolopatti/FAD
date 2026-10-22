@@ -1,4 +1,4 @@
-# Stato del progetto FAD — Fase 1–4 chiuse, UX rifatta, **Fase 5 (test + attestato) in corso** (handoff session-to-session)
+# Stato del progetto FAD — Fase 1–5 su `main`, **Fase 6 (vendita) costruita sul branch, gate M6a/M6 da chiudere** (handoff session-to-session)
 
 > Questo file è il primo da leggere all'inizio di ogni nuova sessione.
 > Riassume cosa è stato fatto, cosa resta, e come riprendere senza dover
@@ -9,7 +9,65 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Fase 6 — vendita dei corsi: brief da ratificare (2026-10-21 sera) e appunti multi-ente
+## Fase 6 — vendita dei corsi: Task 1–6 costruiti (2026-10-22, branch `claude/new-session-qr4kff`, **non su `main`**: gate M6a/M6 da chiudere su un'anteprima con Stripe in modalità test)
+
+Mandato: `docs/brief-fase-6-vendita.md` (§10 ratificata il 21/10 sera). Multi-ente: solo
+appunti (`docs/visione-multi-ente.md`), l'utente vuole capire le scelte prima di toccare
+l'infrastruttura.
+- **Schema** (`20261021000013_fase6_vendita_schema.sql`, **applicata sul live**; pgTAP
+  `supabase/tests/fase6_vendita_schema.sql` **30/30** in rollback): accesso per
+  iscrizione (`iscrizione.accesso_dal/accesso_fino_al/accesso_revocato_at/origine`,
+  `iscrizione_finestra_stato` = finestra dell'edizione ∩ accesso, stati nuovi `scaduta` e
+  `revocata`; `evento_player_registra` la usa), `tenant_dominio` (host → ente, `*` jolly,
+  vince l'esatto; RPC anon `tenant_da_host`), `offerta` (una per edizione, bozza/
+  pubblicata/ritirata, prezzo IVA inclusa in centesimi, `accesso_giorni` null = edizione a
+  date), `ordine` (fatturazione = PII, sta nell'ordine e mai negli Eventi; RLS: propri o
+  staff; scritture solo dalle RPC). RPC pubbliche `catalogo_pubblico(host)`,
+  `catalogo_offerta(host, slug)`; RPC di servizio (rifiutano se `auth.uid()` non è
+  nullo): `persona_da_registrazione`, `ordine_crea` (lock sull'offerta, posti contati con
+  gli in attesa non scaduti, ordini in attesa precedenti annullati),
+  `ordine_imposta_sessione`, `ordine_pagato` (idempotente, crea o riattiva l'iscrizione
+  con accesso = oggi .. oggi+giorni), `ordine_rimborsato` (revoca l'accesso),
+  `ordine_annulla`. Eventi `offerta.*`, `ordine.*`, `iscrizione.revoked`,
+  `persona.registrata` (etichette nel gruppo "vendite").
+- **Applicativo**: `lib/vendita.ts` (prezzi, scorporo IVA, validazioni offerta e
+  fatturazione, versioni dei consensi), `lib/finestra.ts` `finestraIscrizione`,
+  `lib/vetrina.ts` (host, catalogo, scheda, `edizioneGiaIscritta`), `lib/offerte.ts`,
+  `lib/ordini.ts`, `lib/stripe.ts` (`stripe@22.6.2`), `lib/registrazione.ts`,
+  `lib/vendite-admin.ts`. Admin: scheda **Vendita** dell'edizione (`VenditaPanel`: online
+  o a date, prezzo con scorporo, posti, IVA o natura, finestra di vendita, codici sconto,
+  indirizzo, testi; Salva/Pubblica/Ritira), voce di menu **Vendite** (`/admin/vendite`:
+  KPI del mese, filtro, dettaglio con fatturazione e consensi, **rimborso** con
+  `refunds.create` + chiave di idempotenza, export CSV per il gestionale). Pubblico
+  (`components/vetrina/Vetrina.tsx`): `/catalogo`, `/catalogo/[slug]`, `/registrati`
+  (`signUp` con conferma email → `/auth/callback?tipo=registrazione`), `/acquista/[slug]`
+  (account obbligatorio, dati di fatturazione privato/azienda, termini + avvio immediato),
+  `/acquisto/esito` (rilegge la sessione da Stripe), `/termini` e `/privacy` (**testi
+  segnaposto**: li deve scrivere l'ente). `/` porta al catalogo chi non è entrato su un
+  indirizzo dell'ente. `POST /api/acquisto`, `POST /api/stripe/webhook` (completed,
+  async_payment_succeeded/failed, expired, charge.refunded totale), entrambe nel
+  fail-fast di `proxy.ts`. `/profilo`: "I tuoi acquisti".
+- **Seed demo** (`supabase/seed/fase6_vendita_demo.sql`, **eseguito sul live**):
+  indirizzi `fad-wine.vercel.app`, `fad-*-nicolopattis-projects.vercel.app`,
+  `localhost:3100` → tenant demo; offerta **pubblicata** `sicurezza-sul-lavoro-introduttivo`
+  su ED-001 (49 €, IVA 22%, 365 giorni) con Eventi `offerta.created/published`
+  (`origine: seed`); catena integra a **785 eventi**. Senza `STRIPE_SECRET_KEY` l'acquisto
+  risponde 503 "pagamenti non configurati".
+- *Verifiche*: typecheck 0, lint 0, unit **96/96** (`vendita.test.ts` 13, finestra +4),
+  fase4 16/16, build ok, E2E nuovo `tests/e2e/vendita.mjs` (`npm run test:e2e:vendita`,
+  sola lettura) + smoke/funzionali/correzioni (esiti nella sezione sotto, aggiornati a
+  fine sessione). Corretto lo sforamento a 390 px della testata della vetrina.
+- **Non provato da qui** (manca la chiave di servizio, Stripe non è configurato):
+  registrazione reale (serve anche SMTP), acquisto, webhook, rimborso, "Sei iscritto" sulla
+  scheda (legge l'edizione dell'offerta con la service role).
+- **Lato utente prima del gate M6a**: account Stripe (modalità test), su Vercel
+  `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` (Preview), endpoint webhook
+  `https://<anteprima>/api/stripe/webhook` con i 5 eventi sopra; **SMTP** (la conferma
+  della registrazione è un'email); poi prova con la carta 4242 4242 4242 4242. Prima dei
+  pagamenti veri: Supabase Pro, testi legali, decisione IVA col commercialista, ente reale.
+  Email di conferma d'acquisto (gate M6 #5): da fare dopo l'SMTP.
+
+## Fase 6 — vendita dei corsi: brief (2026-10-21 sera) e appunti multi-ente
 
 Richiesta dell'utente: rendere la piattaforma uno strumento **multi-ente** gestito da voi e
 dato in dotazione a enti e clienti, e poter **vendere i corsi** sul sito (registrazione +
@@ -1823,7 +1881,13 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
-> **Punto di ripartenza (2026-10-21 sera, leggere per primo).** Le correzioni dello
+> **Punto di ripartenza (2026-10-22, leggere per primo).** La Fase 6 (vendita) è costruita
+> sul branch `claude/new-session-qr4kff` (sezione "Fase 6 — vendita dei corsi: Task 1–6" in
+> testa): schema applicato sul live, seed demo eseguito, **non su `main`**. Il merge chiede il
+> via libera esplicito dell'utente; prima servono Stripe in modalità test + SMTP per i gate
+> M6a/M6 su un'anteprima. Il multi-ente resta da decidere (`docs/visione-multi-ente.md`).
+>
+> **Punto di ripartenza precedente (2026-10-21 sera).** Le correzioni dello
 > stress test sono **su `main` e in produzione** (sezione in testa al file), verificate
 > sul deploy (29/29 + 80/80). Migration applicate sul live fino alla `20261021000012`
 > (indice unico del CF e CHECK delle date, dopo la pulizia dei dati di prova, eseguita).

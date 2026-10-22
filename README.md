@@ -32,6 +32,33 @@ codice e date, concludi/annulla). Gli indirizzi vecchi (`/admin/sessioni`,
 `/admin/report-fondo`, `/admin/attestati`, `/admin/ente`) reindirizzano; `/admin/sessioni/<id>`
 reindirizza alla sessione sotto la sua edizione.
 
+## Vendita dei corsi (Fase 6): come si accende
+
+Mandato: [`docs/brief-fase-6-vendita.md`](docs/brief-fase-6-vendita.md). Il catalogo
+pubblico (`/catalogo`) mostra le offerte pubblicate dell'ente a cui appartiene
+l'indirizzo della richiesta (tabella `tenant_dominio`, jolly `*` ammesso). Si mette in
+vendita un'edizione dalla scheda **Vendita** della sua pagina; ordini, rimborsi ed export
+per il gestionale stanno in **Vendite**.
+
+1. **Indirizzo → ente**: una riga in `tenant_dominio` per ogni dominio dell'ente (per il
+   demo: `supabase/seed/fase6_vendita_demo.sql`). Senza, il catalogo risponde "nessun ente".
+2. **Stripe** (prima in modalità test): su Vercel `STRIPE_SECRET_KEY` e
+   `STRIPE_WEBHOOK_SECRET` (mai in repo né in chat); in Stripe → Developers → Webhooks un
+   endpoint `https://<indirizzo>/api/stripe/webhook` con `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`,
+   `checkout.session.expired`, `charge.refunded`. Senza chiavi l'acquisto risponde 503.
+3. **SMTP** in Supabase Auth: la registrazione manda un'email di conferma (il mittente di
+   prova di Supabase ne manda pochissime l'ora). Nei Redirect URLs di Supabase Auth deve
+   esserci l'indirizzo del sito (`/auth/callback`). **"Confirm email" deve restare
+   attivo**: la registrazione collega l'account a una Persona già in anagrafica con la
+   stessa email (es. iscritta dall'admin) solo perché l'email è confermata; senza la
+   conferma chiunque potrebbe prendersi la scheda di un altro scrivendo la sua email.
+4. **Testi legali**: `/termini` e `/privacy` sono segnaposto da sostituire con i testi
+   dell'ente; le versioni accettate stanno in `src/lib/vendita.ts` (`VERSIONE_TERMINI`,
+   `VERSIONE_RECESSO`) e si salvano nell'ordine.
+5. Prova con la carta `4242 4242 4242 4242` su un'anteprima, poi rimborso da **Vendite**.
+   Le chiavi live vanno solo su Production, dopo Supabase Pro e la decisione sull'IVA.
+
 ## Modalità di lavoro — tutto in cloud (ratificata)
 
 Niente ambiente locale. Niente file `.env.local`.

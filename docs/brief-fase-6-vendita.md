@@ -31,9 +31,13 @@ configurabili per ente.
 
 ## 2. Principi non negoziabili
 
-1. **Il pagamento lo conferma Stripe, non il browser.** L'iscrizione nasce solo dal webhook
-   firmato (`checkout.session.completed`), mai dalla pagina di ritorno. Il webhook è
-   **idempotente**: ricevuto due volte, produce un'iscrizione sola.
+1. **Il pagamento lo conferma Stripe, non il browser.** L'iscrizione nasce solo da una
+   conferma letta da Stripe: il webhook firmato (`checkout.session.completed`) oppure, sulla
+   pagina di ritorno, la sessione **riletta dal server presso Stripe** (`checkout.sessions.
+   retrieve`, mai i parametri dell'URL). Le due strade passano dalla stessa RPC
+   **idempotente** (`ordine_pagato`): ricevuta due volte, produce un'iscrizione sola.
+   *(Precisazione dell'implementazione, 22/10: senza la rilettura il discente aspetterebbe
+   il webhook guardando "pagamento in conferma".)*
 2. **Nessun dato di carta passa dai nostri server** (Stripe Checkout ospitato).
 3. **Registro eventi come sempre**: ogni passaggio dell'ordine (creato, pagato, rimborsato,
    annullato) è un Evento via `audit_append`, **senza dati personali** (solo UUID, importo,
