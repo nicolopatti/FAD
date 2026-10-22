@@ -54,9 +54,10 @@ l'infrastruttura.
   (`origine: seed`); catena integra a **785 eventi**. Senza `STRIPE_SECRET_KEY` l'acquisto
   risponde 503 "pagamenti non configurati".
 - *Verifiche*: typecheck 0, lint 0, unit **96/96** (`vendita.test.ts` 13, finestra +4),
-  fase4 16/16, build ok, E2E nuovo `tests/e2e/vendita.mjs` (`npm run test:e2e:vendita`,
-  sola lettura) + smoke/funzionali/correzioni (esiti nella sezione sotto, aggiornati a
-  fine sessione). Corretto lo sforamento a 390 px della testata della vetrina.
+  fase4 16/16, build ok; E2E sul dev server: nuovo `tests/e2e/vendita.mjs`
+  (`npm run test:e2e:vendita`, sola lettura) **56/56**, smoke **99/99**, funzionali
+  **50/50**, correzioni **52/52**, 0 errori JS a 1440/390. Corretto lo sforamento a 390 px
+  della testata della vetrina.
 - **Non provato da qui** (manca la chiave di servizio, Stripe non è configurato):
   registrazione reale (serve anche SMTP), acquisto, webhook, rimborso, "Sei iscritto" sulla
   scheda (legge l'edizione dell'offerta con la service role).
