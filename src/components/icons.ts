@@ -32,6 +32,7 @@ export const ICON_PATHS: Record<string, string> = {
   corsi: 'M5 4h13v16H6a2 2 0 0 1-2-2V5z',
   libreria: 'M4 5v14M9 5v14M14 6l5 1-2 13-5-1z',
   sessioni: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
+  vendite: 'M17 6.5A6.5 6.5 0 1 0 17 17.5M4 10.5h9M4 13.5h9',
   sun: 'M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
   moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
   themeAuto: 'M12 3a9 9 0 1 0 0 18zM12 3a9 9 0 1 1 0 18',

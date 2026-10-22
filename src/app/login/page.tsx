@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { Route } from 'next';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Ico } from '@/components/AppShell';
 import { LoginBrand, LoginPreview } from './LoginPreview';
@@ -23,7 +24,15 @@ function messaggioErrore(raw: string): string {
 const AVVISI: Record<string, string> = {
   link: 'Il link non è più valido o è già stato usato: richiedi un nuovo link con "Password dimenticata".',
   password: 'Password aggiornata: entra con quella nuova.',
+  conferma: 'Email confermata: entra con l’email e la password che hai scelto.',
+  registrazione: 'Non siamo riusciti a completare la registrazione da questo indirizzo. Riprova o contatta l’ente.',
 };
+
+/** Ritorno dopo il login (es. all'acquisto): solo percorsi interni. */
+function dopoDaUrl(): string {
+  const d = new URLSearchParams(window.location.search).get('dopo');
+  return d && d.startsWith('/') && !d.startsWith('//') && !d.includes('\\') ? d : '/';
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -56,8 +65,12 @@ export default function LoginPage() {
         return;
       }
       // Server-side: log dell'evento auth.login (passa per audit_append).
-      await fetch('/api/auth/after-login', { method: 'POST' }).catch(() => undefined);
-      router.replace('/');
+      const after = await fetch('/api/auth/after-login', { method: 'POST' }).catch(() => null);
+      if (after && after.status === 404) {
+        const j = await after.json().catch(() => null) as { error?: string } | null;
+        if (j?.error) { setError(j.error); setBusy(false); await supabase.auth.signOut(); return; }
+      }
+      router.replace(dopoDaUrl() as Route);
     } catch (err) {
       setError(messaggioErrore(err instanceof Error ? err.message : String(err)));
       setBusy(false);
@@ -138,7 +151,7 @@ export default function LoginPage() {
         </form>
 
         <p className="page-lead" style={{ fontSize: 13, margin: 0 }}>
-          Non hai le credenziali? Chiedile al referente della formazione della tua azienda.
+          Non hai un account? <Link href="/registrati">Registrati</Link> per acquistare un corso dal <Link href="/catalogo">catalogo</Link>. Se ti iscrive la tua azienda, le credenziali arrivano per email.
         </p>
       </section>
 

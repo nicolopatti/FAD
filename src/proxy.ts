@@ -5,8 +5,9 @@ import { updateSession } from '@/lib/supabase/middleware';
 // corregge con la service role) modificano il DB e POI registrano l'Evento: se
 // la chiave manca, meglio rifiutare subito (503) che lasciare righe senza
 // Evento nel registro. Gli eventi del player video/documento e il profilo
-// passano per RPC con il client dell'utente e non ne hanno bisogno.
-const SCRITTURA = /^\/api\/(admin\/|events\/quiz$|profilo\/(password|informativa)$)/;
+// passano per RPC con il client dell'utente e non ne hanno bisogno. Fase 6:
+// anche l'avvio dell'acquisto e il webhook di Stripe scrivono con la service role.
+const SCRITTURA = /^\/api\/(admin\/|events\/quiz$|profilo\/(password|informativa)$|acquisto$|stripe\/webhook$)/;
 // POST di sola lettura (nessuna scrittura, nessun Evento): passano comunque.
 const SOLO_LETTURA = /^\/api\/admin\/(attestati\/anteprima|learning-objects\/cerca)$/;
 const MUTANTI = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);

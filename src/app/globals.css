@@ -1607,3 +1607,91 @@ h2 { font-weight: 700; letter-spacing: -.015em; }
 .sintesi { display: grid; grid-template-columns: minmax(84px, max-content) minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: 13.5px; }
 .sintesi dt { color: var(--muted); font-weight: 500; }
 .sintesi dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+/* ── Fase 6: vetrina pubblica (catalogo, scheda del corso, acquisto) ───────── */
+.vetrina { min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
+.vetrina__head { display: flex; align-items: center; gap: 16px; height: 64px; padding: 0 clamp(16px, 4vw, 48px); }
+.vetrina__head .topbar__brand { min-width: 0; flex: 0 1 auto; }
+.vetrina__head .topbar__brand span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vetrina__nav { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
+.vetrina__nav > a:not(.btn) { color: var(--ink); text-decoration: none; padding: 8px 12px; border-radius: var(--r-pill); font-size: 14px; font-weight: 500; }
+.vetrina__nav > a:not(.btn):hover { background: var(--surface); text-decoration: none; }
+.vetrina__main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 8px clamp(16px, 4vw, 48px) 56px; display: flex; flex-direction: column; gap: 20px; }
+.vetrina__foot { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; padding: 20px clamp(16px, 4vw, 48px); color: var(--muted); font-size: 13px; border-top: 1px solid var(--surface-2); }
+.vetrina__foot nav { display: flex; gap: 18px; }
+.vetrina__foot a { color: var(--muted); }
+.vetrina__intro h1 { font-family: var(--font-display); font-size: var(--text-3xl); color: var(--deep); margin: 12px 0 6px; }
+.vetrina__intro .page-lead { max-width: 640px; }
+.vetrina__filtri { display: flex; gap: 8px; margin-top: 16px; max-width: 560px; }
+.vetrina__filtri .input { flex: 1; min-width: 0; }
+.vetrina__cat { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.vetrina__cat a { padding: 6px 14px; border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--shadow-1); color: var(--ink); font-size: 13.5px; text-decoration: none; }
+.vetrina__cat a.is-active { background: var(--deep); color: #fff; }
+.vetrina__vuoto, .vetrina__nessuno { padding: 40px 0; }
+.vetrina__griglia { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+.offerta-card { display: flex; flex-direction: column; height: 100%; background: var(--surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-1); color: var(--ink); text-decoration: none; overflow: hidden; transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out); }
+.offerta-card:hover { text-decoration: none; transform: translateY(-2px); box-shadow: var(--shadow-2); }
+.offerta-card__cover { aspect-ratio: 16 / 8; border-radius: 0; }
+.offerta-card__body { padding: 18px 20px 8px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.offerta-card__cat { font-size: 12.5px; color: var(--accent); font-weight: 600; }
+.offerta-card__titolo { font-family: var(--font-display); font-size: 20px; line-height: 1.2; color: var(--deep); margin: 0; }
+.offerta-card__descr { margin: 0; color: var(--muted); font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.offerta-card__fatti { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+.offerta-card__piede { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 20px 18px; }
+.offerta-card__prezzo { font-family: var(--font-display); font-size: 22px; color: var(--deep); }
+.scheda { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px 40px; align-items: start; }
+.scheda__hero { grid-column: 1; background: var(--deep); color: #fff; border-radius: var(--radius-xl); padding: clamp(24px, 4vw, 40px); }
+.scheda__hero h1 { font-family: var(--font-display); font-size: var(--text-3xl); line-height: 1.1; margin: 8px 0 16px; color: #fff; }
+.scheda__cat { color: var(--mint, #7cf0c3); font-weight: 600; font-size: 14px; }
+.scheda__fatti { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.scheda__fatti li { background: rgba(255,255,255,.12); padding: 6px 12px; border-radius: var(--r-pill); font-size: 13.5px; }
+.scheda__acquisto { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 16px; background: var(--surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-2); padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.scheda__cover { aspect-ratio: 16 / 9; border-radius: var(--radius-lg); }
+.scheda__prezzo { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--deep); line-height: 1; margin-top: 4px; }
+.scheda__iva { font-size: 13px; margin-top: -4px; }
+.scheda__posti { font-size: 13px; color: var(--warn); font-weight: 600; text-align: center; }
+.scheda__garanzie { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.scheda__garanzie li { display: flex; align-items: center; gap: 8px; }
+.scheda__corpo { grid-column: 1; display: flex; flex-direction: column; gap: 28px; }
+.scheda__corpo h2 { font-family: var(--font-display); font-size: var(--text-xl); color: var(--deep); margin: 0 0 10px; }
+.scheda__corpo p { margin: 0 0 10px; line-height: 1.6; }
+.scheda__programma { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); }
+.scheda__programma li { display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-size: 14.5px; }
+.scheda__programma li + li { border-top: 1px solid var(--surface-2); }
+.scheda__lez-icona { width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.scheda__lez-titolo { flex: 1; min-width: 0; }
+.scheda__sessioni { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.scheda__sessioni li { display: flex; flex-wrap: wrap; gap: 4px 14px; background: var(--surface); border-radius: var(--radius-lg); padding: 12px 16px; box-shadow: var(--shadow-1); font-size: 14.5px; }
+.scheda__passi { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 6px; line-height: 1.5; }
+.legale { max-width: 760px; }
+.legale h1 { font-family: var(--font-display); color: var(--deep); }
+@media (max-width: 900px) {
+  .scheda { grid-template-columns: minmax(0, 1fr); }
+  .scheda__acquisto { grid-column: 1; grid-row: auto; position: static; }
+  .scheda__corpo { grid-column: 1; }
+}
+@media (max-width: 640px) {
+  .vetrina__head { gap: 10px; }
+  .vetrina__nav { gap: 2px; }
+  .vetrina__nav > a:not(.btn):first-child { display: none; }
+  .vetrina__nav > a:not(.btn) { padding: 8px; }
+  .vetrina__nav .theme-toggle { padding: 8px; }
+  .vetrina__nav .theme-toggle span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .offerta-card, .offerta-card:hover { transition: none; transform: none; } }
+.registrati { max-width: 620px; display: flex; flex-direction: column; gap: 14px; }
+.registrati h1 { font-family: var(--font-display); font-size: var(--text-3xl); color: var(--deep); margin: 12px 0 0; }
+.registrati__ok h2 { font-family: var(--font-display); color: var(--deep); margin: 0 0 8px; }
+.check-row { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.45; cursor: pointer; }
+.check-row input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); flex: none; }
+.acquisto { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px 40px; align-items: start; }
+.acquisto__main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.acquisto__main h1 { font-family: var(--font-display); font-size: var(--text-3xl); color: var(--deep); margin: 8px 0 0; }
+.acquisto__riepilogo { position: sticky; top: 16px; background: var(--surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-2); padding: 20px; }
+.acquisto__riepilogo h2 { font-family: var(--font-display); font-size: 20px; color: var(--deep); margin: 0 0 4px; }
+.acquisto__citta { display: grid; grid-template-columns: 110px minmax(0, 1fr) 90px; gap: 0 12px; }
+.acquisto__esito { max-width: 640px; }
+@media (max-width: 900px) { .acquisto { grid-template-columns: minmax(0, 1fr); } .acquisto__riepilogo { position: static; order: -1; } }
+@media (max-width: 480px) { .acquisto__citta { grid-template-columns: 1fr 1fr; } .acquisto__citta > :nth-child(2) { grid-column: 1 / -1; grid-row: 1; } }
+.kpi-strip--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .kpi-strip--3 { grid-template-columns: minmax(0, 1fr); } .kpi-strip--3 .kpi-strip__item { border-left: 0; } .kpi-strip--3 .kpi-strip__item + .kpi-strip__item { border-top: 1px solid var(--surface-2); } }

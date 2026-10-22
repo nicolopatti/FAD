@@ -48,6 +48,7 @@ export default async function EdizioneLayout(
     { label: 'Sessioni', href: `${base}/sessioni`, count: sessioni.count ?? 0 },
     { label: 'Docenti e tutor', href: `${base}/docenti`, count: incarichi.count ?? 0 },
     { label: 'Fondo', href: `${base}/fondo` },
+    { label: 'Vendita', href: `${base}/vendita` },
     { label: 'Stato', href: `${base}/stato` },
   ];
 

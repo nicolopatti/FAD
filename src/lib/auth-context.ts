@@ -19,13 +19,21 @@ export async function requireSession(): Promise<SessionContext> {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: persona, error } = await supabase
+  let { data: persona } = await supabase
     .from('persona')
     .select('id, tenant_id, nome, cognome')
     .eq('auth_user_id', user.id)
-    .single();
-  if (error || !persona) {
-    throw new Error('Persona collegata all\'utente non trovata');
+    .maybeSingle<{ id: string; tenant_id: string; nome: string | null; cognome: string | null }>();
+  if (!persona) {
+    // Fase 6: utente registrato da solo, Persona non ancora creata (es. ha
+    // confermato l'email su un altro dispositivo). Si crea qui, una volta.
+    const { assicuraPersona } = await import('./registrazione');
+    const esito = await assicuraPersona(user);
+    if (esito.ok) {
+      ({ data: persona } = await supabase.from('persona').select('id, tenant_id, nome, cognome').eq('auth_user_id', user.id)
+        .maybeSingle<{ id: string; tenant_id: string; nome: string | null; cognome: string | null }>());
+    }
+    if (!persona) throw new Error(esito.ok ? 'Persona collegata all\'utente non trovata' : esito.errore);
   }
 
   const appMeta = (user.app_metadata ?? {}) as { role?: string };

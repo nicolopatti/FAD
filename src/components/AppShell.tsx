@@ -50,6 +50,7 @@ const NAV_BY_ROLE: Record<Role, { section: string; items: NavItem[] }> = {
       { key: 'corsi', label: 'Corsi', href: '/admin/corsi', ico: 'corsi' },
       { key: 'persone', label: 'Persone', href: '/admin/persone', ico: 'users' },
       { key: 'agenda', label: 'Agenda', href: '/admin/agenda', ico: 'sessioni' },
+      { key: 'vendite', label: 'Vendite', href: '/admin/vendite', ico: 'vendite' },
       { key: 'rendicontazione', label: 'Rendicontazione', href: '/admin/rendicontazione', ico: 'report' },
       { key: 'impostazioni', label: 'Impostazioni', href: '/admin/impostazioni', ico: 'settings' },
     ],

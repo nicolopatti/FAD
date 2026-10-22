@@ -17,6 +17,7 @@
     "test:e2e": "node tests/e2e/smoke.mjs",
     "test:e2e:funzionali": "node tests/e2e/funzionali.mjs",
     "test:e2e:correzioni": "node tests/e2e/correzioni.mjs",
+    "test:e2e:vendita": "node tests/e2e/vendita.mjs",
     "test:carico": "k6 run tests/carico/player.js"
   },
   "dependencies": {
@@ -26,7 +27,8 @@
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "stripe": "22.6.2"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
