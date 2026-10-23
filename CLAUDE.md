@@ -1920,6 +1920,20 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 > (chiavi su Vercel + webhook) e SMTP; poi una prova d'acquisto con la carta 4242… e un
 > rimborso. L'email di conferma d'acquisto si fa dopo l'SMTP. Il multi-ente resta da
 > decidere (`docs/visione-multi-ente.md`).
+> **Le attività e le prove dell'utente** sono nella checklist "FAD — Le tue attività"
+> (`https://claude.ai/artifact/KX4AhGuc3N3oaKSdiVHvr9`, aggiornata il 23/10: sezione 1
+> "Vendita dei corsi: cosa attivare", sezione 2 "Vendita dei corsi: le prove", regola 4 sulla
+> conferma dell'email). **Cosa fare io quando torna**, a seconda di cosa ha fatto:
+> "Stripe collegato" → ripubblicare la produzione (le variabili nuove valgono solo dopo un
+> deploy: `create_deployment` da `main`, target production, o redeploy dell'ultimo), poi
+> verificare che `POST /api/acquisto` non risponda più 503 e che il webhook risponda 400 a una
+> firma finta; con chiavi di test aggiungere al giro completo un passo con una sessione Stripe
+> di test; SMTP collegato → modelli email in italiano (invito, reset, conferma della
+> registrazione) ed **email di conferma d'acquisto** (gate M6 #5); testi legali → sostituire
+> `/termini` e `/privacy` e, se cambiano, `VERSIONE_TERMINI`/`VERSIONE_RECESSO` in
+> `lib/vendita.ts`; esito IVA → aliquota/natura sulle offerte; ragione sociale e firmatario
+> compilati → riemettere 2026/000003 e concludere ED-WEB-2026; dopo l'acquisto di prova
+> dell'utente → chiudere i gate M6a/M6 nel brief.
 >
 > **Punto di ripartenza precedente (2026-10-21 sera).** Le correzioni dello
 > stress test sono **su `main` e in produzione** (sezione in testa al file), verificate
