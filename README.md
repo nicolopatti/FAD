@@ -59,6 +59,13 @@ per il gestionale stanno in **Vendite**.
 5. Prova con la carta `4242 4242 4242 4242` su un'anteprima, poi rimborso da **Vendite**.
    Le chiavi live vanno solo su Production, dopo Supabase Pro e la decisione sull'IVA.
 
+Nella scheda **Vendita** dell'edizione si impostano anche gli **sconti a tempo** (fino a 10
+periodi dal/al con prezzo scontato e nome; il catalogo mostra il listino barrato, l'ordine
+conserva listino e sconto) e cosa succede **quando le iscrizioni si chiudono**: di base
+l'offerta esce da sola dall'elenco del catalogo (vendita finita, edizione conclusa/annullata/
+chiusa, edizione a date iniziata, posti esauriti), oppure resta con «Iscrizioni chiuse». La
+scheda dal suo indirizzo resta raggiungibile e dice che le iscrizioni sono chiuse.
+
 ## Modalità di lavoro — tutto in cloud (ratificata)
 
 Niente ambiente locale. Niente file `.env.local`.
