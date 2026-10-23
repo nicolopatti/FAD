@@ -49,3 +49,21 @@ begin
   perform public.audit_append(v_tenant, 'offerta.published', v_actor, 'offerta', v_offerta,
     jsonb_build_object('edizione_id', v_edizione, 'slug', 'sicurezza-sul-lavoro-introduttivo', 'origine', 'seed'));
 end $$;
+
+-- (3) 2026-10-22: sconto a tempo dimostrativo sull'offerta demo ("Offerta lancio",
+--     39 € invece di 49 € fino al 30/11/2026). Solo se l'offerta non ha sconti.
+do $$
+declare
+  v_tenant uuid := '00000000-0000-0000-0000-000000000001';
+  v_actor  jsonb := jsonb_build_object('persona_id', 'aaaa3333-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'type', 'persona');
+  v_off    record;
+begin
+  select id, slug into v_off from public.offerta
+  where tenant_id = v_tenant and slug = 'sicurezza-sul-lavoro-introduttivo' and sconti = '[]'::jsonb;
+  if not found then return; end if;
+  update public.offerta
+     set sconti = jsonb_build_array(jsonb_build_object('dal', '2026-10-22', 'al', '2026-11-30', 'prezzo_centesimi', 3900, 'etichetta', 'Offerta lancio'))
+   where id = v_off.id;
+  perform public.audit_append(v_tenant, 'offerta.updated', v_actor, 'offerta', v_off.id,
+    jsonb_build_object('slug', v_off.slug, 'campi', jsonb_build_array('sconti'), 'origine', 'seed'));
+end $$;

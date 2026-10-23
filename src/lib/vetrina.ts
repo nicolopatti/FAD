@@ -20,7 +20,12 @@ export type OffertaCatalogo = {
   descrizione: string;
   categoria: string | null;
   cover_path: string | null;
+  /** Prezzo di oggi: quello scontato se c'è uno sconto a tempo attivo. */
   prezzo_centesimi: number;
+  /** Prezzo di listino, solo se oggi vale uno sconto a tempo (da mostrare barrato). */
+  listino_centesimi: number | null;
+  sconto_etichetta: string | null;
+  sconto_fino_al: string | null;
   valuta: string;
   ore_totali: number | null;
   tipo: 'online' | 'date';

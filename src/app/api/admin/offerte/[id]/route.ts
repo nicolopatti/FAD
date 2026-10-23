@@ -11,7 +11,21 @@ type Body = OffertaInput & { azione?: 'pubblica' | 'ritira' };
 const CAMPI: (keyof OffertaValori)[] = [
   'slug', 'prezzo_centesimi', 'aliquota_iva', 'natura_iva', 'posti_max', 'accesso_giorni',
   'vendita_dal', 'vendita_al', 'codici_sconto', 'titolo_pubblico', 'descrizione_pubblica',
+  'chiusa_visibile', 'sconti',
 ];
+
+// Confronto per campo. Gli sconti sono un elenco di oggetti e jsonb riordina le
+// chiavi: si confrontano con le chiavi in ordine. L'aliquota può tornare come
+// testo ("22.00"): si confronta il valore numerico.
+function normalizza(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(normalizza);
+  if (v && typeof v === 'object') {
+    return Object.fromEntries(Object.keys(v).sort().map((k) => [k, normalizza((v as Record<string, unknown>)[k])]));
+  }
+  if (typeof v === 'string' && /^\d+(\.\d+)?$/.test(v)) return Number(v);
+  return v ?? null;
+}
+const uguale = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 // Fase 6: modifica dell'offerta (form completo) oppure {azione: 'pubblica'|'ritira'}.
 // Il prezzo vale per gli ordini futuri: ogni ordine copia prezzo e IVA alla
@@ -58,7 +72,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
   const parsed = offertaDaBody(body);
   if ('risposta' in parsed) return parsed.risposta;
-  const cambiati = CAMPI.filter((k) => String(parsed.valori[k] ?? '') !== String((off as unknown as Record<string, unknown>)[k] ?? ''));
+  const prima = off as unknown as Record<string, unknown>;
+  const cambiati = CAMPI.filter((k) => !uguale(normalizza(parsed.valori[k]), normalizza(prima[k])));
   if (!cambiati.length) return NextResponse.json({ ok: true, offerta: off, invariata: true });
 
   const { data, error } = await supabase.from('offerta').update(parsed.valori).eq('id', off.id).select(OFFERTA_SELECT).single();

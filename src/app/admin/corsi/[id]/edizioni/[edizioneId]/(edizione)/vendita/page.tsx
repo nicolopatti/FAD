@@ -5,7 +5,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { unwrap } from '@/lib/db-result';
 import { edizioneStato, type EdizioneRow } from '@/lib/db-types';
 import { OFFERTA_SELECT } from '@/lib/offerte';
-import type { OffertaRow } from '@/lib/vendita';
+import { motivoOfferta, type OffertaRow } from '@/lib/vendita';
+import { finestraEdizione, giornoRoma } from '@/lib/finestra';
 import { riepilogoOrdini } from '@/lib/vendite-admin';
 import { VenditaPanel, type RiepilogoOrdini } from '../../_components/VenditaPanel';
 
@@ -42,6 +43,13 @@ export default async function EdizioneVenditaPage(props: { params: Promise<{ id:
     riepilogo = riepilogoOrdini(ordini);
   }
 
+  // Stato dell'offerta oggi (stessa regola del catalogo): serve a dire se è
+  // acquistabile, in arrivo o chiusa, e quindi se compare nell'elenco.
+  const oggi = giornoRoma();
+  const motivo = offerta
+    ? motivoOfferta(offerta, finestraEdizione(ed, oggi).stato, ed.data_inizio, riepilogo.pagati + riepilogo.in_attesa, oggi)
+    : null;
+
   // Il catalogo risponde solo agli indirizzi collegati all'ente (tabella tenant_dominio).
   const host = (await headers()).get('host') ?? '';
   const { data: tenantHost } = await supabase.rpc('tenant_da_host', { p_host: host });
@@ -55,6 +63,7 @@ export default async function EdizioneVenditaPage(props: { params: Promise<{ id:
       corso={{ titolo: ed.corso.titolo, descrizione: ed.corso.descrizione, politica_attestato: ed.corso.politica_attestato, ore_totali: ed.corso.ore_totali }}
       offerta={offerta}
       riepilogo={riepilogo}
+      motivo={motivo}
       hostCollegato={hostCollegato}
       host={host}
     />

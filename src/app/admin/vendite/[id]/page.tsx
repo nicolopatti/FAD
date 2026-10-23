@@ -56,8 +56,10 @@ export default async function OrdinePage(props: { params: Promise<{ id: string }
             <div className="card__head"><h3>Importi</h3></div>
             <div className="card__body">
               <dl className="sintesi">
-                <dt>Totale pagato</dt><dd><strong>{fmtPrezzo(o.importo_centesimi, o.valuta)}</strong></dd>
-                {o.sconto_centesimi > 0 && <><dt>Sconto</dt><dd>{fmtPrezzo(o.sconto_centesimi, o.valuta)}</dd></>}
+                {o.listino_centesimi != null && (o.sconto_tempo_centesimi > 0 || o.sconto_centesimi > 0) && <><dt>Prezzo di listino</dt><dd>{fmtPrezzo(o.listino_centesimi, o.valuta)}</dd></>}
+                {o.sconto_tempo_centesimi > 0 && <><dt>Sconto a tempo{o.sconto_tempo_etichetta ? ` «${o.sconto_tempo_etichetta}»` : ''}</dt><dd>−{fmtPrezzo(o.sconto_tempo_centesimi, o.valuta)}</dd></>}
+                {o.sconto_centesimi > 0 && <><dt>Codice sconto</dt><dd>−{fmtPrezzo(o.sconto_centesimi, o.valuta)}</dd></>}
+                <dt>Totale {o.stato === 'pagato' || o.stato === 'rimborsato' ? 'pagato' : 'da pagare'}</dt><dd><strong>{fmtPrezzo(o.importo_centesimi, o.valuta)}</strong></dd>
                 {Number(o.aliquota_iva) > 0
                   ? <><dt>Imponibile</dt><dd>{fmtPrezzo(iva.imponibile, o.valuta)}</dd><dt>IVA {Number(o.aliquota_iva)}%</dt><dd>{fmtPrezzo(iva.iva, o.valuta)}</dd></>
                   : <><dt>IVA</dt><dd>{o.natura_iva ?? 'non applicata'}</dd></>}

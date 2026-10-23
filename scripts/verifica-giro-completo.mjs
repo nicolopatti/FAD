@@ -295,13 +295,17 @@ if (edizione && iscrizione) {
 // 9b) vendita (Fase 6): offerta sull'edizione, catalogo pubblico, pubblica/ritira.
 // Senza chiavi Stripe l'acquisto e il webhook rispondono 503; con le chiavi, il
 // corpo vuoto si ferma alla validazione (400). Nessun ordine viene creato.
+const anonimo = async (path) => { const r = await fetch(`${URL_APP}${path}`, { headers: vercel ? { cookie: vercel } : {}, redirect: 'manual' }); return { status: r.status, html: await r.text() }; };
+const giornoRoma = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+const traGiorni = (n) => giornoRoma(new Date(Date.now() + n * 86400000));
+const slug = `verifica-${TAG}`;
+let offerta = null;
+let corpoOfferta = null;
 if (edizione) {
-  const anonimo = async (path) => { const r = await fetch(`${URL_APP}${path}`, { headers: vercel ? { cookie: vercel } : {}, redirect: 'manual' }); return { status: r.status, html: await r.text() }; };
-  const slug = `verifica-${TAG}`;
   const male = await api('POST', `/api/admin/edizioni/${edizione}/offerta`, { slug, tipo: 'online', accesso_giorni: '365', prezzo: '0,10', aliquota_iva: '22' });
   check('offerta: prezzo sotto 0,50 € rifiutato sul campo', male.status === 400 && male.json?.campo === 'prezzo', breve(male));
   const o = await api('POST', `/api/admin/edizioni/${edizione}/offerta`, { slug, tipo: 'online', accesso_giorni: '365', prezzo: '19,90', aliquota_iva: '22', titolo_pubblico: NOME, descrizione_pubblica: 'Offerta di prova del giro automatico.' });
-  const offerta = o.json?.offerta?.id ?? null;
+  offerta = o.json?.offerta?.id ?? null;
   check('offerta creata in bozza (19,90 €, 365 giorni)', o.status === 200 && o.json?.offerta?.stato === 'bozza' && o.json?.offerta?.prezzo_centesimi === 1990, breve(o));
   const due = await api('POST', `/api/admin/edizioni/${edizione}/offerta`, { slug: `${slug}-b`, tipo: 'online', accesso_giorni: '30', prezzo: '10', aliquota_iva: '22' });
   check('una sola offerta per edizione (409)', due.status === 409, breve(due));
@@ -316,8 +320,28 @@ if (edizione) {
     check('scheda pubblica senza account: titolo e prezzo', scheda.status === 200 && scheda.html.includes(NOME) && scheda.html.includes('19,90'), `HTTP ${scheda.status}`);
     const cat = await anonimo('/catalogo');
     check('catalogo pubblico elenca l\'offerta', cat.status === 200 && cat.html.includes(NOME), `HTTP ${cat.status}`);
-    const mod = await api('PATCH', `/api/admin/offerte/${offerta}`, { slug, tipo: 'online', accesso_giorni: '180', prezzo: '24,90', aliquota_iva: '22', titolo_pubblico: NOME });
+    corpoOfferta = { slug, tipo: 'online', accesso_giorni: '180', prezzo: '24,90', aliquota_iva: '22', titolo_pubblico: NOME };
+    const mod = await api('PATCH', `/api/admin/offerte/${offerta}`, corpoOfferta);
     check('offerta modificata (prezzo e durata per gli ordini futuri)', mod.status === 200 && mod.json?.offerta?.prezzo_centesimi === 2490 && mod.json?.offerta?.accesso_giorni === 180, breve(mod));
+    // Sconti a tempo: uno attivo da oggi, uno più avanti; sovrapposizioni e prezzo pieno rifiutati.
+    const sovr = await api('PATCH', `/api/admin/offerte/${offerta}`, { ...corpoOfferta, sconti: [
+      { dal: giornoRoma(), al: traGiorni(7), prezzo: '14,90' }, { dal: traGiorni(7), al: traGiorni(14), prezzo: '19,90' }] });
+    check('sconti a tempo sovrapposti rifiutati sul campo', sovr.status === 400 && sovr.json?.campo === 'sconto_1_dal', breve(sovr));
+    const pieno = await api('PATCH', `/api/admin/offerte/${offerta}`, { ...corpoOfferta, sconti: [{ dal: giornoRoma(), al: traGiorni(7), prezzo: '24,90' }] });
+    check('sconto non inferiore al listino rifiutato', pieno.status === 400 && pieno.json?.campo === 'sconto_0_prezzo', breve(pieno));
+    corpoOfferta = { ...corpoOfferta, sconti: [
+      { dal: giornoRoma(), al: traGiorni(7), prezzo: '14,90', etichetta: 'Prova giro' },
+      { dal: traGiorni(8), al: traGiorni(14), prezzo: '19,90', etichetta: '' }] };
+    const sc = await api('PATCH', `/api/admin/offerte/${offerta}`, corpoOfferta);
+    check('due sconti a tempo salvati', sc.status === 200 && sc.json?.offerta?.sconti?.length === 2, breve(sc));
+    const inv = await api('PATCH', `/api/admin/offerte/${offerta}`, corpoOfferta);
+    check('salvataggio identico riconosciuto come invariato', inv.status === 200 && inv.json?.invariata === true, breve(inv));
+    const sScheda = await anonimo(`/catalogo/${slug}`);
+    check('scheda pubblica: prezzo scontato 14,90 € con 24,90 € barrato e nome dello sconto', sScheda.status === 200 && sScheda.html.includes('14,90') && /<s[^>]*>.*24,90/.test(sScheda.html) && sScheda.html.includes('Prova giro'), `HTTP ${sScheda.status}`);
+    const sCat = await anonimo('/catalogo');
+    check('catalogo: prezzo scontato e −40%', sCat.html.includes('14,90') && sCat.html.includes('−40%'), `HTTP ${sCat.status}`);
+    const sAcq = await anonimo(`/acquista/${slug}`);
+    check('riepilogo d\'acquisto: prezzo pieno, sconto e totale', sAcq.html.includes('Prezzo pieno') && sAcq.html.includes('Sconto «Prova giro»') && sAcq.html.includes('14,90'), `HTTP ${sAcq.status}`);
     const acq = await api('POST', '/api/acquisto', { slug });
     check('acquisto senza Stripe (503) o con dati mancanti (400): nessun ordine', acq.status === 503 || acq.status === 400, breve(acq));
     const wh = await fetch(`${URL_APP}/api/stripe/webhook`, { method: 'POST', headers: { 'content-type': 'application/json', ...(vercel ? { cookie: vercel } : {}) }, body: '{}' });
@@ -328,10 +352,6 @@ if (edizione) {
     check('area Vendite filtrata per offerta', ve.status === 200 && /Vendite/.test(ve.html), `HTTP ${ve.status}`);
     const csv = await api('GET', '/api/admin/vendite/export');
     check('export degli ordini in CSV per il gestionale', csv.status === 200 && /text\/csv/.test(csv.headers.get('content-type') ?? '') && csv.testo.includes('data_pagamento;ordine;stato'), `HTTP ${csv.status}`);
-    const rit = await api('PATCH', `/api/admin/offerte/${offerta}`, { azione: 'ritira' });
-    check('offerta ritirata dal catalogo', rit.status === 200 && rit.json?.offerta?.stato === 'ritirata', breve(rit));
-    const via = await anonimo(`/catalogo/${slug}`);
-    check('offerta ritirata: non più nel catalogo pubblico', !via.html.includes(NOME), `HTTP ${via.status}`);
   }
 }
 
@@ -344,6 +364,23 @@ if (edizione) {
     check('edizione già conclusa: seconda conclusione rifiutata (409)', bis.status === 409, breve(bis));
     const annConc = await api('POST', `/api/admin/edizioni/${edizione}/annulla`, {});
     check('edizione conclusa: annullamento rifiutato (409)', annConc.status === 409, breve(annConc));
+    if (offerta && corpoOfferta) {
+      // Iscrizioni chiuse: l'offerta esce da sola dall'elenco; la scheda dal link resta e lo dice.
+      const fuori = await anonimo('/catalogo');
+      check('edizione conclusa: l\'offerta esce da sola dall\'elenco del catalogo', !fuori.html.includes(NOME), `HTTP ${fuori.status}`);
+      const link = await anonimo(`/catalogo/${slug}`);
+      check('scheda dal link: iscrizioni chiuse, niente acquisto', link.html.includes(NOME) && link.html.includes('Le iscrizioni sono chiuse') && !link.html.includes(`/acquista/${slug}"`), `HTTP ${link.status}`);
+      const tieni = await api('PATCH', `/api/admin/offerte/${offerta}`, { ...corpoOfferta, chiusa_visibile: true });
+      check('scelta "lascia nel catalogo" salvata', tieni.status === 200 && tieni.json?.offerta?.chiusa_visibile === true, breve(tieni));
+      const dentro = await anonimo('/catalogo');
+      check('con la scelta: l\'offerta resta in elenco con iscrizioni chiuse', dentro.html.includes(NOME) && dentro.html.includes('Le iscrizioni sono chiuse'), `HTTP ${dentro.status}`);
+      const tab = await pagina(`/admin/corsi/${corso}/edizioni/${edizione}/vendita`);
+      check('scheda Vendita: avviso delle iscrizioni chiuse con la scelta fatta', tab.status === 200 && tab.html.includes('Il corso resta nel catalogo con'), `HTTP ${tab.status}`);
+      const rit = await api('PATCH', `/api/admin/offerte/${offerta}`, { azione: 'ritira' });
+      check('offerta ritirata dal catalogo', rit.status === 200 && rit.json?.offerta?.stato === 'ritirata', breve(rit));
+      const via = await anonimo(`/catalogo/${slug}`);
+      check('offerta ritirata: scheda non più raggiungibile', !via.html.includes(NOME), `HTTP ${via.status}`);
+    }
     const dopo = await api('POST', `/api/admin/edizioni/${edizione}/iscritti`, { nome: 'Tardi', cognome: 'Vo', email: `tardivo-${TAG}@fad.local` });
     check('niente iscritti su edizione conclusa (409)', dopo.status === 409, breve(dopo));
   }

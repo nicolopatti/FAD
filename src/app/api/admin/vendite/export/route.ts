@@ -28,7 +28,8 @@ export async function GET(request: Request) {
   const righe: string[] = [[
     'data_pagamento', 'ordine', 'stato', 'tipo', 'intestatario', 'codice_fiscale', 'partita_iva', 'codice_sdi', 'pec',
     'indirizzo', 'cap', 'citta', 'provincia', 'nazione', 'email_account', 'corso', 'edizione',
-    'totale_eur', 'sconto_eur', 'imponibile_eur', 'iva_eur', 'aliquota_iva', 'natura_iva', 'stripe_payment_intent', 'data_rimborso',
+    'listino_eur', 'sconto_a_tempo_eur', 'sconto_a_tempo', 'sconto_codice_eur',
+    'totale_eur', 'imponibile_eur', 'iva_eur', 'aliquota_iva', 'natura_iva', 'stripe_payment_intent', 'data_rimborso',
   ].join(';')];
   let from = 0;
   let troncato = false;
@@ -44,7 +45,8 @@ export async function GET(request: Request) {
       righe.push([
         o.pagato_il ?? '', o.id, o.stato, f.tipo ?? '', intestatario(f), f.codice_fiscale ?? '', f.partita_iva ?? '', f.codice_sdi ?? '', f.pec ?? '',
         f.indirizzo ?? '', f.cap ?? '', f.citta ?? '', f.provincia ?? '', f.nazione ?? '', o.persona?.email ?? '', corsoDi(o), o.offerta?.edizione?.codice ?? '',
-        euro(o.importo_centesimi), euro(o.sconto_centesimi), euro(iva.imponibile), euro(iva.iva), String(o.aliquota_iva).replace('.', ','), o.natura_iva ?? '',
+        euro(o.listino_centesimi ?? o.importo_centesimi + o.sconto_centesimi), euro(o.sconto_tempo_centesimi), o.sconto_tempo_etichetta ?? '', euro(o.sconto_centesimi),
+        euro(o.importo_centesimi), euro(iva.imponibile), euro(iva.iva), String(o.aliquota_iva).replace('.', ','), o.natura_iva ?? '',
         o.stripe_payment_intent ?? '', o.rimborsato_il ?? '',
       ].map(csvCell).join(';'));
     }

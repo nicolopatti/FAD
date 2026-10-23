@@ -50,7 +50,15 @@ export async function POST(request: Request) {
     const e = erroreOrdineCrea(error.message);
     return NextResponse.json({ ok: false, error: e.error || motivoNonVendibile(e.motivo), motivo: e.motivo }, { status: e.status });
   }
-  const o = ordine as { ordine_id: string; importo_centesimi: number; valuta: string; codici_sconto: boolean; sessioni_da_scadere: string[] };
+  const o = ordine as {
+    ordine_id: string; importo_centesimi: number; listino_centesimi: number; sconto_etichetta: string | null;
+    valuta: string; codici_sconto: boolean; sessioni_da_scadere: string[];
+  };
+  // Sconto a tempo: il prezzo è già quello del giorno; la descrizione lo dice.
+  const descrizione = [
+    scheda.tipo === 'online' ? 'Corso online' : 'Iscrizione all’edizione',
+    o.importo_centesimi < o.listino_centesimi ? (o.sconto_etichetta ? `sconto «${o.sconto_etichetta}»` : 'prezzo scontato') : null,
+  ].filter(Boolean).join(' · ');
 
   // Sessioni di un tentativo precedente: si chiudono, così non si paga due volte.
   for (const vecchia of o.sessioni_da_scadere ?? []) {
@@ -73,7 +81,7 @@ export async function POST(request: Request) {
         price_data: {
           currency: o.valuta,
           unit_amount: o.importo_centesimi,
-          product_data: { name: scheda.titolo, description: scheda.tipo === 'online' ? 'Corso online' : 'Iscrizione all’edizione' },
+          product_data: { name: scheda.titolo, description: descrizione },
         },
       }],
       allow_promotion_codes: o.codici_sconto || undefined,

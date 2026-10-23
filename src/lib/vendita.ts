@@ -34,10 +34,30 @@ export type OffertaRow = {
   titolo_pubblico: string | null;
   descrizione_pubblica: string | null;
   cover_path: string | null;
+  chiusa_visibile: boolean;
+  sconti: ScontoTempo[];
   creato_il: string;
   pubblicata_il: string | null;
   ritirata_il: string | null;
 };
+
+/**
+ * Sconto a tempo: dal/al sono giorni interi a Roma (estremi inclusi), il prezzo
+ * è il prezzo scontato IVA inclusa. Stessa forma di `offerta.sconti` nel DB.
+ */
+export type ScontoTempo = { dal: string; al: string; prezzo_centesimi: number; etichetta: string | null };
+
+export const MAX_SCONTI = 10;
+
+/** Sconto valido in un giorno (aaaa-mm-gg), come `offerta_sconto_attivo` nel DB. */
+export function scontoAttivo(sconti: ScontoTempo[] | null | undefined, giorno: string): ScontoTempo | null {
+  return [...(sconti ?? [])].sort((a, b) => a.dal.localeCompare(b.dal)).find((s) => s.dal <= giorno && s.al >= giorno) ?? null;
+}
+
+/** Percentuale di sconto arrotondata (4900 → 3900 = 20). */
+export function percentualeSconto(listino: number, scontato: number): number {
+  return listino > 0 ? Math.round((1 - scontato / listino) * 100) : 0;
+}
 
 /** Prezzo minimo accettato da Stripe in euro (0,50 €). */
 export const PREZZO_MINIMO_CENTESIMI = 50;
@@ -110,7 +130,12 @@ export type OffertaInput = {
   codici_sconto?: boolean;
   titolo_pubblico?: string;
   descrizione_pubblica?: string;
+  chiusa_visibile?: boolean;
+  sconti?: ScontoInput[];
 };
+
+/** Riga di sconto come arriva dal form (prezzo in euro, come testo). */
+export type ScontoInput = { dal?: string; al?: string; prezzo?: string; etichetta?: string };
 
 export type OffertaValori = {
   slug: string;
@@ -124,7 +149,42 @@ export type OffertaValori = {
   codici_sconto: boolean;
   titolo_pubblico: string | null;
   descrizione_pubblica: string | null;
+  chiusa_visibile: boolean;
+  sconti: ScontoTempo[];
 };
+
+const isDataIso = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
+
+/**
+ * Sconti a tempo: errori per riga con chiavi `sconto_<i>_dal|al|prezzo|etichetta`;
+ * in uscita ordinati per data di inizio. Stesse regole del trigger del DB.
+ */
+function validaSconti(righe: ScontoInput[], listino: number | null, e: Errori): ScontoTempo[] {
+  if (righe.length > MAX_SCONTI) { e.sconti = `Al massimo ${MAX_SCONTI} sconti a tempo.`; return []; }
+  const out: (ScontoTempo & { i: number })[] = [];
+  righe.forEach((r, i) => {
+    const dal = (r.dal ?? '').trim();
+    const al = (r.al ?? '').trim();
+    const prezzo = parsePrezzo(r.prezzo);
+    const etichetta = (r.etichetta ?? '').trim() || null;
+    let ok = true;
+    if (!isDataIso(dal)) { e[`sconto_${i}_dal`] = 'Scegli il primo giorno dello sconto.'; ok = false; }
+    if (!isDataIso(al)) { e[`sconto_${i}_al`] = 'Scegli l’ultimo giorno dello sconto.'; ok = false; }
+    else if (isDataIso(dal) && al < dal) { e[`sconto_${i}_al`] = 'L’ultimo giorno non può precedere il primo.'; ok = false; }
+    if (prezzo == null) { e[`sconto_${i}_prezzo`] = 'Scrivi il prezzo scontato in euro.'; ok = false; }
+    else if (prezzo < PREZZO_MINIMO_CENTESIMI) { e[`sconto_${i}_prezzo`] = 'Il prezzo minimo è 0,50 €.'; ok = false; }
+    else if (listino != null && prezzo >= listino) { e[`sconto_${i}_prezzo`] = 'Deve essere minore del prezzo di listino.'; ok = false; }
+    if (etichetta && etichetta.length > 40) { e[`sconto_${i}_etichetta`] = 'Massimo 40 caratteri.'; ok = false; }
+    if (ok) out.push({ i, dal, al, prezzo_centesimi: prezzo!, etichetta });
+  });
+  const ordinati = [...out].sort((a, b) => a.dal.localeCompare(b.dal));
+  for (let k = 1; k < ordinati.length; k++) {
+    const prima = ordinati[k - 1];
+    const dopo = ordinati[k];
+    if (dopo.dal <= prima.al) e[`sconto_${dopo.i}_dal`] = `Si sovrappone allo sconto ${prima.i + 1}: i periodi non possono toccarsi.`;
+  }
+  return ordinati.map((x) => ({ dal: x.dal, al: x.al, prezzo_centesimi: x.prezzo_centesimi, etichetta: x.etichetta }));
+}
 
 /** Validazione dell'offerta per campo (form admin e route). */
 export function validaOfferta(input: OffertaInput): { valori?: OffertaValori; errori: Errori } {
@@ -164,6 +224,8 @@ export function validaOfferta(input: OffertaInput): { valori?: OffertaValori; er
   const descr = (input.descrizione_pubblica ?? '').trim() || null;
   if (descr && descr.length > 20000) e.descrizione_pubblica = 'Testo troppo lungo.';
 
+  const sconti = validaSconti(Array.isArray(input.sconti) ? input.sconti : [], prezzo ?? null, e);
+
   if (Object.keys(e).length) return { errori: e };
   return {
     errori: e,
@@ -172,6 +234,7 @@ export function validaOfferta(input: OffertaInput): { valori?: OffertaValori; er
       posti_max: posti ?? null, accesso_giorni: accesso,
       vendita_dal: dal, vendita_al: al, codici_sconto: Boolean(input.codici_sconto),
       titolo_pubblico: titolo, descrizione_pubblica: descr,
+      chiusa_visibile: Boolean(input.chiusa_visibile), sconti,
     },
   };
 }
@@ -279,4 +342,36 @@ export function motivoNonVendibile(m: string | null | undefined): string | null 
     'già iscritto': 'Sei già iscritto a questo corso.',
   };
   return mappa[m] ?? 'Al momento non è possibile acquistare questo corso.';
+}
+
+/**
+ * Iscrizioni chiuse in modo definitivo (= `offerta_chiusa_definitiva` nel DB): con
+ * `chiusa_visibile` spento l'offerta esce dall'elenco del catalogo. "Non ancora
+ * aperta" non conta: resta in elenco come annuncio.
+ */
+/**
+ * Perché un'offerta non si può comprare oggi: stessa regola di
+ * `offerta_motivo_non_vendibile` nel DB, per l'area admin (che non chiama la
+ * RPC di servizio). `statoEdizione` = `finestraEdizione(…).stato`; `occupati` =
+ * ordini pagati + in attesa non scaduti.
+ */
+export function motivoOfferta(
+  o: Pick<OffertaRow, 'stato' | 'vendita_dal' | 'vendita_al' | 'accesso_giorni' | 'posti_max'>,
+  statoEdizione: string,
+  dataInizio: string | null,
+  occupati: number,
+  oggi: string,
+): string | null {
+  if (o.stato !== 'pubblicata') return 'non in vendita';
+  if (o.vendita_dal && oggi < o.vendita_dal) return 'vendita non ancora aperta';
+  if (o.vendita_al && oggi > o.vendita_al) return 'vendita chiusa';
+  if (['chiusa', 'conclusa', 'annullata'].includes(statoEdizione)) return `edizione ${statoEdizione}`;
+  if (o.accesso_giorni == null && dataInizio && oggi > dataInizio.slice(0, 10)) return 'edizione già iniziata';
+  if (o.posti_max != null && occupati >= o.posti_max) return 'posti esauriti';
+  return null;
+}
+
+export const MOTIVI_CHIUSA = ['vendita chiusa', 'edizione chiusa', 'edizione conclusa', 'edizione annullata', 'edizione già iniziata', 'posti esauriti'];
+export function chiusaDefinitiva(m: string | null | undefined): boolean {
+  return Boolean(m && MOTIVI_CHIUSA.includes(m));
 }

@@ -110,6 +110,19 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     check(`${tag} offerta: prezzo e scorporo`, (await page.inputValue('#of-prezzo')) === '49,00' && v.includes('40,16'), await page.inputValue('#of-prezzo'));
     check(`${tag} offerta: "Ritira dal catalogo" disponibile`, (await page.locator('button', { hasText: 'Ritira dal catalogo' }).count()) === 1);
   }
+  check(`${tag} vendita: sezione sconti a tempo e scelta per le iscrizioni chiuse`, v.includes('Sconti a tempo') && v.includes('Togli dal catalogo') && v.includes('Lascia con «Iscrizioni chiuse»'), '');
+  if (v.includes('in vendita')) {
+    // Riga di sconto aggiunta e validata nel browser: nessun salvataggio (l'errore blocca prima della rete).
+    await page.click('button:has-text("Aggiungi uno sconto a tempo")');
+    await page.fill('#of-sc-0-prezzo', '60');
+    const richieste = [];
+    page.on('request', (r) => { if (r.method() === 'PATCH') richieste.push(r.url()); });
+    await page.click('button:has-text("Salva le modifiche")');
+    await page.waitForTimeout(300);
+    const t = await page.locator('form.card').first().innerText();
+    check(`${tag} sconto: prezzo sopra il listino e data mancante segnalati, nessun salvataggio`, /minore del prezzo di listino/.test(t) && /ultimo giorno/.test(t) && richieste.length === 0, richieste.join(','));
+    check(`${tag} sconto: riga con chip di stato e percentuale nel suggerimento`, (await page.locator('.sconto-riga').count()) === 1, '');
+  }
   check(`${tag} vendita: niente sforamento`, !(await overflow(page)));
 
   await vai(page, '/admin/vendite');

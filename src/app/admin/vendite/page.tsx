@@ -87,7 +87,7 @@ export default async function VenditePage(props: { searchParams?: Promise<Params
                       <td className="muted">{fmtDataOra(o.pagato_il ?? o.creato_il)}</td>
                       <td className="t-title"><Link className="t-link" href={href}>{intestatario(o.fatturazione)}</Link><div className="muted" style={{ fontSize: 12 }}>{o.persona?.email}</div></td>
                       <td>{corsoDi(o)}<div className="muted mono" style={{ fontSize: 11 }}>{o.offerta?.edizione?.codice}</div></td>
-                      <td>{fmtPrezzo(o.importo_centesimi, o.valuta)}{o.sconto_centesimi > 0 && <div className="muted" style={{ fontSize: 12 }}>sconto {fmtPrezzo(o.sconto_centesimi, o.valuta)}</div>}</td>
+                      <td>{fmtPrezzo(o.importo_centesimi, o.valuta)}{o.sconto_tempo_centesimi + o.sconto_centesimi > 0 && <div className="muted" style={{ fontSize: 12 }}>sconto {fmtPrezzo(o.sconto_tempo_centesimi + o.sconto_centesimi, o.valuta)}</div>}</td>
                       <td><span className={`chip ${st.cls}`}>{st.label}</span></td>
                       <td><Link className="btn btn--ghost btn--xs" href={href}>Apri <Icon name="arrowRight" /></Link></td>
                     </tr>

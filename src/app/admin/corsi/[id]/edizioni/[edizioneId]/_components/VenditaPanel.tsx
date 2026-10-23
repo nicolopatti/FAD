@@ -10,8 +10,9 @@ import { useFeedback } from '@/components/ui/Feedback';
 import type { Errori } from '@/lib/validazione';
 import { giornoRoma } from '@/lib/finestra';
 import {
-  fmtPrezzo, parsePrezzo, prezzoPerCampo, scorporoIva, slugDa, validaOfferta,
-  type OffertaInput, type OffertaRow,
+  MAX_SCONTI, chiusaDefinitiva, fmtPrezzo, motivoNonVendibile, parsePrezzo, percentualeSconto, prezzoPerCampo,
+  scorporoIva, slugDa, validaOfferta,
+  type OffertaInput, type OffertaRow, type ScontoInput,
 } from '@/lib/vendita';
 
 export type RiepilogoOrdini = { pagati: number; in_attesa: number; rimborsati: number; incasso_centesimi: number };
@@ -23,6 +24,8 @@ type Props = {
   corso: { titolo: string; descrizione: string | null; politica_attestato: string | null; ore_totali: number | null };
   offerta: OffertaRow | null;
   riepilogo: RiepilogoOrdini;
+  /** Perché oggi non si compra (null = in vendita), calcolato dal server. */
+  motivo: string | null;
   hostCollegato: boolean;
   host: string;
 };
@@ -34,7 +37,7 @@ const STATO_CHIP: Record<OffertaRow['stato'], { cls: string; label: string }> = 
 };
 
 function iniziale(o: OffertaRow | null, titolo: string): OffertaInput {
-  if (!o) return { slug: slugDa(titolo), prezzo: '', aliquota_iva: '22', natura_iva: '', posti_max: '', accesso_giorni: '365', tipo: 'online', vendita_dal: '', vendita_al: '', codici_sconto: false, titolo_pubblico: '', descrizione_pubblica: '' };
+  if (!o) return { slug: slugDa(titolo), prezzo: '', aliquota_iva: '22', natura_iva: '', posti_max: '', accesso_giorni: '365', tipo: 'online', vendita_dal: '', vendita_al: '', codici_sconto: false, titolo_pubblico: '', descrizione_pubblica: '', chiusa_visibile: false, sconti: [] };
   return {
     slug: o.slug,
     prezzo: prezzoPerCampo(o.prezzo_centesimi),
@@ -48,7 +51,17 @@ function iniziale(o: OffertaRow | null, titolo: string): OffertaInput {
     codici_sconto: o.codici_sconto,
     titolo_pubblico: o.titolo_pubblico ?? '',
     descrizione_pubblica: o.descrizione_pubblica ?? '',
+    chiusa_visibile: o.chiusa_visibile,
+    sconti: (o.sconti ?? []).map((x) => ({ dal: x.dal, al: x.al, prezzo: prezzoPerCampo(x.prezzo_centesimi), etichetta: x.etichetta ?? '' })),
   };
+}
+
+/** Stato di una riga di sconto rispetto a oggi (per il chip accanto alla riga). */
+function statoSconto(r: ScontoInput, oggi: string): { cls: string; label: string } | null {
+  if (!r.dal || !r.al) return null;
+  if (r.al < oggi) return { cls: 'chip--muted', label: 'concluso' };
+  if (r.dal > oggi) return { cls: 'chip--freeze', label: 'in programma' };
+  return { cls: 'chip--ok', label: 'attivo oggi' };
 }
 
 /**
@@ -56,7 +69,7 @@ function iniziale(o: OffertaRow | null, titolo: string): OffertaInput {
  * in bozza, poi si pubblica nel catalogo; ritirarla chiude la vendita (gli
  * ordini già pagati restano).
  */
-export function VenditaPanel({ edizioneId, attiva, edizione, corso, offerta, riepilogo, hostCollegato, host }: Props) {
+export function VenditaPanel({ edizioneId, attiva, edizione, corso, offerta, riepilogo, motivo, hostCollegato, host }: Props) {
   const { call, busy, error, setError } = useCall();
   const { confirm } = useFeedback();
   const [v, setV] = useState<OffertaInput>(() => iniziale(offerta, corso.titolo));
@@ -67,6 +80,24 @@ export function VenditaPanel({ edizioneId, attiva, edizione, corso, offerta, rie
   const set = <K extends keyof OffertaInput>(k: K, val: OffertaInput[K]) => {
     setV((x) => ({ ...x, [k]: val }));
     if (errs[k as string]) setErrs((e) => ({ ...e, [k as string]: '' }));
+  };
+
+  const sconti = v.sconti ?? [];
+  const setSconto = (i: number, k: keyof ScontoInput, val: string) => {
+    setV((x) => ({ ...x, sconti: (x.sconti ?? []).map((r, j) => (j === i ? { ...r, [k]: val } : r)) }));
+    const chiave = `sconto_${i}_${k}`;
+    if (errs[chiave]) setErrs((e) => ({ ...e, [chiave]: '' }));
+  };
+  // Le chiavi degli errori seguono la posizione della riga: aggiungendo o
+  // togliendo righe si ripuliscono (la validazione al salvataggio li ricalcola).
+  const senzaErroriSconti = () => setErrs((e) => Object.fromEntries(Object.entries(e).filter(([k]) => !k.startsWith('sconto'))));
+  const aggiungiSconto = () => {
+    setV((x) => ({ ...x, sconti: [...(x.sconti ?? []), { dal: oggi, al: '', prezzo: '', etichetta: '' }] }));
+    senzaErroriSconti();
+  };
+  const togliSconto = (i: number) => {
+    setV((x) => ({ ...x, sconti: (x.sconti ?? []).filter((_, j) => j !== i) }));
+    senzaErroriSconti();
   };
 
   const prezzo = parsePrezzo(v.prezzo);
@@ -133,6 +164,17 @@ export function VenditaPanel({ edizioneId, attiva, edizione, corso, offerta, rie
         <div className="card__body">
           <ErrorBanner error={error} />
           {!attiva && <div className="banner banner--ocra"><Icon name="alert" className="banner__icon" /><div className="banner__body">L’edizione non è attiva: l’offerta non si può pubblicare.</div></div>}
+          {offerta?.stato === 'pubblicata' && chiusaDefinitiva(motivo) && (
+            <div className="banner banner--ocra"><Icon name="alert" className="banner__icon" /><div className="banner__body">
+              <b>Iscrizioni chiuse</b> — {motivoNonVendibile(motivo)}{' '}
+              {offerta.chiusa_visibile
+                ? 'Il corso resta nel catalogo con «Iscrizioni chiuse».'
+                : 'Il corso non compare più nell’elenco del catalogo; chi ha il link della scheda vede che le iscrizioni sono chiuse.'}
+            </div></div>
+          )}
+          {offerta?.stato === 'pubblicata' && motivo === 'vendita non ancora aperta' && (
+            <div className="banner banner--info"><Icon name="clock" className="banner__icon" /><div className="banner__body">Nel catalogo come annuncio: le iscrizioni si aprono il {fmtData(offerta.vendita_dal)}.</div></div>
+          )}
 
           <div className="field">
             <label>Cosa si vende</label>
@@ -183,6 +225,46 @@ export function VenditaPanel({ edizioneId, attiva, edizione, corso, offerta, rie
             )}
           </div>
 
+          <div className="sconti">
+            <div className="row between" style={{ alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <h4 style={{ margin: 0 }}>Sconti a tempo</h4>
+              <span className="muted" style={{ fontSize: 12 }}>Nel periodo indicato il corso costa meno; il catalogo mostra il prezzo pieno barrato.</span>
+            </div>
+            {errs.sconti && <div className="field__error" role="alert">{errs.sconti}</div>}
+            {sconti.length === 0 && <p className="muted" style={{ fontSize: 13, margin: '8px 0 0' }}>Nessuno sconto: vale sempre il prezzo di listino.</p>}
+            {sconti.map((r, i) => {
+              const p = parsePrezzo(r.prezzo);
+              const stato = statoSconto(r, oggi);
+              return (
+                <fieldset key={i} className="sconto-riga" aria-label={`Sconto ${i + 1}`}>
+                  <div className="sconto-riga__head">
+                    <span className="sconto-riga__n">Sconto {i + 1}</span>
+                    {stato && <span className={`chip ${stato.cls}`}>{stato.label}</span>}
+                    <button type="button" className="icon-btn" title="Togli lo sconto" aria-label={`Togli lo sconto ${i + 1}`} disabled={busy} onClick={() => togliSconto(i)}><Icon name="trash" /></button>
+                  </div>
+                  <div className="grid-2">
+                    <Field id={`of-sc-${i}-dal`} label="Dal" required error={errs[`sconto_${i}_dal`]}>
+                      <input id={`of-sc-${i}-dal`} className="input" type="date" value={r.dal ?? ''} onChange={(e) => setSconto(i, 'dal', e.target.value)} disabled={busy} aria-invalid={errId(`sconto_${i}_dal`)} />
+                    </Field>
+                    <Field id={`of-sc-${i}-al`} label="Al (incluso)" required error={errs[`sconto_${i}_al`]}>
+                      <input id={`of-sc-${i}-al`} className="input" type="date" value={r.al ?? ''} min={r.dal || undefined} onChange={(e) => setSconto(i, 'al', e.target.value)} disabled={busy} aria-invalid={errId(`sconto_${i}_al`)} />
+                    </Field>
+                  </div>
+                  <div className="grid-2">
+                    <Field id={`of-sc-${i}-prezzo`} label="Prezzo scontato (€, IVA inclusa)" required error={errs[`sconto_${i}_prezzo`]}
+                      hint={p != null && prezzo != null && p < prezzo ? `−${percentualeSconto(prezzo, p)}% rispetto a ${fmtPrezzo(prezzo)}` : 'es. 39 o 39,90'}>
+                      <input id={`of-sc-${i}-prezzo`} className="input" inputMode="decimal" value={r.prezzo ?? ''} onChange={(e) => setSconto(i, 'prezzo', e.target.value)} disabled={busy} aria-invalid={errId(`sconto_${i}_prezzo`)} placeholder="39,00" />
+                    </Field>
+                    <Field id={`of-sc-${i}-etichetta`} label="Nome dello sconto" error={errs[`sconto_${i}_etichetta`]} hint="Facoltativo, compare nel catalogo.">
+                      <input id={`of-sc-${i}-etichetta`} className="input" maxLength={40} value={r.etichetta ?? ''} onChange={(e) => setSconto(i, 'etichetta', e.target.value)} disabled={busy} aria-invalid={errId(`sconto_${i}_etichetta`)} placeholder="Offerta lancio" />
+                    </Field>
+                  </div>
+                </fieldset>
+              );
+            })}
+            <button type="button" className="btn btn--ghost btn--sm" onClick={aggiungiSconto} disabled={busy || sconti.length >= MAX_SCONTI}><Icon name="plus" /> Aggiungi uno sconto a tempo</button>
+          </div>
+
           <div className="grid-2">
             <Field id="of-dal" label="Vendita dal" hint="Vuoto = subito.">
               <input id="of-dal" className="input" type="date" value={v.vendita_dal} onChange={(e) => set('vendita_dal', e.target.value)} disabled={busy} />
@@ -190,6 +272,15 @@ export function VenditaPanel({ edizioneId, attiva, edizione, corso, offerta, rie
             <Field id="of-al" label="Vendita fino al" error={errs.vendita_al} hint="Vuoto = finché l’edizione è aperta.">
               <input id="of-al" className="input" type="date" value={v.vendita_al} onChange={(e) => set('vendita_al', e.target.value)} disabled={busy} aria-invalid={errId('vendita_al')} />
             </Field>
+          </div>
+
+          <div className="field">
+            <label id="of-chiusa-label">Quando le iscrizioni si chiudono</label>
+            <div className="seg seg--mono" role="group" aria-labelledby="of-chiusa-label">
+              <button type="button" className={!v.chiusa_visibile ? 'is-active' : ''} aria-pressed={!v.chiusa_visibile} onClick={() => set('chiusa_visibile', false)} disabled={busy}>Togli dal catalogo</button>
+              <button type="button" className={v.chiusa_visibile ? 'is-active' : ''} aria-pressed={Boolean(v.chiusa_visibile)} onClick={() => set('chiusa_visibile', true)} disabled={busy}>Lascia con «Iscrizioni chiuse»</button>
+            </div>
+            <div className="field__hint">Vale quando la vendita è finita, l’edizione è conclusa, annullata o chiusa, l’edizione a date è iniziata o i posti sono esauriti. Chi ha il link della scheda vede comunque che le iscrizioni sono chiuse.</div>
           </div>
 
           <div className="row between" style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-ctrl)', padding: '12px 14px', marginBottom: 14 }}>

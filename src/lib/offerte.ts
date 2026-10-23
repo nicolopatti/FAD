@@ -8,7 +8,7 @@ import { validaOfferta, type OffertaInput, type OffertaValori } from './vendita'
  * delle route admin (`error` + `campo` + `errori`).
  */
 export const OFFERTA_SELECT =
-  'id, tenant_id, edizione_id, slug, stato, prezzo_centesimi, valuta, aliquota_iva, natura_iva, posti_max, accesso_giorni, vendita_dal, vendita_al, codici_sconto, titolo_pubblico, descrizione_pubblica, cover_path, creato_il, pubblicata_il, ritirata_il';
+  'id, tenant_id, edizione_id, slug, stato, prezzo_centesimi, valuta, aliquota_iva, natura_iva, posti_max, accesso_giorni, vendita_dal, vendita_al, codici_sconto, titolo_pubblico, descrizione_pubblica, cover_path, chiusa_visibile, sconti, creato_il, pubblicata_il, ritirata_il';
 
 export function offertaDaBody(body: OffertaInput | null): { valori: OffertaValori } | { risposta: NextResponse } {
   if (!body) return { risposta: NextResponse.json({ ok: false, error: 'body mancante' }, { status: 400 }) };

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parsePrezzo, fmtPrezzo, prezzoPerCampo, scorporoIva, slugDa, isSlug,
   validaOfferta, validaFatturazione, isPartitaIva, intestatario, motivoNonVendibile,
+  scontoAttivo, percentualeSconto, motivoOfferta, chiusaDefinitiva, type ScontoTempo,
 } from '../../src/lib/vendita';
 
 describe('prezzi', () => {
@@ -94,5 +95,80 @@ describe('motivoNonVendibile', () => {
     expect(motivoNonVendibile(null)).toBeNull();
     expect(motivoNonVendibile('posti esauriti')).toBe('Posti esauriti.');
     expect(motivoNonVendibile('qualcosa di nuovo')).toMatch(/non è possibile/);
+  });
+});
+
+describe('sconti a tempo', () => {
+  const base = { slug: 'corso-base', prezzo: '49', tipo: 'online' as const, accesso_giorni: '365' };
+
+  it('valida le righe e le restituisce ordinate per data', () => {
+    const r = validaOfferta({ ...base, sconti: [
+      { dal: '2026-12-01', al: '2026-12-31', prezzo: '44', etichetta: 'Natale' },
+      { dal: '2026-11-01', al: '2026-11-15', prezzo: '39,90', etichetta: '' },
+    ] });
+    expect(r.errori).toEqual({});
+    expect(r.valori?.sconti).toEqual([
+      { dal: '2026-11-01', al: '2026-11-15', prezzo_centesimi: 3990, etichetta: null },
+      { dal: '2026-12-01', al: '2026-12-31', prezzo_centesimi: 4400, etichetta: 'Natale' },
+    ]);
+  });
+
+  it('rifiuta prezzo non inferiore al listino, date mancanti o invertite, sovrapposizioni', () => {
+    const r = validaOfferta({ ...base, sconti: [
+      { dal: '2026-11-01', al: '2026-11-15', prezzo: '49' },
+      { dal: '', al: '2026-11-15', prezzo: '30' },
+      { dal: '2026-11-20', al: '2026-11-10', prezzo: '30' },
+      { dal: '2026-11-10', al: '2026-11-30', prezzo: '0,20' },
+    ] });
+    expect(r.errori.sconto_0_prezzo).toMatch(/minore del prezzo di listino/);
+    expect(r.errori.sconto_1_dal).toBeTruthy();
+    expect(r.errori.sconto_2_al).toMatch(/precedere/);
+    expect(r.errori.sconto_3_prezzo).toMatch(/0,50/);
+    const sovr = validaOfferta({ ...base, sconti: [
+      { dal: '2026-11-01', al: '2026-11-15', prezzo: '40' },
+      { dal: '2026-11-15', al: '2026-11-30', prezzo: '45' },
+    ] });
+    expect(sovr.errori.sconto_1_dal).toMatch(/sovrappone allo sconto 1/);
+  });
+
+  it('nessuno sconto: elenco vuoto, e la scelta sulle offerte chiuse passa', () => {
+    const r = validaOfferta({ ...base, chiusa_visibile: true });
+    expect(r.valori?.sconti).toEqual([]);
+    expect(r.valori?.chiusa_visibile).toBe(true);
+    expect(validaOfferta(base).valori?.chiusa_visibile).toBe(false);
+  });
+
+  it('scontoAttivo prende il periodo che comprende il giorno, estremi inclusi', () => {
+    const sconti: ScontoTempo[] = [
+      { dal: '2026-12-01', al: '2026-12-31', prezzo_centesimi: 4400, etichetta: null },
+      { dal: '2026-11-01', al: '2026-11-15', prezzo_centesimi: 3990, etichetta: 'Lancio' },
+    ];
+    expect(scontoAttivo(sconti, '2026-10-31')).toBeNull();
+    expect(scontoAttivo(sconti, '2026-11-01')?.etichetta).toBe('Lancio');
+    expect(scontoAttivo(sconti, '2026-11-15')?.prezzo_centesimi).toBe(3990);
+    expect(scontoAttivo(sconti, '2026-11-16')).toBeNull();
+    expect(scontoAttivo(sconti, '2026-12-31')?.prezzo_centesimi).toBe(4400);
+    expect(scontoAttivo(null, '2026-11-01')).toBeNull();
+    expect(percentualeSconto(4900, 3900)).toBe(20);
+  });
+});
+
+describe('offerte chiuse', () => {
+  const off = { stato: 'pubblicata' as const, vendita_dal: null, vendita_al: null, accesso_giorni: 365, posti_max: null };
+  it('motivoOfferta segue la regola del catalogo', () => {
+    expect(motivoOfferta(off, 'aperta', '2026-11-01', 0, '2026-10-22')).toBeNull();
+    expect(motivoOfferta({ ...off, stato: 'bozza' }, 'aperta', null, 0, '2026-10-22')).toBe('non in vendita');
+    expect(motivoOfferta({ ...off, vendita_dal: '2026-11-01' }, 'aperta', null, 0, '2026-10-22')).toBe('vendita non ancora aperta');
+    expect(motivoOfferta({ ...off, vendita_al: '2026-10-21' }, 'aperta', null, 0, '2026-10-22')).toBe('vendita chiusa');
+    expect(motivoOfferta(off, 'conclusa', null, 0, '2026-10-22')).toBe('edizione conclusa');
+    expect(motivoOfferta({ ...off, accesso_giorni: null }, 'aperta', '2026-10-21', 0, '2026-10-22')).toBe('edizione già iniziata');
+    expect(motivoOfferta({ ...off, accesso_giorni: null }, 'aperta', '2026-10-22', 0, '2026-10-22')).toBeNull();
+    expect(motivoOfferta({ ...off, posti_max: 2 }, 'aperta', null, 2, '2026-10-22')).toBe('posti esauriti');
+  });
+  it('chiusaDefinitiva: le chiuse sì, "non ancora aperta" no', () => {
+    expect(chiusaDefinitiva('edizione conclusa')).toBe(true);
+    expect(chiusaDefinitiva('posti esauriti')).toBe(true);
+    expect(chiusaDefinitiva('vendita non ancora aperta')).toBe(false);
+    expect(chiusaDefinitiva(null)).toBe(false);
   });
 });

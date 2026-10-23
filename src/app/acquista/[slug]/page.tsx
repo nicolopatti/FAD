@@ -76,9 +76,14 @@ export default async function AcquistaPage(props: { params: Promise<{ slug: stri
           <h2>{s.titolo}</h2>
           {quando && <p className="muted">{quando}</p>}
           <dl className="sintesi">
+            {s.listino_centesimi != null && <>
+              <dt>Prezzo pieno</dt><dd><s>{fmtPrezzo(s.listino_centesimi, s.valuta)}</s></dd>
+              <dt>{s.sconto_etichetta ? `Sconto «${s.sconto_etichetta}»` : 'Sconto'}</dt><dd>−{fmtPrezzo(s.listino_centesimi - s.prezzo_centesimi, s.valuta)}</dd>
+            </>}
             {s.aliquota_iva > 0 ? <><dt>Imponibile</dt><dd>{fmtPrezzo(iva.imponibile, s.valuta)}</dd><dt>IVA {s.aliquota_iva}%</dt><dd>{fmtPrezzo(iva.iva, s.valuta)}</dd></> : <><dt>IVA</dt><dd>{s.natura_iva ?? 'non applicata'}</dd></>}
             <dt>Totale</dt><dd><strong>{fmtPrezzo(s.prezzo_centesimi, s.valuta)}</strong></dd>
           </dl>
+          {s.listino_centesimi != null && s.sconto_fino_al && <p className="muted" style={{ fontSize: 13 }}>Prezzo scontato fino al {fmtData(s.sconto_fino_al)}: vale per chi passa al pagamento entro quel giorno.</p>}
           {s.codici_sconto && <p className="muted" style={{ fontSize: 13 }}>Hai un codice sconto? Lo inserisci nella pagina di pagamento.</p>}
           <p className="muted" style={{ fontSize: 13 }}>Il pagamento avviene sulla pagina sicura di Stripe. L’iscrizione è attiva appena il pagamento è confermato.</p>
         </aside>

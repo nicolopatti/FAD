@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { caricaCatalogo, durataAccesso, hostRichiesta, type OffertaCatalogo } from '@/lib/vetrina';
-import { fmtPrezzo, motivoNonVendibile } from '@/lib/vendita';
+import { motivoNonVendibile } from '@/lib/vendita';
 import { fmtDurata, plurale } from '@/lib/formato';
 import { Cover, coverUrl, fmtData } from '@/components/admin/Atlante';
-import { Vetrina } from '@/components/vetrina/Vetrina';
+import { PrezzoVetrina, Vetrina, testoSconto } from '@/components/vetrina/Vetrina';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +88,10 @@ export default async function CatalogoPage(props: { searchParams: Promise<{ cate
                     </ul>
                   </div>
                   <div className="offerta-card__piede">
-                    <strong className="offerta-card__prezzo">{fmtPrezzo(o.prezzo_centesimi, o.valuta)}</strong>
+                    <div>
+                      <PrezzoVetrina prezzo={o.prezzo_centesimi} listino={o.listino_centesimi} valuta={o.valuta} className="offerta-card__prezzo" />
+                      {o.in_vendita && testoSconto(o) && <div className="offerta-card__sconto">{testoSconto(o)}</div>}
+                    </div>
                     {o.in_vendita ? <span className="chip chip--ok">Iscrizioni aperte</span> : <span className="chip chip--muted">{motivoNonVendibile(o.motivo)}</span>}
                   </div>
                 </Link>

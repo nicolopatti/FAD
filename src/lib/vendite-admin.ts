@@ -7,7 +7,12 @@ export type OrdineAdmin = {
   id: string;
   stato: StatoOrdine;
   importo_centesimi: number;
+  /** Sconto dei codici promozionali di Stripe. */
   sconto_centesimi: number;
+  /** Listino al momento dell'ordine (null negli ordini precedenti agli sconti a tempo). */
+  listino_centesimi: number | null;
+  sconto_tempo_centesimi: number;
+  sconto_tempo_etichetta: string | null;
   valuta: string;
   aliquota_iva: number;
   natura_iva: string | null;
@@ -26,7 +31,7 @@ export type OrdineAdmin = {
 };
 
 export const ORDINE_ADMIN_SELECT =
-  'id, stato, importo_centesimi, sconto_centesimi, valuta, aliquota_iva, natura_iva, fatturazione, consensi, stripe_session_id, stripe_payment_intent, iscrizione_id, scade_il, creato_il, pagato_il, rimborsato_il, annullato_il, ' +
+  'id, stato, importo_centesimi, sconto_centesimi, listino_centesimi, sconto_tempo_centesimi, sconto_tempo_etichetta, valuta, aliquota_iva, natura_iva, fatturazione, consensi, stripe_session_id, stripe_payment_intent, iscrizione_id, scade_il, creato_il, pagato_il, rimborsato_il, annullato_il, ' +
   'persona:persona_id ( id, nome, cognome, email ), offerta:offerta_id ( id, slug, titolo_pubblico, edizione:edizione_id ( id, codice, corso:corso_id ( id, titolo ) ) )';
 
 export type FiltroStato = 'tutti' | 'pagato' | 'in_attesa' | 'rimborsato' | 'annullato';

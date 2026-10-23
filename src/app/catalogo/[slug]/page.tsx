@@ -3,11 +3,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { caricaScheda, durataAccesso, edizioneGiaIscritta, hostRichiesta, paragrafi } from '@/lib/vetrina';
-import { fmtPrezzo, motivoNonVendibile } from '@/lib/vendita';
+import { motivoNonVendibile } from '@/lib/vendita';
 import { fmtDurata, plurale } from '@/lib/formato';
 import { Cover, coverUrl, fmtData, fmtDataOra } from '@/components/admin/Atlante';
 import { Ico } from '@/components/AppShell';
-import { Vetrina } from '@/components/vetrina/Vetrina';
+import { PrezzoVetrina, Vetrina, testoSconto } from '@/components/vetrina/Vetrina';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,7 +60,8 @@ export default async function SchedaCorsoPage(props: { params: Promise<{ slug: s
 
         <aside className="scheda__acquisto" aria-label="Iscrizione">
           <Cover categoria={s.categoria} src={coverUrl(s.cover_path)} className="scheda__cover" />
-          <div className="scheda__prezzo">{fmtPrezzo(s.prezzo_centesimi, s.valuta)}</div>
+          <PrezzoVetrina prezzo={s.prezzo_centesimi} listino={s.listino_centesimi} valuta={s.valuta} className="scheda__prezzo" />
+          {s.in_vendita && testoSconto(s) && <div className="scheda__sconto">{testoSconto(s)}</div>}
           <div className="muted scheda__iva">{s.aliquota_iva > 0 ? `IVA ${s.aliquota_iva}% inclusa` : s.natura_iva ?? 'IVA non applicata'}</div>
           {giaIscritto ? (
             <Link href={`/corsi/${giaIscritto}`} className="btn btn--block">Sei iscritto: vai al corso</Link>
