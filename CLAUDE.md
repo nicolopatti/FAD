@@ -58,9 +58,31 @@ l'infrastruttura.
   (`npm run test:e2e:vendita`, sola lettura) **56/56**, smoke **99/99**, funzionali
   **50/50**, correzioni **52/52**, 0 errori JS a 1440/390. Corretto lo sforamento a 390 px
   della testata della vetrina.
+- **Sconti a tempo e offerte chiuse (22/10, richiesta dell'utente)**: migration
+  `20261022000001_fase6_sconti_offerte_chiuse.sql` (**applicata sul live**; pgTAP
+  `supabase/tests/fase6_sconti_chiuse.sql` **14/14**, `fase6_vendita_schema.sql` ancora
+  **30/30**, entrambi in rollback). `offerta.sconti` jsonb `[{dal, al, prezzo_centesimi,
+  etichetta}]` validato dal trigger `tg_offerta_coerenza` (ISO, prezzo < listino e ≥ 0,50 €,
+  max 10, niente sovrapposizioni); `offerta_sconto_attivo(sconti, giorno)`; catalogo e scheda
+  danno `prezzo_centesimi` = prezzo del giorno + `listino_centesimi`/`sconto_etichetta`/
+  `sconto_fino_al`; `ordine_crea` salva `ordine.listino_centesimi`,
+  `sconto_tempo_centesimi`, `sconto_tempo_etichetta` (lo sconto dei codici Stripe resta in
+  `sconto_centesimi`). `offerta.chiusa_visibile` (default false) +
+  `offerta_chiusa_definitiva(motivo)`: le offerte con iscrizioni chiuse in modo definitivo
+  escono dall'elenco di `catalogo_pubblico`; `catalogo_offerta` (link) le dà ancora. TS:
+  `validaOfferta` con `sconto_<i>_<campo>`, `scontoAttivo`, `percentualeSconto`,
+  `motivoOfferta` (= `offerta_motivo_non_vendibile`, per la scheda Vendita), `chiusaDefinitiva`;
+  `PrezzoVetrina`/`testoSconto` in `components/vetrina/Vetrina.tsx`. La PATCH dell'offerta
+  confronta i campi con le chiavi in ordine (jsonb riordina le chiavi). Seed demo: "Offerta
+  lancio" 39 € dal 22/10 al 30/11/2026 sull'offerta demo (Evento `offerta.updated`,
+  `origine: seed`; catena integra a **786 eventi**). Unit **102/102**.
 - **Non provato da qui** (manca la chiave di servizio, Stripe non è configurato):
   registrazione reale (serve anche SMTP), acquisto, webhook, rimborso, "Sei iscritto" sulla
-  scheda (legge l'edizione dell'offerta con la service role).
+  scheda (legge l'edizione dell'offerta con la service role). Il giro completo
+  (`scripts/verifica-giro-completo.mjs`) ha i passi della vendita (offerta, sconti,
+  pubblica, catalogo, chiusura automatica a edizione conclusa, scelta "lascia", ritiro): va
+  lanciato **dopo il merge su `main`** (il push su `main` è stato negato dal sistema dei
+  permessi il 22/10: serve la conferma esplicita dell'utente).
 - **Lato utente prima del gate M6a**: account Stripe (modalità test), su Vercel
   `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` (Preview), endpoint webhook
   `https://<anteprima>/api/stripe/webhook` con i 5 eventi sopra; **SMTP** (la conferma

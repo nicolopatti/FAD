@@ -65,6 +65,17 @@ configurabili per ente.
     limitati, vendita chiusa a posti esauriti o a edizione iniziata (regola in §10).
 - Admin: scheda **Vendita** nell'edizione (crea/modifica offerta, anteprima della scheda,
   pubblica/ritira).
+- *Aggiunte del 22/10 su richiesta dell'utente*:
+  - **Sconti a tempo**: fino a 10 periodi per offerta (dal/al, giorni di Roma inclusi, prezzo
+    scontato IVA inclusa, nome facoltativo), senza sovrapposizioni. Nel periodo il catalogo
+    mostra il prezzo scontato con il listino barrato, il nome e la scadenza; l'ordine prende il
+    prezzo del giorno e conserva listino e sconto (fattura ed export). Diversi dai codici
+    sconto di Stripe, che restano.
+  - **Iscrizioni chiuse**: quando la vendita è finita, l'edizione è conclusa/annullata/chiusa,
+    l'edizione a date è iniziata o i posti sono esauriti, l'offerta **esce da sola dall'elenco
+    del catalogo**, salvo che l'admin scelga "lascia con «Iscrizioni chiuse»". La scheda dal
+    link resta e dice che le iscrizioni sono chiuse; "non ancora aperta" resta in elenco come
+    annuncio.
 
 ### 3b. Accesso per iscrizione
 - `iscrizione.accesso_fino_al` (e `accesso_dal`): la finestra effettiva diventa

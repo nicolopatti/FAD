@@ -11,6 +11,12 @@ const SLUG = 'sicurezza-sul-lavoro-introduttivo';
 const CORSO_001 = 'c0c01111-c0c0-c0c0-c0c0-c0c0c0c0c0c0';
 const ED_001 = 'ed011111-ed01-ed01-ed01-ed01ed01ed01';
 
+// L'offerta demo ha uno sconto a tempo ("Offerta lancio", 39 € fino al 30/11/2026):
+// i controlli accettano sia il prezzo scontato (con il listino barrato) sia quello pieno.
+const PIENO = { prezzo: '49,00 €', imponibile: '40,16 €', iva: '8,84 €' };
+const SCONTATO = { prezzo: '39,00 €', imponibile: '31,97 €', iva: '7,03 €' };
+const prezzi = (testo) => (testo.includes('Offerta lancio') ? SCONTATO : PIENO);
+
 const browser = await apriBrowser();
 const salta = (nome, motivo) => check(nome, true, `saltato: ${motivo}`);
 const testo = async (page) => (await page.locator('body').innerText()).replace(/\s+/g, ' ');
@@ -28,7 +34,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   const cat = await testo(page);
   if (!cat.includes('Sicurezza sul lavoro')) salta(`${tag} catalogo`, 'offerta demo assente');
   else {
-    check(`${tag} catalogo: card con prezzo e stato`, cat.includes('49,00 €') && cat.includes('Iscrizioni aperte'), '');
+    check(`${tag} catalogo: card con prezzo e stato`, cat.includes(prezzi(cat).prezzo) && cat.includes('Iscrizioni aperte'), '');
+    if (cat.includes('Offerta lancio')) check(`${tag} catalogo: sconto a tempo con listino barrato e scadenza`, (await page.locator('.offerta-card .prezzo__listino').first().innerText()).includes('49,00') && /−20% fino al/.test(cat), '');
     check(`${tag} catalogo: link a termini e privacy`, (await page.locator('a[href="/termini"]').count()) > 0 && (await page.locator('a[href="/privacy"]').count()) > 0);
     check(`${tag} catalogo: niente sforamento`, !(await overflow(page)));
   }
@@ -40,7 +47,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   const scheda = await testo(page);
   if (!scheda.includes('Sicurezza sul lavoro')) salta(`${tag} scheda`, 'offerta demo assente');
   else {
-    check(`${tag} scheda: prezzo con IVA`, scheda.includes('49,00 €') && scheda.includes('IVA 22% inclusa'), '');
+    check(`${tag} scheda: prezzo con IVA`, scheda.includes(prezzi(scheda).prezzo) && scheda.includes('IVA 22% inclusa'), '');
     check(`${tag} scheda: programma con le lezioni`, (await page.locator('.scheda__programma li').count()) >= 1);
     check(`${tag} scheda: "Iscriviti al corso" verso l'acquisto`, (await page.locator(`a[href="/acquista/${SLUG}"]`).count()) === 1);
     check(`${tag} scheda: niente sforamento`, !(await overflow(page)));
@@ -52,7 +59,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   await vai(page, `/acquista/${SLUG}`);
   const acq = await testo(page);
   check(`${tag} acquisto senza account: chiede l'account`, acq.includes('Serve un account') && (await page.locator(`a[href*="/registrati?dopo="]`).count()) === 1, '');
-  check(`${tag} acquisto: riepilogo con imponibile e IVA`, acq.includes('Imponibile') && acq.includes('40,16 €') && acq.includes('8,84 €'), '');
+  const pa = acq.includes('Sconto «Offerta lancio»') ? SCONTATO : PIENO;
+  check(`${tag} acquisto: riepilogo con imponibile e IVA`, acq.includes('Imponibile') && acq.includes(pa.imponibile) && acq.includes(pa.iva), '');
+  if (pa === SCONTATO) check(`${tag} acquisto: prezzo pieno, sconto e scadenza`, acq.includes('Prezzo pieno') && acq.includes('−10,00 €') && acq.includes('Prezzo scontato fino al'), '');
   check(`${tag} acquisto: niente sforamento`, !(await overflow(page)));
 
   await vai(page, `/registrati?dopo=/acquista/${SLUG}`);
