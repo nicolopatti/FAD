@@ -9,6 +9,8 @@
 # codice vecchio i controlli nuovi falliscono (e possono lasciare residui).
 # 2026-10-21: rilanciato dopo la pulizia dei dati di prova (indice unico del CF e
 # CHECK delle date dell'edizione appena applicati sul live).
+# 2026-10-23: rilanciato dopo il merge della Fase 6 (vendita: offerte, catalogo,
+# sconti a tempo, offerte chiuse che escono dal catalogo).
 name: Verifica scritture admin
 
 on:
