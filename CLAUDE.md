@@ -1,4 +1,4 @@
-# Stato del progetto FAD — Fase 1–5 su `main`, **Fase 6 (vendita) costruita sul branch, gate M6a/M6 da chiudere** (handoff session-to-session)
+# Stato del progetto FAD — Fase 1–5 e **Fase 6 (vendita) su `main` e in produzione** (gate M6a/M6 da chiudere con Stripe in modalità test) (handoff session-to-session)
 
 > Questo file è il primo da leggere all'inizio di ogni nuova sessione.
 > Riassume cosa è stato fatto, cosa resta, e come riprendere senza dover
@@ -9,7 +9,7 @@
 > conflitto `piattaforma-elearning-stato-progetto-v8.md` (non in repo) con le
 > decisioni D1–D37.
 
-## Fase 6 — vendita dei corsi: Task 1–6 costruiti (2026-10-22, branch `claude/new-session-qr4kff`, **non su `main`**: gate M6a/M6 da chiudere su un'anteprima con Stripe in modalità test)
+## Fase 6 — vendita dei corsi: Task 1–6 + sconti a tempo e offerte chiuse (2026-10-23, branch `claude/new-session-qr4kff`, **su `main` e in produzione** col via libera dell'utente "procedi con deploy su main"; gate M6a/M6 da chiudere con Stripe in modalità test)
 
 Mandato: `docs/brief-fase-6-vendita.md` (§10 ratificata il 21/10 sera). Multi-ente: solo
 appunti (`docs/visione-multi-ente.md`), l'utente vuole capire le scelte prima di toccare
@@ -80,9 +80,18 @@ l'infrastruttura.
   registrazione reale (serve anche SMTP), acquisto, webhook, rimborso, "Sei iscritto" sulla
   scheda (legge l'edizione dell'offerta con la service role). Il giro completo
   (`scripts/verifica-giro-completo.mjs`) ha i passi della vendita (offerta, sconti,
-  pubblica, catalogo, chiusura automatica a edizione conclusa, scelta "lascia", ritiro): va
-  lanciato **dopo il merge su `main`** (il push su `main` è stato negato dal sistema dei
-  permessi il 22/10: serve la conferma esplicita dell'utente).
+  pubblica, catalogo, chiusura automatica a edizione conclusa, scelta "lascia", ritiro).
+- **Merge e prova in produzione (23/10)**: fast-forward `42a3b2c..22d519e` su `main` (il 22/10
+  il primo tentativo era stato negato dal sistema dei permessi; il 23/10 l'utente ha scritto
+  "procedi con deploy su main"); Vercel ha creato da solo il deploy di produzione
+  (`dpl_7HS9vvWm…` READY in `fra1` con `fad-wine.vercel.app`); `/` porta al catalogo. Poi
+  `verifica-scritture.yml` (push del branch che tocca il workflow, `f9f42a3`): **scritture
+  29/29, giro completo 108/108** (offerta, sconti a tempo con listino barrato e −40%,
+  pubblica/ritira, iscrizioni chiuse che escono da sole dall'elenco, scelta "lascia",
+  acquisto e webhook 503 senza chiavi), catena integra a **845 eventi**; tempi mediani
+  `/admin` 684 ms, `/admin/corsi` 416 ms, `/admin/rendicontazione` 487 ms. Residuo voluto del
+  giro: un'offerta ritirata sull'edizione di prova conclusa e archiviata. E2E sul dev server
+  prima del merge: vendita **68/68**, smoke 99/99, funzionali 50/50, correzioni 52/52.
 - **Lato utente prima del gate M6a**: account Stripe (modalità test), su Vercel
   `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` (Preview), endpoint webhook
   `https://<anteprima>/api/stripe/webhook` con i 5 eventi sopra; **SMTP** (la conferma
@@ -1904,11 +1913,13 @@ porta solo `payload.hash` (mai PII, D18). Più snapshot per (Edizione, Piano) co
 
 ## Cosa fare nella prossima sessione
 
-> **Punto di ripartenza (2026-10-22, leggere per primo).** La Fase 6 (vendita) è costruita
-> sul branch `claude/new-session-qr4kff` (sezione "Fase 6 — vendita dei corsi: Task 1–6" in
-> testa): schema applicato sul live, seed demo eseguito, **non su `main`**. Il merge chiede il
-> via libera esplicito dell'utente; prima servono Stripe in modalità test + SMTP per i gate
-> M6a/M6 su un'anteprima. Il multi-ente resta da decidere (`docs/visione-multi-ente.md`).
+> **Punto di ripartenza (2026-10-23, leggere per primo).** La Fase 6 (vendita, con sconti a
+> tempo e offerte chiuse) è **su `main` e in produzione** (sezione "Fase 6" in testa),
+> verificata sul deploy (29/29 + 108/108). Migration applicate sul live fino alla
+> `20261022000001`. Per chiudere i gate M6a/M6 servono dall'utente: Stripe in modalità test
+> (chiavi su Vercel + webhook) e SMTP; poi una prova d'acquisto con la carta 4242… e un
+> rimborso. L'email di conferma d'acquisto si fa dopo l'SMTP. Il multi-ente resta da
+> decidere (`docs/visione-multi-ente.md`).
 >
 > **Punto di ripartenza precedente (2026-10-21 sera).** Le correzioni dello
 > stress test sono **su `main` e in produzione** (sezione in testa al file), verificate
